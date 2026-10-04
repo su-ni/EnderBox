@@ -30,6 +30,33 @@ Go 单 exe 守护进程 + React/TS/Tailwind v4 + Wails（**未开始**）。多�
   （壳 10MB vs 真身 1.3GB）。厂商判定也读权威属性 `java.vendor`，**别对整份输出做子串扫描**
   （`java.library.path` 里混着 Microsoft.DesktopAppInstaller，会把 Oracle 认成 Microsoft）。
 - store.Store 的 All() 遍历 map 顺序随机，用前必须自己排序。
+- **别把「可见但不可点」当成默认答案**（2026-10-04 返工教训）：库里没实现一个类型时，
+  我第一反应是把它做成「列出来但置灰、写明原因」。用户反问「你堵死干什么？」——
+  他要的是**能用**。正确的第一动作是**先探接口看能不能真接上**，接不上再说为什么；
+  置灰只该用于「探过了、确认接不了」的类型。
+- **Fabric**（实测 2026-10-04，2026-10-04 接入）：`meta.fabricmc.net/v2`。
+  三段式 `versions/loader/{游戏版本}/{Loader}/{安装器}/server/jar` → **200，直接就是可运行的服务端启动器**
+  （181,840 字节，PK 头）。**少一段就 404**（第一遍只写两段，三个组合全 404，差点误判成「不支持直连」）。
+  它是启动器，真正的 jar 首次启动才拉 → 首次开服必须联网且慢；
+  **既不给 Content-Length 也不给校验和**，所以大小/校验只能是「未知」——别编数。
+  版本筛选用上游自带的 `stable` 字段，别用「名字里有没有横杠」去猜。
+  BMCLAPI 只镜像它的**元数据**、jar 路径 404，所以不给它挂镜像。
+- **Velocity**：和 Paper 同一个源站、同一套结构 → `paper.go` 做成项目参数化复用，别复制一份。
+  ⚠ `channel` 是 **RECOMMENDED** 而非 STABLE（3.5.1=RECOMMENDED，3.4.0/4.2.0=STABLE）。
+  前端 `isStable()` 必须两个都放行，否则会把推荐版误报成测试版 + 误触发「零稳定构建」警告。
+  Java 要求上游**不给**，按版本线推断（读 jar 字节码实测：3.4.0→17、3.5.1→21、4.2.0→25；
+  class major − 44 = Java 版本）。三档跨度说明**取固定值一定是错的**。见 `velocityJava()`。
+- **未接的三家（探明结论，别再重复探测）**：
+  Forge：maven 可达，installer 两段式（要跑安装器 + 改用 `@args.txt` 启动，动启动模型）。
+  NeoForge：`maven.neoforged.net` 在本机**只解析出 IPv6、连接被重置**，打不通。
+  BungeeCord：`ci.md-5.net` 301 到 `hub.spigotmc.org`；jar 有 26 MB 而实测 ~80 KB/s
+  （两分钟只跑到 9.9 MB）→ 和「30 秒开服」的承诺直接冲突，且是滚动构建、没有游戏版本概念。
+
+- **⚠ 两个 http 客户端不能合并**：`apiClient`（Timeout 30s，只给元数据）与
+  `dlClient`（**不设总超时**）。`http.Client.Timeout` 覆盖整个 body 读取 —— 曾经共用一个
+  Timeout=30s 的客户端，于是「下载几十 MB 的 jar」被限死在 30 秒内：
+  机房网络 49 MB/3 秒所以一直没暴露，换家宽（1 MB/s 要 50 秒）就稳定报「下载失败」，
+  而且看起来像**源站**的问题。
 
 ## UI 规范（用户拍板）
 - Token：底 `#111311`/面板 `#1c201d`/线 `#3d453d`/文字 `#eef1ec·#b7c2b4·#8b978a`/主绿 `#7cc24f`/警 `#f2c14e`/危 `#e0574c`/青 `#4aedd9`。零圆角零渐变，像素 SVG 图标（禁 emoji）。
@@ -76,7 +103,10 @@ server-jar 下载 / start 体检不过回 409+整份报告 / 全局设置+鉴权
 - v0.1 剩余：自动备份（P0，用户已点名下一个做）、崩溃日志智能分析（P1）。
 
 **已做**：选版本/构建时就比对本机 Java（`web/src/useLocalJava.ts`）。
-**已做**：未支持的服务端类型如实说清原因 —— `fetch.Sources()` 补全 7 种 + `SourceOf()`；
+**已做**：未支持的服务端类型如实说清原因**已做**：服务端直连下载覆盖 **paper / vanilla / fabric / velocity** 四种。
+Fabric 只有一个构建（最新稳定 Loader）；Velocity 构建带真实编号（如 #615）。
+两种都走 `Build.Label` / `Build.JavaFrom`，前端据此显示「Loader 0.19.5」和如实标注 Java 数值来源。
+ —— `fetch.Sources()` 补全 7 种 + `SourceOf()`；
 向导第 1 步置灰不可点的类型（仍列出并写明原因，免得选完版本走到第 2 步才发现是死路）；
 ServerPicker 的「不支持」面板加了 `srcReady`（问过源站没有）才生效，**避免把网络失败误报成「不支持」**。
 `null`=还没问到（闭嘴）、`0`=真没有（报警）必须分开；`maxRef` 给「加载时挑默认项」用，避免加载函数重建。
