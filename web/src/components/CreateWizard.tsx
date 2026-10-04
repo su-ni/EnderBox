@@ -352,7 +352,11 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
                 </dd>
                 <dt className="eyebrow">数值来自</dt>
                 <dd className="text-[12.5px] text-ink-2">
-                  {picked?.javaMajor ? 'Mojang 官方元数据（权威值）' : '按版本号推断（没拿到权威值）'}
+                  {picked?.javaFrom === 'mojang'
+                    ? 'Mojang 官方元数据（权威值）'
+                    : picked?.javaFrom === 'versionline'
+                      ? '按版本线推断（上游 API 不提供这个信息）'
+                      : '按版本号推断（没拿到权威值）'}
                 </dd>
               </dl>
             </div>
@@ -364,7 +368,7 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
                 <span className="chip chip-g ml-auto">自动下载</span>
               </div>
               <p className="text-[12.5px] leading-relaxed text-ink-2">
-                创建后直接从源站下到实例目录里，带 SHA 校验和断点续传。
+                创建后直接从源站下到实例目录里，支持断点续传；源站提供校验和的会校验一遍。
                 下完会自动把端口和标语写进 server.properties —— 也就是你在下一步填的那些值。
               </p>
               {picked && (
@@ -372,7 +376,9 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
                   <dt className="eyebrow">将下载</dt>
                   <dd className="mono-value break-all">{picked.name}</dd>
                   <dt className="eyebrow">大小</dt>
-                  <dd className="mono-value">{(picked.size / 1048576).toFixed(1)} MB</dd>
+                  <dd className="mono-value">
+                    {picked.size > 0 ? `${(picked.size / 1048576).toFixed(1)} MB` : '源站没给'}
+                  </dd>
                 </dl>
               )}
             </div>

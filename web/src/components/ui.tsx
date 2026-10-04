@@ -163,6 +163,12 @@ export function fmtSize(bytes: number): string {
   return `${bytes} B`
 }
 
+/** 上游有时不给大小（Fabric 的启动器 jar 就没给 Content-Length）。
+ *  这时别显示「0 B」—— 那看起来像文件是空的，比说「不知道」还糟。 */
+export function fmtSizeMaybe(bytes: number): string {
+  return bytes > 0 ? fmtSize(bytes) : '大小未知'
+}
+
 export function fmtTime(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'

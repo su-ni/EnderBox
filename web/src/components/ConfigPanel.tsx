@@ -460,7 +460,7 @@ export function ConfigPanel({ instance, onToast, onSaved }: Props) {
         )}
       </div>
       <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
-        下载带 SHA 校验和断点续传，中断了再点一次会接着下。
+        下载支持断点续传，中断了再点一次会接着下；源站给了校验和的会校验一遍。
         换完服务端记得看一眼「实例设置」里的端口和内存还合不合适。
       </p>
     </>

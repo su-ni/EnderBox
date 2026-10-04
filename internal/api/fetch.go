@@ -81,6 +81,10 @@ func (s *Server) fetchVersions(w http.ResponseWriter, r *http.Request) {
 		vs, err = fetch.PaperVersions()
 	case fetch.KindVanilla:
 		vs, err = fetch.VanillaVersions(s.mirrorOf(r))
+	case fetch.KindFabric:
+		vs, err = fetch.FabricVersions()
+	case fetch.KindVelocity:
+		vs, err = fetch.VelocityVersions()
 	}
 	if err != nil {
 		// 上游挂了 / 结构变了都要说清楚是哪个源的问题，别只回「失败」
@@ -115,18 +119,27 @@ func (s *Server) fetchBuilds(w http.ResponseWriter, r *http.Request) {
 		bs, err = fetch.PaperBuilds(ver, limit)
 	case fetch.KindVanilla:
 		bs, err = fetch.VanillaBuilds(s.mirrorOf(r), ver)
+	case fetch.KindFabric:
+		bs, err = fetch.FabricBuilds(s.mirrorOf(r), ver)
+	case fetch.KindVelocity:
+		bs, err = fetch.VelocityBuilds(ver, limit)
 	}
 	if err != nil {
 		writeErr(w, 502, err.Error())
 		return
 	}
 
-	// 补上「这个版本要哪个 Java」。Paper 的 API 不给，去查同版本的原版元数据；
-	// 原版自己就有。拿不到就让它是 0，前端按版本号兜底算，别编一个数出来。
-	if len(bs) > 0 && bs[0].JavaMajor == 0 {
+	// 补上「这个版本要哪个 Java」。只有 **Paper** 需要在这里补 ——
+	// 原版自己就带；Fabric 跟随 MC 版本、在 FabricBuilds 里已经填了；
+	// Velocity 是代理端、跟 MC 版本无关，走 velocityJava() 的版本线规则。
+	// 拿不到就让它是 0，前端如实说「拿不到」，别编一个数出来。
+	if len(bs) > 0 && bs[0].JavaMajor == 0 && k == fetch.KindPaper {
 		jm := fetch.RequiredJava(s.mirrorOf(r), ver)
-		for i := range bs {
-			bs[i].JavaMajor = jm
+		if jm > 0 {
+			for i := range bs {
+				bs[i].JavaMajor = jm
+				bs[i].JavaFrom = "mojang"
+			}
 		}
 	}
 	writeJSON(w, 200, map[string]any{"items": bs, "limited": len(bs) >= limit})
@@ -224,6 +237,31 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 		if err == nil && len(bs) > 0 {
 			build = bs[0]
 		}
+	case fetch.KindFabric:
+		// Fabric 只有一个构建（最新稳定 Loader），不需要按 build 号挑
+		var bs []fetch.Build
+		bs, err = fetch.FabricBuilds(body.Mirror, body.Version)
+		if err == nil && len(bs) > 0 {
+			build = bs[0]
+		}
+	case fetch.KindVelocity:
+		if body.Build > 0 {
+			var bs []fetch.Build
+			bs, err = fetch.VelocityBuilds(body.Version, 0)
+			if err == nil {
+				for _, b := range bs {
+					if b.ID == body.Build {
+						build = b
+						break
+					}
+				}
+				if build.URL == "" {
+					err = fmt.Errorf("版本 %s 下没有构建 %d", body.Version, body.Build)
+				}
+			}
+		} else {
+			build, err = fetch.VelocityLatestBuild(body.Version)
+		}
 	default:
 		if src, ok := fetch.SourceOf(fetch.Kind(body.Type)); ok {
 			err = fmt.Errorf("%s 还不能自动下载，%s", src.Label, src.Note)
@@ -235,8 +273,11 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 502, err.Error())
 		return
 	}
-	if build.JavaMajor == 0 {
+	if build.JavaMajor == 0 && fetch.Kind(body.Type) == fetch.KindPaper {
 		build.JavaMajor = fetch.RequiredJava(body.Mirror, body.Version)
+		if build.JavaMajor > 0 {
+			build.JavaFrom = "mojang"
+		}
 	}
 
 	dest := daemon.JarPathOf(inst)

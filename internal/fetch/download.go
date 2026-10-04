@@ -205,7 +205,8 @@ func (m *Manager) run(ctx context.Context, id string, opts Options) {
 	if offset > 0 {
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
 	}
-	resp, err := httpClient.Do(req.WithContext(ctx))
+	// 走 dlClient：不设总超时，否则慢网下大文件必失败（见 source.go 里的说明）
+	resp, err := dlClient.Do(req.WithContext(ctx))
 	if err != nil {
 		if ctx.Err() != nil {
 			m.fail(id, fmt.Errorf("已取消"))

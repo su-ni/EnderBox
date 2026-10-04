@@ -61,8 +61,19 @@ func buildArgs(inst *Instance) []string {
 	if inst.JVMArgs != "" {
 		args = append(args, strings.Fields(inst.JVMArgs)...)
 	}
-	args = append(args, "-jar", resolveJar(*inst), "nogui")
+	args = append(args, "-jar", resolveJar(*inst))
+	// nogui 是 Minecraft **服务端**的参数（别开那个图形界面）。
+	// 代理端（Velocity / BungeeCord）既没有界面、也没有这个参数，
+	// 塞进去只会被它当成未知参数。
+	if !isProxy(inst.Type) {
+		args = append(args, "nogui")
+	}
 	return args
+}
+
+// isProxy 代理端：自己不开世界，只把玩家转发给后面的服务器。
+func isProxy(t Type) bool {
+	return t == TypeVelocity || t == TypeBungee
 }
 
 // Start 拉起进程

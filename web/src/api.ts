@@ -56,6 +56,10 @@ export type FetchBuild = {
   url: string
   /** 这个版本要求的 Java 大版本；0 表示上游没给 */
   javaMajor: number
+  /** 构建行的显示名（Fabric 用它显示 Loader 版本）；留空则按 #编号/官方 显示 */
+  label?: string
+  /** javaMajor 是哪来的：mojang=官方元数据、versionline=按版本线推断 */
+  javaFrom?: string
 }
 
 /** 一次下载任务。前端按 id 轮询它。 */

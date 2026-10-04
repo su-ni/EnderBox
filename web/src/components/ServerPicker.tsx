@@ -2,11 +2,23 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type FetchBuild, type FetchSource, type GameVersion } from '../api'
 import { javaShortage, lacksJava, useLocalJava } from '../useLocalJava'
 import { IconRefresh } from './Icons'
-import { fmtSize, fmtTime } from './ui'
+import { fmtSizeMaybe, fmtTime } from './ui'
 
-/** 原版没有通道概念（channel 为空），按稳定处理 */
+/**
+ * 哪些通道算「稳定可用」。
+ * 原版没有通道概念（为空）。⚠ Velocity 用的是 RECOMMENDED —— 实测 3.5.1 是 RECOMMENDED、
+ * 3.4.0 与 4.2.0 是 STABLE。只认 STABLE 的话，会把 Velocity 的推荐版误报成测试版，
+ * 还会误触发下面那条「一个稳定构建都没有」的警告。
+ */
 function isStable(b: FetchBuild) {
-  return b.channel === '' || b.channel === 'STABLE'
+  return b.channel === '' || b.channel === 'STABLE' || b.channel === 'RECOMMENDED'
+}
+
+/** 通道的显示文案。上游各家用的词不一样，这里统一成人话。 */
+function channelLabel(ch: string) {
+  if (ch === 'STABLE') return '稳定'
+  if (ch === 'RECOMMENDED') return '推荐'
+  return ch
 }
 
 /**
@@ -33,6 +45,8 @@ export type Picked = {
   version: string
   build: number
   javaMajor: number
+  /** javaMajor 的来源，确认页要如实说明；空=按旧口径兜底 */
+  javaFrom?: string
   size: number
   name: string
   /** 下这个包该走哪个源。由选择器决定，调用方直接用，不要自己再拼 */
@@ -150,6 +164,7 @@ export function ServerPicker({
             version: ver,
             build: def.id,
             javaMajor: def.javaMajor,
+            javaFrom: def.javaFrom,
             size: def.size,
             name: def.name,
             mirror,
@@ -268,6 +283,9 @@ export function ServerPicker({
           <p className="field-label">
             构建
             {type === 'vanilla' && <span className="mono-meta ml-3 font-normal">原版没有构建号，只有一个</span>}
+            {type === 'fabric' && (
+              <span className="mono-meta ml-3 font-normal">Fabric 固定用最新的稳定 Loader，没得挑</span>
+            )}
           </p>
           {loading === 'builds' ? (
             <p className="text-[12.5px] text-ink-3">正在取 {version} 的构建…</p>
@@ -302,6 +320,7 @@ export function ServerPicker({
                         version,
                         build: b.id,
                         javaMajor: b.javaMajor,
+                        javaFrom: b.javaFrom,
                         size: b.size,
                         name: b.name,
                         mirror,
@@ -314,14 +333,14 @@ export function ServerPicker({
                       className={`mono-value shrink-0 ${on ? 'font-bold text-accent' : ''}`}
                       style={{ minWidth: 74 }}
                     >
-                      {b.id > 0 ? `#${b.id}` : '官方'}
+                      {b.label || (b.id > 0 ? `#${b.id}` : '官方')}
                     </span>
                     {b.channel && (
-                      <span className={`chip shrink-0 ${b.channel === 'STABLE' ? 'chip-g' : 'chip-w'}`}>
-                        {b.channel === 'STABLE' ? '稳定' : b.channel}
+                      <span className={`chip shrink-0 ${isStable(b) ? 'chip-g' : 'chip-w'}`}>
+                        {channelLabel(b.channel)}
                       </span>
                     )}
-                    <span className="mono-meta shrink-0">{fmtSize(b.size)}</span>
+                    <span className="mono-meta shrink-0">{fmtSizeMaybe(b.size)}</span>
                     <span className={`mono-meta shrink-0${javaMissing(b.javaMajor) ? ' text-[#ffc2c2]' : ''}`}>
                       需要 Java {b.javaMajor || '?'}
                     </span>

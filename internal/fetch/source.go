@@ -89,6 +89,13 @@ type Build struct {
 	SHAKind   string `json:"shaKind"` // sha256 / sha1
 	URL       string `json:"url"`
 	JavaMajor int    `json:"javaMajor"` // 这个版本要求的 Java；0 表示拿不到
+
+	// Label 构建行的显示名。留空时前端按「#编号」显示，没编号的显示「官方」——
+	// Fabric 那种「构建 = Loader 版本」的，编号没有意义，得让它自己给个说法。
+	Label string `json:"label,omitempty"`
+	// JavaFrom 说明 JavaMajor 是哪来的：mojang=官方元数据（权威）、
+	// versionline=按版本线推断（上游不提供）。留空 = 前端按原口径兜底。
+	JavaFrom string `json:"javaFrom,omitempty"`
 }
 
 // Source 界面上要展示的一种服务端类型
@@ -156,16 +163,16 @@ func Sources() []Source {
 			Note: "官方源直连可用；Paper 没有可用的国内镜像，走直连。"},
 		{Type: KindVanilla, Label: "原版 Vanilla", Available: true,
 			Note: "可用官方源，也可以切 BMCLAPI 镜像。"},
-		{Type: KindFabric, Label: "Fabric", Available: false,
-			Note: "要先装 Loader 再拿 launcher，装法跟 Paper 不是一套，还没接。"},
+		{Type: KindFabric, Label: "Fabric", Available: true,
+			Note: "官方源直连可用。给的是一百多 KB 的启动器 jar，首次启动它会自己去下依赖 —— 所以第一次开服会慢一些，而且必须联网。"},
+		{Type: KindVelocity, Label: "Velocity", Available: true,
+			Note: "和 Paper 用同一个源站，直连可用。"},
 		{Type: KindForge, Label: "Forge", Available: false,
 			Note: "installer 两段式安装，装完由它自己生成启动脚本，还没接。"},
 		{Type: KindNeoForge, Label: "NeoForge", Available: false,
-			Note: "跟 Forge 一样是 installer 两段式，还没接。"},
-		{Type: KindVelocity, Label: "Velocity", Available: false,
-			Note: "代理端，下载路径和启动方式还没核对过，还没接。"},
+			Note: "官方 maven 在本机连不通（只解析出 IPv6 地址，连接被重置），而且跟 Forge 一样是 installer 两段式，还没接。"},
 		{Type: KindBungeeCord, Label: "BungeeCord", Available: false,
-			Note: "构建从 Jenkins 出，元数据格式还没核对过，还没接。"},
+			Note: "源站能连通但实测很慢（26 MB 的 jar 两分钟只跑到 9.9 MB），而且它是滚动构建、没有游戏版本概念，暂时没接。"},
 	}
 }
 
@@ -180,13 +187,30 @@ func SourceOf(k Kind) (Source, bool) {
 	return Source{}, false
 }
 
-// httpClient 所有外部请求共用。CDN 对没有 UA 的请求偶尔会拒，统一带上。
-var httpClient = &http.Client{
-	Timeout: 30 * time.Second,
+// 两个客户端，别合并 —— 它们的超时语义完全不同，混用的代价是「大文件必失败」。
+//
+// ⚠ 踩过的坑：http.Client.Timeout 是**整个请求**的时限，包含读完 response body。
+// 早先只有这一个客户端、Timeout=30s，于是「下载服务端 jar」也被限死在 30 秒内 ——
+// 一台 49 MB 的 Paper 在 19 MB/s 的机房网络 3 秒就完了，所以一直没暴露；
+// 换成家宽（2 MB/s 要 25 秒、1 MB/s 要 50 秒）就会稳定报「下载失败」。
+// 更坏的是它看起来像源站的问题，排查会先怀疑人家。
+var apiClient = &http.Client{
+	Timeout: 30 * time.Second, // 元数据接口：小、快，30 秒足够，超时就是真有问题
 	Transport: &http.Transport{
 		MaxIdleConns:        8,
 		IdleConnTimeout:     60 * time.Second,
 		TLSHandshakeTimeout: 15 * time.Second,
+	},
+}
+
+// dlClient 下载专用：**不设总超时**（几十 MB 的文件不该有时限），
+// 只靠阶段性的超时兜住「连不上 / 不回 header」，以及用户点取消走的 ctx。
+var dlClient = &http.Client{
+	Transport: &http.Transport{
+		MaxIdleConns:          8,
+		IdleConnTimeout:       60 * time.Second,
+		TLSHandshakeTimeout:   15 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second, // 连上了但迟迟不给 header，当成挂了
 	},
 }
 
@@ -207,7 +231,7 @@ func getJSON(url string, out any) error {
 	if err != nil {
 		return err
 	}
-	resp, err := httpClient.Do(req)
+	resp, err := apiClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("%s 连不上：%w", hostOf(url), err)
 	}
