@@ -1,6 +1,7 @@
 # ServerBox 后端补全计划
 
-> 状态截至 2026-10-04 04:40。UI 侧：B 系设计稿 5 页 + 4 个真实页面（概览 / 插件 / 备份 / 设置）+ 新建向导 + 移动抽屉，全部落地并真机验证过。
+> 状态截至 2026-10-04 14:45（含一次进度盘点：embed 项实为「代码已完成、未实测」，已修正；首个 git 提交 `fdf6d0b` 已补）。
+> UI 侧：B 系设计稿 5 页 + 4 个真实页面（概览 / 插件 / 备份 / 设置）+ 新建向导 + 移动抽屉，全部落地并真机验证过。
 
 ## 为什么现在补后端
 
@@ -64,7 +65,7 @@
 | 服务端下载：Fabric / NeoForge / Forge | Fabric 走 Meta API（`/v2/versions/loader/{game}`，装法是一个 loader jar + 一个 launcher jar，和 Paper 不一样）、NeoForge 走 maven 的 installer、Forge 是 installer 两段式（要先跑 installer 生成启动脚本）。**这三个都不能简单套 Paper 那套「下一个 jar 就完事」**，得各自写。 | `fetch.Sources()` 里已经把它们标成「还不支持」并说明原因，界面上是明确报错而不是静默失败 |
 | ~~全局设置持久化 + 鉴权~~ | ✅ **已完成并实测**（2026-10-04 下午）。见下方专节 | — |
 | **自动备份调度器** | 用**单个**定时器按分钟粒度扫，不要每实例一个 goroutine；保留份数清理**不碰** `pre-restore-*`；改策略立刻生效 | 备份页「自动备份」只剩一段说明（假的禁用控件已拿掉） |
-| **embed 前端 → 单 exe** | `go:embed` 不能跨 `..`，需要一个构建步骤把 `web/dist` 放到可 embed 的位置；SPA 兜底到 `index.html` 且不能吃掉 `/api`；加 `-open` 自动开浏览器 | **双击 exe 目前是空页面**，必须另跑 vite dev。这是「开箱即用」的唯一硬门槛 |
+| **embed 前端 → 单 exe** | ⚠️ **代码已落地，但从未实测**（2026-10-04 盘点修正）。`internal/webui/webui.go` 已有 `go:embed all:dist` + SPA 回落 + `index.html` 不缓存 + `Built()` 探测；`cmd/server/main.go` 已把 `webui.Handler()` 挂上、`/api/` 与前端分流、`-open` 自动开浏览器也已实现；`build.sh` 负责把 `web/dist` 搬到 `internal/webui/dist` 再编译，并注入版本号。**缺的只是跑一次 `./build.sh` 并真跑起来验收** —— 现存 `bin/serverbox.exe`（13:10 构建）里不含 `assets/`，说明从没出过带真前端的版本 |
 
 ### 后端 P1 · 让服务器真的可控
 
@@ -87,8 +88,9 @@
 
 | 项 | 说明 |
 | --- | --- |
-| 后端不托管前端 | 见 P0 的 embed 项；在那之前没有「一个文件就能用」的形态 |
+| 后端不托管前端 | **代码已就位**（`internal/webui` + `build.sh` + `-open`），但一次带真前端的构建都没跑过。待办是「跑 `./build.sh` + 实测双击启动」，不是「从零实现」 |
 | Wails 桌面壳未开始 | 托盘常驻、单实例、开机自启都依赖它 |
+| git 仓库零提交 | 2026-10-04 `fdf6d0b` 已补首个提交（118 文件）。此前七轮产出全部处于未版本化状态 |
 | 实例删除不清理磁盘目录 | **刻意的**：删配置不动存档，界面上有说明。要做「连目录一起删」得再给一次强确认 |
 | `store.Store` 是 map，`All()` 顺序随机 | 用之前必须自己排序。`Manager.List()` 已按 `CreatedAt` 升序修好 |
 | `ResolveJava` 每次都重新扫 Java | 一次要起好几个 `java -version` 子进程。目前只在体检和启动时调用，量可接受；如果以后轮询就得上 TTL 缓存 |
