@@ -64,6 +64,9 @@ export function ServerPicker({
   preferVersion?: string
 }) {
   const [src, setSrc] = useState<FetchSource | null>(null)
+  // 「问过源站支持哪些类型了」没有。只有问过之后才有资格判定「这个类型不支持」——
+  // 网络失败时 src 也是 null，那不能当成「不支持」，得让下面的请求去报真正的网络错。
+  const [srcReady, setSrcReady] = useState(false)
   const [mirror, setMirror] = useState('')
   const [versions, setVersions] = useState<GameVersion[] | null>(null)
   const [builds, setBuilds] = useState<FetchBuild[] | null>(null)
@@ -78,15 +81,20 @@ export function ServerPicker({
   // 所以可选源由后端按类型给，前端不猜。
   useEffect(() => {
     let alive = true
+    setSrcReady(false)
     api
       .fetchSources()
       .then((d) => {
         if (!alive) return
         const s = (d.items ?? []).find((x) => x.type === type) ?? null
         setSrc(s)
+        setSrcReady(true)
         if (s && s.mirrors.length > 0) setMirror(s.mirrors[0].id)
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!alive) return
+        setSrcReady(false)
+      })
     return () => {
       alive = false
     }
@@ -168,13 +176,23 @@ export function ServerPicker({
   const javaMissing = (major: number) => lacksJava(major, javaMax)
   const pickedMissing = value !== null && javaMissing(value.javaMajor)
 
-  const unsupported = src && !src.available
+  // 后端认这个类型、但明说了「没接自动下载」，或者压根不认这个类型（前端传错）。
+  // 两种情况都不该去拉版本列表 —— 那个接口必然 400，而界面会把它画成一个
+  // 「点重试」的错误，点一百次也还是同样的错，纯属浪费感情。
+  const unsupported = srcReady && (!src || !src.available)
 
   if (unsupported) {
     return (
       <div className="border-l-[3px] border-warn bg-[#1a1812] px-4 py-3">
-        <p className="text-[13px] font-semibold text-[#e7dcb2]">{src?.label} 还不能自动下载</p>
-        <p className="mt-1 text-[12.5px] leading-relaxed text-[#e7dcb2]">{src?.note}</p>
+        <p className="text-[13px] font-semibold text-[#e7dcb2]">
+          {src ? `${src.label} 还不能自动下载` : '这个服务端类型还不能自动下载'}
+        </p>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-[#e7dcb2]">
+          {src?.note || '这个类型后端不认，可能是参数传错了。'}
+        </p>
+        <p className="mt-2 text-[12px] leading-relaxed text-ink-3">
+          现在能自动下载的只有 Paper 和原版。想用这个类型，得自己把服务端文件装好再放进实例目录。
+        </p>
       </div>
     )
   }

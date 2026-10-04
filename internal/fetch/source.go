@@ -28,6 +28,14 @@ type Kind string
 const (
 	KindPaper   Kind = "paper"
 	KindVanilla Kind = "vanilla"
+
+	// 下面这些只是「界面上认识」，还没有对应的下载实现。
+	// 单独列出来是为了让界面能如实地说「暂不支持」，而不是整块消失。
+	KindFabric     Kind = "fabric"
+	KindForge      Kind = "forge"
+	KindNeoForge   Kind = "neoforge"
+	KindVelocity   Kind = "velocity"
+	KindBungeeCord Kind = "bungeecord"
 )
 
 // javaFallback 按 MC 版本猜需要的 Java 大版本。
@@ -148,7 +156,28 @@ func Sources() []Source {
 			Note: "官方源直连可用；Paper 没有可用的国内镜像，走直连。"},
 		{Type: KindVanilla, Label: "原版 Vanilla", Available: true,
 			Note: "可用官方源，也可以切 BMCLAPI 镜像。"},
+		{Type: KindFabric, Label: "Fabric", Available: false,
+			Note: "要先装 Loader 再拿 launcher，装法跟 Paper 不是一套，还没接。"},
+		{Type: KindForge, Label: "Forge", Available: false,
+			Note: "installer 两段式安装，装完由它自己生成启动脚本，还没接。"},
+		{Type: KindNeoForge, Label: "NeoForge", Available: false,
+			Note: "跟 Forge 一样是 installer 两段式，还没接。"},
+		{Type: KindVelocity, Label: "Velocity", Available: false,
+			Note: "代理端，下载路径和启动方式还没核对过，还没接。"},
+		{Type: KindBungeeCord, Label: "BungeeCord", Available: false,
+			Note: "构建从 Jenkins 出，元数据格式还没核对过，还没接。"},
 	}
+}
+
+// SourceOf 查某个类型对应的描述。第二个返回值是「认不认识这个类型」——
+// 认识了但没接实现，和压根不认识（拼错/前端传错），给用户的解释完全不一样。
+func SourceOf(k Kind) (Source, bool) {
+	for _, s := range Sources() {
+		if s.Type == k {
+			return s, true
+		}
+	}
+	return Source{}, false
 }
 
 // httpClient 所有外部请求共用。CDN 对没有 UA 的请求偶尔会拒，统一带上。

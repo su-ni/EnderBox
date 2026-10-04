@@ -110,6 +110,24 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
   const [dlErr, setDlErr] = useState('')
   // 本机 Java 的最高主版本 —— 判断「选的这个构建在这台机器上跑不跑得起来」
   const { max: javaMax } = useLocalJava()
+  // 后端说哪些类型接了自动下载。以此为准，而不是前端写死 ——
+  // 哪天 Forge 接上了，这里自动就放开了，不用回来改这个文件。
+  const [srcAvail, setSrcAvail] = useState<Record<string, { label: string; available: boolean; note: string }>>({})
+  useEffect(() => {
+    let alive = true
+    api
+      .fetchSources()
+      .then((d) => {
+        if (!alive) return
+        const m: Record<string, { label: string; available: boolean; note: string }> = {}
+        for (const s of d.items ?? []) m[s.type] = { label: s.label, available: s.available, note: s.note }
+        setSrcAvail(m)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
   const [form, setForm] = useState({
     name: '',
     type: 'paper',
@@ -244,11 +262,17 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
             {Object.keys(TYPE_LABEL).map((v) => {
               const t = TYPE_INFO[v]
               const on = form.type === v
+              // 后端说这个类型还没接自动下载 —— 那就别让它可选。
+              // 列出来（而不是藏起来）是为了让你知道「有这么个东西，只是现在走不通」。
+              // 源站还没问出来时（srcAvail 为空）一律按可选处理，别误伤。
+              const info = srcAvail[v]
+              const off = info ? !info.available : false
               return (
                 <button
                   key={v}
                   type="button"
                   onClick={() => set('type', v)}
+                  disabled={off}
                   aria-pressed={on}
                   className={`type-card${on ? ' sel' : ''}`}
                 >
@@ -266,12 +290,18 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
                   </span>
                   <span className="mt-2.5 block min-h-10 text-[12.5px] leading-relaxed text-ink-2">{t.desc}</span>
                   <span className="mt-2.5 block">
+                    {off && <span className="chip chip-w">还不能自动下载</span>}
                     {t.chips.map((c) => (
                       <span key={c.t} className={`chip${c.tone ? ` chip-${c.tone}` : ''}`}>
                         {c.t}
                       </span>
                     ))}
                   </span>
+                  {off && (
+                    <span className="mt-2 block border-t-[3px] border-black pt-2 text-[11.5px] leading-relaxed text-[#e7dcb2]">
+                      {info?.note}
+                    </span>
+                  )}
                 </button>
               )
             })}

@@ -49,8 +49,12 @@ func kindOf(r *http.Request) (fetch.Kind, error) {
 	if k == "" {
 		return fetch.KindPaper, nil
 	}
-	switch k {
-	case fetch.KindPaper, fetch.KindVanilla:
+	// 认识的类型里，没接实现的要给出「为什么没接」，而不是一句「不认识」——
+	// 前者用户知道下一步该干嘛，后者只会让人以为是自己选错了。
+	if src, ok := fetch.SourceOf(k); ok {
+		if !src.Available {
+			return "", fmt.Errorf("%s 还不能自动下载，%s", src.Label, src.Note)
+		}
 		return k, nil
 	}
 	return "", fmt.Errorf("不认识的服务端类型：%s", k)
@@ -221,7 +225,11 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 			build = bs[0]
 		}
 	default:
-		err = fmt.Errorf("还不支持给 %s 自动下载服务端（Forge 是 installer 两段式，Fabric/NeoForge 待接）", body.Type)
+		if src, ok := fetch.SourceOf(fetch.Kind(body.Type)); ok {
+			err = fmt.Errorf("%s 还不能自动下载，%s", src.Label, src.Note)
+		} else {
+			err = fmt.Errorf("不认识的服务端类型：%s", body.Type)
+		}
 	}
 	if err != nil {
 		writeErr(w, 502, err.Error())

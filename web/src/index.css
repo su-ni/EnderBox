@@ -544,6 +544,17 @@ input[type="search"]::-webkit-search-cancel-button {
       3px 0 0 0 #000,
       inset 0 0 0 3px var(--color-accent-deep);
   }
+  /* 还没接自动下载的类型：列出来是为了让你知道"有这么个东西，只是现在走不通"，
+     但点不了 —— 免得好不容易选完版本、走到第 2 步才发现是死路。
+     用下沉底色表示不可用，而不是整体降透明度：降透明度会把说明文字一起压到
+     4.5:1 以下，而那些说明恰恰是这张卡片存在的理由。 */
+  .type-card:disabled {
+    cursor: not-allowed;
+    background: var(--color-deep);
+  }
+  .type-card:disabled:hover {
+    background: var(--color-deep);
+  }
 
   /* ── 版本 chip ── */
   .ver-chip {
