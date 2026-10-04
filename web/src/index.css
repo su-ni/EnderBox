@@ -1,0 +1,952 @@
+@import "tailwindcss";
+
+/* ── 动效参数 ─────────────────────────────────────────
+   尺度定在「顺滑」档：状态反馈 140ms，常规过渡 220ms，入场 300ms，一律 ease-out。
+   不要出现弹跳/回弹曲线 —— 像素风配回弹会显得廉价。 */
+:root {
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --dur-slow: 300ms;
+  --ease-out: cubic-bezier(0.16, 0.84, 0.44, 1);
+}
+/* 调试/偏好开关：body 上挂 no-anim 即可一次关掉全部过渡与入场动画。
+   headless 截图取「静止态」也用它，避免动画中途被截到。 */
+body.no-anim *,
+body.no-anim *::before,
+body.no-anim *::after {
+  transition: none !important;
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}
+
+/* ── 设计 token：方块像素 ─────────────────────────────
+   底色系取自 MC 的泥土/石头/草方块，主色是草绿。
+   规则：零渐变装饰、零圆角、零玻璃拟态。像素感靠硬边界与盒阴影做。
+
+   ⚠ 文字对比度是硬指标，改色前先算一遍（相对底色 #111311）：
+     ink-1 #eef1ec → 16.2:1  ✓ 正文、标题
+     ink-2 #b7c2b4 →  9.1:1  ✓ 次要文字
+     ink-3 #8b978a →  6.1:1  ✓ 辅助标注（这已经是下限，再暗就掉出 AA）
+   之前 ink-3 是 #6b7769，只有 3.97:1，却承担了满屏的小字 —— 这是「看着乱、有些看不清」的主因。 */
+@theme {
+  --color-base: #111311;
+  --color-deep: #0a0c0a;
+  --color-panel: #1c201d;
+  --color-panel-2: #232822;
+  --color-raised: #2e352f;
+
+  /* 细分割线。面板内部的行分隔用这个，不要用近黑色 ——
+     比面板还暗的线看起来像「裂缝」而不是「分隔」。 */
+  --color-line: #3d453d;
+
+  --color-ink-1: #eef1ec;
+  --color-ink-2: #b7c2b4;
+  --color-ink-3: #8b978a;
+
+  /* accent 语义被 types.ts 的 STATUS_COLOR 引用，勿改名 */
+  --color-accent: #7cc24f;
+  --color-accent-deep: #5d9c3a;
+  --color-warn: #f2c14e;
+  --color-danger: #e0574c;
+
+  --color-cyan: #4aedd9;
+  --color-dirt: #8b5a2b;
+  --color-stone: #9aa39b;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-base);
+  /* 极淡的 32px 网格，暗示「方块」但不干扰阅读 */
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.016) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--color-ink-1);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+svg {
+  shape-rendering: crispEdges;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ── 字阶 ─────────────────────────────────────────────
+   只有这几档，别再临时加中间值。字号一多，页面就散了。
+     22  页面标题
+     16  区块标题
+     14  行标题（卡片里的主对象）
+   13.5  正文 / 控件文字
+     12  次要文字、表单说明
+   11.5  元信息（时间、大小、路径、key 名）
+     11  眉标 eyebrow（section 序号这种，极少用）
+   正文区最小 12px，再小就别放中文。 */
+
+/* 滚动条全局统一。只给 .scroll-thin 加样式的话，没挂这个类的地方会露出系统默认的
+   浅色滚动条 —— 在深色面板上就是一条刺眼的白条，典型的「割裂」。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #39413a transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #39413a;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4d574c;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── 干掉原生控件 ─────────────────────────────────────
+   number 输入框的系统 spinner 是白色小箭头，在深色主题里像贴上去的。数值统一改用
+   .step-ctl 的 [-] 值 [+]（工程上也可点区域更大，Shift 点一下走 10 格）。 */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* ⚠ 以下所有组件类必须待在 @layer components 里。
+   不放进层里会变成「无层样式」，优先级高于所有 Tailwind 工具类 ——
+   .btn{display:inline-flex} 会压掉 md:hidden，移动端/桌面端显隐直接失效。
+   放进组件层之后，工具类（utilities 层）才能正常覆盖它们。
+
+   ⚠ 另一条规矩：同一个 CSS 属性不要既由组件类定义、又在 JSX 上挂工具类。
+   想「按状态变色」就走 CSS（.step .step-t / .step.cur .step-t），
+   想让调用方随意覆盖才挂工具类。 */
+@layer components {
+  /* ── 像素描边 ──
+     黑色硬边只允许出现在两级：面板（.px-card）与可点击控件（.btn）。
+     中间层级一律用 1px 的 --color-line，否则满屏黑线会把层次糊在一起。 */
+  .pxb {
+    box-shadow:
+      0 -3px 0 0 #000,
+      0 3px 0 0 #000,
+      -3px 0 0 0 #000,
+      3px 0 0 0 #000;
+  }
+  .pxb-2 {
+    box-shadow:
+      0 -2px 0 0 #000,
+      0 2px 0 0 #000,
+      -2px 0 0 0 #000,
+      2px 0 0 0 #000;
+  }
+
+  /* ── 面板：一组信息的外框 ── */
+  .px-card {
+    background: var(--color-panel);
+    box-shadow:
+      0 -3px 0 0 #000,
+      0 3px 0 0 #000,
+      -3px 0 0 0 #000,
+      3px 0 0 0 #000;
+  }
+
+  /* ── 卡片内部的一行 ── */
+  .row-b {
+    border-bottom: 1px solid var(--color-line);
+  }
+  .row-b:last-child {
+    border-bottom: 0;
+  }
+
+  /* ── 按钮：MC 风格凹凸面 ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border: 0;
+    background: #5f665e;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow:
+      inset -3px -3px 0 0 rgba(0, 0, 0, 0.4),
+      inset 3px 3px 0 0 rgba(255, 255, 255, 0.16),
+      0 -3px 0 0 #000,
+      0 3px 0 0 #000,
+      -3px 0 0 0 #000,
+      3px 0 0 0 #000;
+  }
+  .btn:hover:not(:disabled) {
+    background: #6e766c;
+  }
+  .btn:disabled {
+    opacity: 0.38;
+    cursor: default;
+  }
+  .btn-grass {
+    background: var(--color-accent-deep);
+    color: #0c1108;
+  }
+  .btn-grass:hover:not(:disabled) {
+    background: var(--color-accent);
+  }
+  .btn-danger {
+    background: #9e2626;
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: #b62d2d;
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-ink-2);
+    box-shadow:
+      0 -3px 0 0 #000,
+      0 3px 0 0 #000,
+      -3px 0 0 0 #000,
+      3px 0 0 0 #000;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--color-panel-2);
+    color: var(--color-ink-1);
+  }
+  .btn-sm {
+    padding: 6px 11px;
+    font-size: 12.5px;
+  }
+
+  /* ── 标签 ──
+     刻意不给黑边。chip 在页面上动辄出现几十个，每个都描一圈黑边会变成满屏小黑框。 */
+  .chip {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--color-panel-2);
+    color: var(--color-ink-2);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+  .chip-g {
+    background: var(--color-accent-deep);
+    color: #0c1108;
+    font-weight: 700;
+  }
+  .chip-w {
+    background: var(--color-warn);
+    color: #241a05;
+    font-weight: 700;
+  }
+  .chip-d {
+    background: #5f2222;
+    color: #ffc2c2;
+  }
+  .chip-c {
+    background: #264a56;
+    color: #b6e8f5;
+  }
+
+  /* ── 分段刻度条：替代折线图，像素味更足 ── */
+  .seg {
+    display: flex;
+    gap: 2px;
+  }
+  .seg > i {
+    flex: 1;
+    height: 14px;
+    background: #232822;
+    box-shadow: inset 0 0 0 1px #000;
+  }
+  .seg > i.on {
+    background: var(--color-accent-deep);
+  }
+  .seg > i.w {
+    background: var(--color-warn);
+  }
+  .seg > i.d {
+    background: var(--color-danger);
+  }
+
+  /* ── 输入控件 ── */
+  .px-input {
+    background: #0c0e0c;
+    border: 0;
+    outline: 0;
+    color: var(--color-ink-1);
+    font-size: 13.5px;
+    padding: 8px 11px;
+    box-shadow:
+      0 -2px 0 0 #000,
+      0 2px 0 0 #000,
+      -2px 0 0 0 #000,
+      2px 0 0 0 #000;
+  }
+  /* 只有「值本身是机器数据」的输入框才用等宽字体：路径、端口、key */
+  .px-input-mono {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+  }
+  .px-input::placeholder {
+    color: #6d786c;
+  }
+  .px-input:focus {
+    box-shadow:
+      0 -2px 0 0 #000,
+      0 2px 0 0 #000,
+      -2px 0 0 0 #000,
+      2px 0 0 0 #000,
+      0 0 0 2px var(--color-accent-deep);
+  }
+  select.px-input {
+    cursor: pointer;
+  }
+
+  /* ── 字段标签 ── */
+  .field-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-ink-2);
+    margin-bottom: 6px;
+  }
+  /* 表单说明：给人读的中文句子，12px ink-3（6.1:1）够看，别用 mono */
+  .field-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--color-ink-3);
+  }
+  /* 机器数据：路径、时间、大小、版本号、key 名 */
+  .mono-meta {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--color-ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .mono-value {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--color-ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── 眉标：区块前的极短标注 ── */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--color-ink-3);
+  }
+
+  /* ── 世界列表行 ── */
+  .world-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    padding: 9px 10px;
+    margin-bottom: 6px;
+    border: 0;
+    background: var(--color-panel);
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+  }
+  .world-row:hover {
+    background: var(--color-panel-2);
+  }
+  .world-row.on {
+    background: var(--color-raised);
+    box-shadow:
+      0 -3px 0 0 #000,
+      0 3px 0 0 #000,
+      -3px 0 0 0 #000,
+      3px 0 0 0 #000,
+      inset 4px 0 0 0 var(--color-accent-deep);
+  }
+
+  /* ── 控制台 ── */
+  .log-line {
+    display: flex;
+    gap: 10px;
+  }
+  .log-line > .t {
+    flex: 0 0 auto;
+    color: #5c675b;
+  }
+  .log-line > .lv {
+    flex: 0 0 auto;
+    width: 52px;
+    font-weight: 700;
+  }
+  .log-line > .m {
+    min-width: 0;
+    word-break: break-all;
+    color: #ccd6ca;
+  }
+  .log-line > .m em {
+    font-style: normal;
+    color: var(--color-accent);
+  }
+
+  /* ── 开关 ──
+     轨道不能太黑：近黑轨道在深色行里等于看不见，开关会退化成一个悬空色块 ——
+     开/关根本分不出来。所以轨道给足亮度，滑块用色相区分状态。 */
+  .tg-sw {
+    flex: 0 0 auto;
+    position: relative;
+    width: 44px;
+    height: 22px;
+    border: 0;
+    padding: 0;
+    background: #3f483e;
+    cursor: pointer;
+    box-shadow:
+      0 -2px 0 0 #000,
+      0 2px 0 0 #000,
+      -2px 0 0 0 #000,
+      2px 0 0 0 #000;
+  }
+  .tg-sw::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: #a3ada1;
+  }
+  .tg-sw.on {
+    background: #2c4720;
+  }
+  .tg-sw.on::after {
+    left: 24px;
+    background: var(--color-accent);
+  }
+
+  /* ── 向导步骤条 ── */
+  .step {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 0;
+    border-right: 3px solid #000;
+    background: var(--color-panel);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    color: inherit;
+  }
+  .step:last-child {
+    border-right: 0;
+  }
+  .step:hover {
+    background: var(--color-panel-2);
+  }
+  .step-n {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    background: var(--color-panel-2);
+    color: var(--color-ink-3);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .step.done .step-n {
+    background: var(--color-accent-deep);
+    color: #0c1108;
+  }
+  .step.cur {
+    background: var(--color-raised);
+  }
+  .step.cur .step-n {
+    background: var(--color-accent);
+    color: #0c1108;
+  }
+  /* 步骤标题的配色只在 CSS 里定，不要在 JSX 上挂 text-ink-3 ——
+     工具类优先级高于组件层，挂上去就会把「当前步骤高亮」压掉。 */
+  .step .step-t {
+    color: var(--color-ink-2);
+  }
+  .step.cur .step-t {
+    color: var(--color-ink-1);
+  }
+  .step .step-s {
+    color: var(--color-ink-3);
+  }
+
+  /* ── 类型卡片 ── */
+  .type-card {
+    position: relative;
+    padding: 14px 13px;
+    border: 0;
+    background: var(--color-panel);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    color: inherit;
+    box-shadow:
+      0 -3px 0 0 #000,
+      0 3px 0 0 #000,
+      -3px 0 0 0 #000,
+      3px 0 0 0 #000;
+  }
+  .type-card:hover {
+    background: var(--color-panel-2);
+  }
+  .type-card.sel {
+    background: var(--color-raised);
+    box-shadow:
+      0 -3px 0 0 #000,
+      0 3px 0 0 #000,
+      -3px 0 0 0 #000,
+      3px 0 0 0 #000,
+      inset 0 0 0 3px var(--color-accent-deep);
+  }
+
+  /* ── 版本 chip ── */
+  .ver-chip {
+    padding: 7px 12px;
+    border: 0;
+    background: var(--color-panel-2);
+    color: var(--color-ink-2);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    cursor: pointer;
+    box-shadow:
+      0 -2px 0 0 #000,
+      0 2px 0 0 #000,
+      -2px 0 0 0 #000,
+      2px 0 0 0 #000;
+  }
+  .ver-chip:hover {
+    background: var(--color-raised);
+    color: var(--color-ink-1);
+  }
+  .ver-chip.sel {
+    background: var(--color-accent-deep);
+    color: #0c1108;
+    font-weight: 700;
+  }
+
+  /* ── 标签分页（设置页） ── */
+  .tab-btn {
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: 10px 14px;
+    border: 0;
+    border-right: 3px solid #000;
+    background: var(--color-panel);
+    color: var(--color-ink-2);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tab-btn:last-child {
+    border-right: 0;
+  }
+  .tab-btn:hover {
+    background: var(--color-panel-2);
+    color: var(--color-ink-1);
+  }
+  .tab-btn.on {
+    background: var(--color-accent-deep);
+    color: #0c1108;
+    font-weight: 700;
+  }
+
+  /* ── 页面导航（概览 / 配置 / …） ── */
+  .nav-pill {
+    padding: 7px 12px;
+    background: var(--color-panel);
+    color: var(--color-ink-2);
+    font-size: 13px;
+    box-shadow:
+      0 -2px 0 0 #000,
+      0 2px 0 0 #000,
+      -2px 0 0 0 #000,
+      2px 0 0 0 #000;
+  }
+  .nav-pill:hover {
+    background: var(--color-panel-2);
+    color: var(--color-ink-1);
+  }
+  .nav-pill.on {
+    background: var(--color-accent-deep);
+    color: #0c1108;
+    font-weight: 700;
+  }
+
+  /* ── 进度条 ──
+     像素风的分段进度：轨道挖进去、填充是主色。没有渐变也没有圆角。 */
+  .pbar {
+    height: 14px;
+    background: #0c0e0c;
+    box-shadow: inset 0 0 0 1px #000;
+    overflow: hidden;
+  }
+  .pbar > i {
+    display: block;
+    height: 100%;
+    background: var(--color-cyan);
+    transition: width var(--dur) linear;
+  }
+
+  /* ── 搜索框 ── */
+  .search {
+    background: #0c0e0c;
+    box-shadow:
+      0 -2px 0 0 #000,
+      0 2px 0 0 #000,
+      -2px 0 0 0 #000,
+      2px 0 0 0 #000;
+    transition: box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .search:focus-within {
+    box-shadow:
+      0 -2px 0 0 #000,
+      0 2px 0 0 #000,
+      -2px 0 0 0 #000,
+      2px 0 0 0 #000,
+      0 0 0 2px var(--color-accent-deep);
+  }
+
+  /* ── 交互过渡 ─────────────────────────────────────────
+     之前全项目零过渡：hover 只跳颜色、开关瞬移、页面硬切 —— 就是用户说的「太干」。
+     统一挂在这里，不为每个页面单独写。 */
+  .btn,
+  .tg-sw,
+  .tg-sw::after,
+  .nav-pill,
+  .tab-btn,
+  .chip,
+  .ver-chip,
+  .type-card {
+    transition:
+      background var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-out);
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(2px);
+  }
+  .world-row {
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .px-input {
+    transition:
+      box-shadow var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out);
+  }
+  .px-card > .row-b {
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .px-card > .row-b:hover {
+    background: rgba(255, 255, 255, 0.022);
+  }
+
+  /* ── 数值步进：[-] 值 [+] ──
+     替代原生 number spinner（那对白色小箭头和这套风格不是一路东西）。 */
+  .step-ctl {
+    display: flex;
+    align-items: center;
+    max-width: 300px;
+    box-shadow:
+      0 -2px 0 0 #000,
+      0 2px 0 0 #000,
+      -2px 0 0 0 #000,
+      2px 0 0 0 #000;
+    transition: box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .step-ctl:focus-within {
+    box-shadow:
+      0 -2px 0 0 #000,
+      0 2px 0 0 #000,
+      -2px 0 0 0 #000,
+      2px 0 0 0 #000,
+      0 0 0 2px var(--color-accent-deep);
+  }
+  .step-ctl > .inp {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    text-align: center;
+    background: #0c0e0c;
+    border: 0;
+    outline: 0;
+    color: var(--color-ink-1);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+  }
+  .step-ctl > .sb {
+    height: 32px;
+    padding: 0 12px;
+    border: 0;
+    background: var(--color-raised);
+    color: var(--color-ink-1);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      background var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out);
+  }
+  .step-ctl > .sb:hover {
+    background: var(--color-accent-deep);
+    color: #0c1108;
+  }
+  .step-ctl > .sb:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  /* ── 配置行：标签固定列 + 控件紧随（不要控件右对齐 —— 宽屏下中间会空出好几百像素） ── */
+  .crow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--color-line);
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .crow:last-child {
+    border-bottom: 0;
+  }
+  .crow:hover {
+    background: rgba(255, 255, 255, 0.022);
+  }
+  .crow-lab {
+    flex: 0 0 330px;
+    min-width: 0;
+  }
+  .crow-fl {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-ink-1);
+  }
+  .crow-fh {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--color-ink-3);
+  }
+  .crow-ctl {
+    flex: 0 1 300px;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .crow-ctl > .px-input,
+  .crow-ctl > .step-ctl,
+  .crow-ctl > select {
+    width: 100%;
+  }
+
+  /* ── 分组导航（配置页左栏） ── */
+  .fnav {
+    background: var(--color-panel);
+    padding: 8px 0;
+    box-shadow:
+      0 -3px 0 0 #000,
+      0 3px 0 0 #000,
+      -3px 0 0 0 #000,
+      3px 0 0 0 #000;
+  }
+  .fitem {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 11px 14px;
+    border: 0;
+    background: transparent;
+    color: var(--color-ink-2);
+    font-family: inherit;
+    font-size: 13.5px;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      background var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out);
+  }
+  .fitem:hover:not(:disabled) {
+    background: var(--color-panel-2);
+    color: var(--color-ink-1);
+  }
+  .fitem.on {
+    background: var(--color-raised);
+    color: var(--color-ink-1);
+    font-weight: 700;
+  }
+  .fitem:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .fitem > i.bar-l {
+    width: 3px;
+    height: 18px;
+    flex: 0 0 auto;
+    background: transparent;
+    transition:
+      background var(--dur) var(--ease-out),
+      transform var(--dur) var(--ease-out);
+  }
+  .fitem.on > i.bar-l {
+    background: var(--color-accent);
+    transform: scaleY(1.25);
+  }
+  .fitem > .cnt {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--color-ink-3);
+  }
+
+  /* ── 分组内容面板 ── */
+  .fhead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--color-panel);
+    box-shadow:
+      0 -3px 0 0 #000,
+      -3px 0 0 0 #000,
+      3px 0 0 0 #000;
+  }
+  .fhead h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-ink-1);
+  }
+  .fpane {
+    max-height: min(56vh, 520px);
+    overflow-y: auto;
+    background: var(--color-panel);
+    padding: 4px 18px 14px;
+    box-shadow:
+      0 3px 0 0 #000,
+      -3px 0 0 0 #000,
+      3px 0 0 0 #000;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slideInX {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* 页面级只做淡入，不用 transform ——
+   滚动容器上挂 transform 会生成 containing block，把内部 position:sticky 的层搞崩。 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.anim-fade {
+  animation: fadeIn var(--dur) var(--ease-out) both;
+}
+/* 区块级：靠 key 变化触发重挂载来重放，不需要额外状态管理 */
+.anim-in {
+  animation: rise var(--dur-slow) var(--ease-out) both;
+}
+.anim-in-x {
+  animation: slideInX var(--dur-slow) var(--ease-out) both;
+}
+.stagger > * {
+  animation: fadeUp 320ms var(--ease-out) both;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+.cursor-block {
+  width: 8px;
+  height: 15px;
+  background: var(--color-accent);
+  animation: blink 1.1s steps(1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cursor-block {
+    animation: none;
+  }
+}

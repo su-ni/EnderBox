@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方案 B · 备份与还原 — ServerBox 设计稿</title>
+<style>
+:root{
+  --bg:#111311;--bg2:#0b0d0b;--panel:#1c201d;--panel2:#242a25;--raised:#2e352f;
+  --ink1:#e9ede7;--ink2:#9daa9c;--ink3:#6b7769;
+  --grass:#5d9c3a;--grass2:#7cc24f;--dirt:#8b5a2b;--stone:#9aa39b;
+  --diamond:#4aedd9;--red:#e02c2c;--gold:#f2c14e;
+  --font:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,"Courier New",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:32px 32px;
+  color:var(--ink1);font-family:var(--font);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+svg{shape-rendering:crispEdges;display:block}
+.shell{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+.side{background:var(--bg2);padding:18px 14px;border-right:3px solid #000}
+.logo{display:flex;align-items:center;gap:10px;margin:0 4px 20px}
+.logo b{font-size:15px;font-weight:700}
+.logo span{font-family:var(--mono);font-size:11px;color:var(--ink3)}
+.side-label{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--ink3);margin:0 4px 10px}
+.world{display:flex;align-items:center;gap:11px;padding:9px 10px;margin-bottom:6px;background:var(--panel)}
+.world:hover{background:var(--panel2)}
+.world.on{background:var(--raised);box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000,inset 4px 0 0 0 var(--grass)}
+.world .nm{font-size:13.5px;font-weight:600;line-height:1.3}
+.world .sub{font-family:var(--mono);font-size:10.5px;color:var(--ink3)}
+.world .dot{margin-left:auto;width:8px;height:8px;background:var(--ink3)}
+.world.on .dot{background:var(--grass2)}
+.side-foot{margin:16px 4px 0;padding-top:14px;border-top:3px solid #000;font-family:var(--mono);font-size:10.5px;color:var(--ink3);line-height:1.9}
+
+.main{padding:20px 26px 40px;min-width:0}
+.back{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11.5px;color:var(--ink3);cursor:pointer}
+.back:hover{color:var(--grass2)}
+h1{font-size:22px;font-weight:700;margin-top:10px;line-height:1.3}
+.lead{margin-top:6px;font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+.lead b{color:var(--grass2);font-weight:700}
+
+.chip{display:inline-block;margin:0 6px 6px 0;padding:2px 7px;background:var(--raised);font-family:var(--mono);font-size:11px;color:var(--ink2);box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000}
+.chip.g{background:var(--grass);color:#0c1108;font-weight:700}
+.chip.w{background:var(--gold);color:#241a05;font-weight:700}
+.chip.d{background:#5f2222;color:#ffb3b3}
+.chip.b{background:#2a4a58;color:#a9e2f2}
+code{font-family:var(--mono);font-size:12px;color:var(--diamond);background:#0b0f0c;padding:2px 7px;display:inline-block;box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000}
+
+/* 读数带 */
+.band{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:16px 18px;background:var(--panel);margin:22px 0 26px;
+  box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.gauge-h{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--ink3)}
+.gauge-n{display:flex;align-items:baseline;gap:5px;margin:7px 0 9px}
+.gauge-n b{font-family:var(--mono);font-size:25px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.gauge-n i{font-family:var(--mono);font-size:11.5px;font-style:normal;color:var(--ink3)}
+.seg{display:flex;gap:2px}
+.seg i{flex:1;height:14px;background:#20251f;box-shadow:inset 0 0 0 1px #000}
+.seg i.on{background:var(--grass)}
+.seg i.w{background:var(--gold)}
+.seg i.d{background:var(--red)}
+
+/* 分节 */
+.sec-head{display:flex;align-items:center;gap:12px;margin:30px 0 14px;padding-bottom:10px;border-bottom:3px solid #000}
+.sec-head h2{font-size:16px;font-weight:700}
+.sec-head .idx{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--ink3)}
+.sec-head .note{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink3)}
+
+.card{background:var(--panel);padding:16px;box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.form{display:grid;grid-template-columns:repeat(3,1fr);gap:18px 20px}
+.f{display:flex;flex-direction:column;gap:7px;min-width:0}
+.f label{font-size:13px;font-weight:600}
+.f .desc{font-size:11.5px;color:var(--ink3);line-height:1.6}
+input[type=text],input[type=number],select{background:#0d100d;border:0;outline:0;color:var(--ink1);font-family:var(--mono);font-size:13px;padding:10px 12px;width:100%;
+  box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000}
+input:focus,select:focus{box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000,0 0 0 2px var(--grass)}
+.to{display:flex;align-items:flex-start;gap:11px}
+.to .tl{font-size:13px;font-weight:600}
+.to .td{font-size:11.5px;color:var(--ink3);line-height:1.6}
+.tg-sw{flex:0 0 auto;width:44px;height:22px;background:#1a1f1a;position:relative;cursor:pointer;box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000}
+.tg-sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;background:var(--stone)}
+.tg-sw.on{background:#1f3a1f}
+.tg-sw.on::after{left:24px;background:var(--grass2)}
+
+/* 手动操作条 */
+.manual{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px;background:var(--panel);box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.manual .warn{font-size:12.5px;color:var(--gold);line-height:1.6;max-width:56ch}
+.bar{display:flex;gap:2px;flex:1;min-width:160px}
+.bar i{flex:1;height:12px;background:#1a1f1a;box-shadow:inset 0 0 0 1px #000}
+.bar i.on{background:var(--gold)}
+
+/* 备份列表 */
+.list{background:var(--panel);box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.lhead,.lrow{display:grid;grid-template-columns:34px 1fr 150px 110px 92px 210px;gap:14px;align-items:center;padding:12px 16px}
+.lhead{background:var(--panel2);border-bottom:3px solid #000}
+.lhead span{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;color:var(--ink3)}
+.lrow{border-bottom:1px solid #0b0d0b}
+.lrow:last-child{border-bottom:0}
+.lrow:hover{background:var(--panel2)}
+.lrow .nm{font-size:13.5px;font-weight:600;line-height:1.35}
+.lrow .pth{font-family:var(--mono);font-size:10.5px;color:var(--ink3);margin-top:3px}
+.lrow .t{font-family:var(--mono);font-size:12px;color:var(--ink2)}
+.lrow .sz{font-family:var(--mono);font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.lrow .ops{display:flex;gap:9px;justify-content:flex-end}
+.link{font-family:var(--mono);font-size:11.5px;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.link:hover{color:var(--grass2)}
+.link.dz:hover{color:#ff8b8b}
+.lrow.prot{background:rgba(93,156,58,.06)}
+
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;background:#6d6d6d;color:#fff;font-weight:600;font-size:13px;border:0;cursor:pointer;
+  box-shadow:inset -3px -3px 0 0 rgba(0,0,0,.42),inset 3px 3px 0 0 rgba(255,255,255,.2),0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.btn:hover{background:#7d7d7d}
+.btn.g{background:var(--grass);color:#0c1108}
+.btn.g:hover{background:var(--grass2)}
+.btn.r{background:#9e2626}
+.btn.r:hover{background:#b62d2d}
+.btn.ghost{background:transparent;color:var(--ink2);box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.btn.ghost:hover{color:var(--ink1);background:var(--panel2)}
+.btn.sm{padding:6px 11px;font-size:12.5px}
+
+/* 还原危险区 */
+.restore{margin-top:14px;background:#141011;box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.rz-bar{height:6px;background:repeating-linear-gradient(45deg,#e0a33e 0 9px,#1a1208 9px 18px)}
+.rz-body{padding:16px}
+.rz-top{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.rz-top h3{font-size:15px;font-weight:700}
+.rz-top p{margin-top:5px;font-size:12.5px;color:var(--ink2);line-height:1.7;max-width:78ch}
+.steps3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:16px 0}
+.st{padding:12px 13px;background:#1b1618;box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000}
+.st .no{font-family:var(--mono);font-size:10.5px;color:var(--gold);letter-spacing:.14em}
+.st b{display:block;margin-top:5px;font-size:13.5px}
+.st p{margin-top:4px;font-size:12px;color:var(--ink2);line-height:1.65}
+.rz-pick{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 14px;background:#0d100d;box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000}
+.rz-pick .lb{font-size:13px;font-weight:600}
+.rz-pick select{width:auto;min-width:320px}
+.rz-act{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+.rz-act .cf{font-size:12.5px;color:var(--ink2)}
+.rz-act .r{margin-left:auto;display:flex;gap:10px}
+
+.tag-plan{position:fixed;right:14px;bottom:12px;padding:5px 10px;background:var(--raised);font-family:var(--mono);font-size:10.5px;color:var(--ink3);box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000;z-index:9}
+
+@media(max-width:1150px){
+  .lhead,.lrow{grid-template-columns:1fr;gap:6px}
+  .lhead{display:none}
+  .lrow .ops{justify-content:flex-start;margin-top:8px}
+}
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .side{border-right:0;border-bottom:3px solid #000}
+  .main{padding:16px 16px 30px;min-width:0}
+  .side{min-width:0}
+  .card,.list,.manual,.restore,.lrow,.st,.rz-pick{min-width:0}
+  .lrow .pth,.st p{overflow-wrap:anywhere}
+  code{word-break:break-all}
+  .band{grid-template-columns:repeat(2,1fr)}
+  .form{grid-template-columns:1fr}
+  .steps3{grid-template-columns:1fr}
+  .rz-pick select{min-width:0;width:100%}
+  .rz-act .r{margin-left:0;width:100%}
+  .sec-head{flex-wrap:wrap}
+  .sec-head .note{margin-left:0;width:100%}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="logo">
+      <svg width="26" height="26" viewBox="0 0 16 16">
+        <rect width="16" height="16" fill="#3b2a1a"/><rect width="16" height="5" fill="#5d9c3a"/>
+        <rect x="1" y="2" width="2" height="2" fill="#7cc24f"/><rect x="6" y="1" width="2" height="2" fill="#4a7d2c"/>
+        <rect x="2" y="6" width="3" height="2" fill="#a06c34"/><rect x="8" y="8" width="4" height="2" fill="#6f4520"/>
+      </svg>
+      <div><b>ServerBox</b><br><span>v0.3 · WIN</span></div>
+    </div>
+    <p class="side-label">世界 / WORLDS</p>
+    <div class="world on">
+      <svg width="22" height="22" viewBox="0 0 16 16"><rect width="16" height="16" fill="#3b2a1a"/><rect width="16" height="5" fill="#5d9c3a"/><rect x="1" y="2" width="2" height="2" fill="#7cc24f"/><rect x="9" y="6" width="3" height="2" fill="#a06c34"/></svg>
+      <div><div class="nm">生存服 · 长期档</div><div class="sub">PAPER 1.21.4</div></div><span class="dot"></span>
+    </div>
+    <div class="world">
+      <svg width="22" height="22" viewBox="0 0 16 16"><rect width="16" height="16" fill="#3b2a1a"/><rect width="16" height="5" fill="#5d9c3a"/><rect x="4" y="1" width="2" height="2" fill="#7cc24f"/><rect x="2" y="7" width="4" height="2" fill="#a06c34"/></svg>
+      <div><div class="nm">创造服 · 建筑</div><div class="sub">FABRIC 1.20.1</div></div><span class="dot"></span>
+    </div>
+    <div class="side-foot">备份占用 6.4 GB<br>保留 8 / 12 份<br>下次自动 今天 04:00</div>
+  </aside>
+
+  <main class="main">
+    <span class="back">
+      <svg width="12" height="12" viewBox="0 0 16 16"><rect x="6" y="3" width="2" height="10" fill="currentColor"/><rect x="4" y="6" width="2" height="4" fill="currentColor"/><rect x="2" y="7" width="2" height="2" fill="currentColor"/></svg>
+      返回控制台
+    </span>
+    <h1>备份与还原</h1>
+    <p class="lead">正在管 <b>生存服 · 长期档</b> 的存档 —— 世界越大越舍不得丢，建议就让它自己每天备一次。</p>
+
+    <section class="band">
+      <div>
+        <div class="gauge-h">
+          <svg width="12" height="12" viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="9" fill="#8b5a2b"/><rect x="2" y="4" width="12" height="3" fill="#a87540"/><rect x="7" y="2" width="2" height="2" fill="#6b7769"/></svg>
+          占用空间
+        </div>
+        <div class="gauge-n"><b>6.4</b><i>GB</i></div>
+        <div class="seg"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="w"></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div>
+        <div class="gauge-h">
+          <svg width="12" height="12" viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="3" fill="#9aa39b"/><rect x="3" y="7" width="10" height="3" fill="#9aa39b"/><rect x="3" y="12" width="10" height="2" fill="#5c665c"/></svg>
+          现有份数
+        </div>
+        <div class="gauge-n"><b>8</b><i>/ 12 份</i></div>
+        <div class="seg"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+      </div>
+      <div>
+        <div class="gauge-h">
+          <svg width="12" height="12" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" fill="#e6e8e3"/><rect x="6" y="6" width="2" height="4" fill="#6d6d6d"/><rect x="8" y="6" width="2" height="4" fill="#6d6d6d"/><rect x="10" y="6" width="2" height="4" fill="#6d6d6d"/></svg>
+          最近一次
+        </div>
+        <div class="gauge-n"><b>2</b><i>小时前</i></div>
+        <div class="seg"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+      </div>
+      <div>
+        <div class="gauge-h">
+          <svg width="12" height="12" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" fill="#3b2a1a"/><rect x="7" y="4" width="2" height="5" fill="#f2c14e"/><rect x="7" y="9" width="5" height="2" fill="#f2c14e"/></svg>
+          下次自动
+        </div>
+        <div class="gauge-n"><b>04:00</b><i>今天</i></div>
+        <div class="seg"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+    </section>
+
+    <div class="sec-head"><span class="idx">策略</span><h2>自动备份</h2><span class="note">改完立刻生效，不用重启服务器</span></div>
+    <div class="card">
+      <div class="to" style="margin-bottom:18px">
+        <span class="tg-sw on"></span>
+        <div><div class="tl">开启自动备份</div><p class="td">到点前会先通知服务器保存地图，再打包 —— 不用停服，玩家感觉不到。</p></div>
+      </div>
+      <div class="form">
+        <div class="f">
+          <label>频率</label>
+          <select><option>每天一次</option><option>每 6 小时</option><option>每周一次</option><option>只在手动触发</option></select>
+          <span class="desc">人少的服务器每天一次就够。</span>
+        </div>
+        <div class="f">
+          <label>时间点</label>
+          <input type="text" value="04:00">
+          <span class="desc">挑没人在线的时候，打包更稳也更快。</span>
+        </div>
+        <div class="f">
+          <label>保留份数</label>
+          <input type="number" value="12">
+          <span class="desc">超出的自动删最旧的。按当前体积算，12 份约 9.6 GB。</span>
+        </div>
+        <div class="f">
+          <label>备份内容</label>
+          <select><option>世界 + 插件配置</option><option>只备份世界存档</option><option>全部（含日志与缓存）</option></select>
+          <span class="desc">带插件配置的好处：换机器还原后插件不用重配。</span>
+        </div>
+        <div class="f">
+          <label>存放位置</label>
+          <input type="text" value="F:\项目\开服器\backups\survival">
+          <span class="desc">可以直接指到移动硬盘或 NAS 的挂载盘。</span>
+        </div>
+        <div class="f">
+          <label>压缩</label>
+          <select><option>标准压缩（推荐）</option><option>最大压缩（慢，体积小）</option><option>不压缩（最快）</option></select>
+          <span class="desc">这服务器打包一次约 40 秒。</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-head"><span class="idx">手动</span><h2>现在就来一份</h2></div>
+    <div class="manual">
+      <button class="btn g">
+        <svg width="13" height="13" viewBox="0 0 16 16"><rect x="7" y="2" width="2" height="8" fill="#0c1108"/><rect x="4" y="9" width="8" height="2" fill="#0c1108"/><rect x="5" y="11" width="6" height="2" fill="#0c1108"/></svg>
+        立即备份
+      </button>
+      <div class="warn">改插件配置、装新模组之前，先手动来一份 —— 出问题了能一秒退回去，比翻日志查错快得多。</div>
+    </div>
+
+    <div class="sec-head"><span class="idx">历史</span><h2>备份文件</h2><span class="note">点文件名可看内容清单</span></div>
+    <div class="list">
+      <div class="lhead">
+        <span></span><span>名称 / 路径</span><span>时间</span><span>体积</span><span>类型</span><span style="text-align:right">操作</span>
+      </div>
+      <div class="lrow prot">
+        <svg width="18" height="18" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="3" y="2" width="10" height="12" fill="#5d9c3a"/><rect x="6" y="6" width="4" height="4" fill="#e9ede7"/></svg>
+        <div><div class="nm">survival-20261004-0145 <span class="chip g">已校验</span></div><div class="pth">F:\项目\开服器\backups\survival\survival-20261004-0145.zip</div></div>
+        <div class="t">今天 01:45</div>
+        <div class="sz">412 MB</div>
+        <div><span class="chip">自动</span></div>
+        <div class="ops"><span class="link">还原</span><span class="link">下载</span><span class="link">清单</span><span class="link dz">删除</span></div>
+      </div>
+      <div class="lrow">
+        <svg width="18" height="18" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="3" y="2" width="10" height="12" fill="#5d9c3a"/><rect x="6" y="6" width="4" height="4" fill="#e9ede7"/></svg>
+        <div><div class="nm">survival-20261003-0400</div><div class="pth">F:\项目\开服器\backups\survival\survival-20261003-0400.zip</div></div>
+        <div class="t">昨天 04:00</div>
+        <div class="sz">409 MB</div>
+        <div><span class="chip">自动</span></div>
+        <div class="ops"><span class="link">还原</span><span class="link">下载</span><span class="link">清单</span><span class="link dz">删除</span></div>
+      </div>
+      <div class="lrow">
+        <svg width="18" height="18" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="3" y="2" width="10" height="12" fill="#c8823c"/><rect x="6" y="6" width="4" height="4" fill="#241a05"/></svg>
+        <div><div class="nm">装 EssentialsX 之前 <span class="chip w">手动</span></div><div class="pth">F:\项目\开服器\backups\survival\manual-20261003-2210.zip</div></div>
+        <div class="t">昨天 22:10</div>
+        <div class="sz">411 MB</div>
+        <div><span class="chip">手动</span></div>
+        <div class="ops"><span class="link">还原</span><span class="link">下载</span><span class="link">清单</span><span class="link dz">删除</span></div>
+      </div>
+      <div class="lrow">
+        <svg width="18" height="18" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="3" y="2" width="10" height="12" fill="#5d9c3a"/><rect x="6" y="6" width="4" height="4" fill="#e9ede7"/></svg>
+        <div><div class="nm">survival-20261002-0400</div><div class="pth">F:\项目\开服器\backups\survival\survival-20261002-0400.zip</div></div>
+        <div class="t">10-02 04:00</div>
+        <div class="sz">403 MB</div>
+        <div><span class="chip">自动</span></div>
+        <div class="ops"><span class="link">还原</span><span class="link">下载</span><span class="link">清单</span><span class="link dz">删除</span></div>
+      </div>
+      <div class="lrow">
+        <svg width="18" height="18" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="3" y="2" width="10" height="12" fill="#5d9c3a"/><rect x="6" y="6" width="4" height="4" fill="#e9ede7"/></svg>
+        <div><div class="nm">survival-20261001-0400</div><div class="pth">F:\项目\开服器\backups\survival\survival-20261001-0400.zip</div></div>
+        <div class="t">10-01 04:00</div>
+        <div class="sz">398 MB</div>
+        <div><span class="chip">自动</span></div>
+        <div class="ops"><span class="link">还原</span><span class="link">下载</span><span class="link">清单</span><span class="link dz">删除</span></div>
+      </div>
+    </div>
+
+    <div class="restore">
+      <div class="rz-bar"></div>
+      <div class="rz-body">
+        <div class="rz-top">
+          <svg width="26" height="26" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="7" y="2" width="2" height="8" fill="#e0a33e"/><rect x="7" y="11" width="2" height="2" fill="#e0a33e"/><rect x="2" y="2" width="2" height="12" fill="#5a3a10"/><rect x="12" y="2" width="2" height="12" fill="#5a3a10"/></svg>
+          <div>
+            <h3>还原会把当前世界换成备份里的样子</h3>
+            <p>这是唯一一个按错就真丢东西的操作。所以它不藏在列表里，单独拎出来说清楚会发生什么。你现在看到的是「选了 10-02 那份」的状态。</p>
+          </div>
+        </div>
+
+        <div class="steps3">
+          <div class="st"><div class="no">第 1 步</div><b>先把现在存一份</b><p>自动打包当前世界成 <code>pre-restore-</code> 开头的备份，放在最前面。后悔了还能回去。</p></div>
+          <div class="st"><div class="no">第 2 步</div><b>停服，问在线玩家</b><p>提前 60 秒广播「服务器即将回档」，然后优雅停服。有玩家在线时不会硬来。</p></div>
+          <div class="st"><div class="no">第 3 步</div><b>换文件，重新开服</b><p>替换世界目录后自动启动，日志实时推给你看。出异常会保留现场。</p></div>
+        </div>
+
+        <div class="rz-pick">
+          <span class="lb">要还原到哪一份</span>
+          <select>
+            <option>survival-20261002-0400 · 10-02 04:00 · 403 MB</option>
+            <option>survival-20261003-0400 · 昨天 04:00 · 409 MB</option>
+            <option>survival-20261004-0145 · 今天 01:45 · 412 MB</option>
+            <option>manual-20261003-2210 · 装 EssentialsX 之前 · 411 MB</option>
+          </select>
+          <span class="chip w">当前世界有 7 人在线</span>
+        </div>
+
+        <div class="rz-act">
+          <span class="cf">按下去不会问你第二遍，确认好再点。</span>
+          <div class="r">
+            <button class="btn ghost">取消</button>
+            <button class="btn r">停服并还原到这一份</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="tag-plan">方案 B · 备份与还原</div>
+</body>
+</html>

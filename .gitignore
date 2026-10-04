@@ -1,0 +1,31 @@
+# Go
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# 运行时数据（存档与备份，绝不入库）
+data/
+servers/
+backups/
+runtimes/
+*.log
+
+# 开发用假服务端的编译产物（源码是 FakeServer.java + manifest.txt，需要时重编）
+tools/fakeserver/*.class
+tools/fakeserver/server.jar
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 系统
+Thumbs.db
+Desktop.ini

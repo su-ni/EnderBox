@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方案 B · 插件市场 — ServerBox 设计稿</title>
+<style>
+:root{
+  --bg:#111311;--bg2:#0b0d0b;--panel:#1c201d;--panel2:#242a25;--raised:#2e352f;
+  --ink1:#e9ede7;--ink2:#9daa9c;--ink3:#6b7769;
+  --grass:#5d9c3a;--grass2:#7cc24f;--dirt:#8b5a2b;--stone:#9aa39b;
+  --diamond:#4aedd9;--red:#e02c2c;--gold:#f2c14e;
+  --font:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,"Courier New",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:32px 32px;
+  color:var(--ink1);font-family:var(--font);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+svg{shape-rendering:crispEdges;display:block}
+.shell{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+.side{background:var(--bg2);padding:18px 14px;border-right:3px solid #000}
+.logo{display:flex;align-items:center;gap:10px;margin:0 4px 20px}
+.logo b{font-size:15px;font-weight:700}
+.logo span{font-family:var(--mono);font-size:11px;color:var(--ink3)}
+.side-label{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--ink3);margin:0 4px 10px}
+.world{display:flex;align-items:center;gap:11px;padding:9px 10px;margin-bottom:6px;background:var(--panel)}
+.world:hover{background:var(--panel2)}
+.world.on{background:var(--raised);box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000,inset 4px 0 0 0 var(--grass)}
+.world .nm{font-size:13.5px;font-weight:600;line-height:1.3}
+.world .sub{font-family:var(--mono);font-size:10.5px;color:var(--ink3)}
+.world.off{opacity:.62}
+.world .dot{margin-left:auto;width:8px;height:8px;background:var(--ink3)}
+.world.on .dot{background:var(--grass2)}
+.side-foot{margin:16px 4px 0;padding-top:14px;border-top:3px solid #000;font-family:var(--mono);font-size:10.5px;color:var(--ink3);line-height:1.9}
+
+.main{padding:20px 26px 40px;min-width:0}
+.back{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11.5px;color:var(--ink3);cursor:pointer}
+.back:hover{color:var(--grass2)}
+h1{font-size:22px;font-weight:700;margin-top:10px;line-height:1.3}
+.lead{margin-top:6px;font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+.lead b{color:var(--grass2);font-weight:700}
+
+.chip{display:inline-block;margin:0 6px 6px 0;padding:2px 7px;background:var(--raised);font-family:var(--mono);font-size:11px;color:var(--ink2);box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000}
+.chip.g{background:var(--grass);color:#0c1108;font-weight:700}
+.chip.w{background:var(--gold);color:#241a05;font-weight:700}
+.chip.d{background:#5f2222;color:#ffb3b3}
+code{font-family:var(--mono);font-size:12px;color:var(--diamond);background:#0b0f0c;padding:2px 7px;display:inline-block;box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000}
+
+/* 搜索区 */
+.search{display:flex;gap:12px;margin:22px 0 16px;flex-wrap:wrap}
+.sbox{flex:1;min-width:260px;display:flex;align-items:center;gap:10px;padding:0 14px;background:#0d100d;box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.sbox input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--ink1);font-size:14px;padding:13px 0}
+.sbox input::placeholder{color:#4e584d}
+.srcs{display:flex;box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.src{padding:12px 15px;background:var(--panel);border-right:3px solid #000;font-size:13px;color:var(--ink2);cursor:pointer}
+.src:last-child{border-right:0}
+.src:hover{background:var(--panel2);color:var(--ink1)}
+.src.on{background:var(--grass);color:#0c1108;font-weight:700}
+.src .c{font-family:var(--mono);font-size:10px;opacity:.75;margin-left:5px}
+
+/* 筛选条 */
+.filters{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:13px 15px;background:var(--panel);box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.filters .fl{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--ink3)}
+.fchip{padding:5px 11px;background:var(--panel2);font-size:12.5px;color:var(--ink2);cursor:pointer;box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000}
+.fchip:hover{color:var(--ink1)}
+.fchip.on{background:var(--grass);color:#0c1108;font-weight:700}
+.filters .sort{margin-left:auto;display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+
+/* 结果列表 */
+.results{margin-top:18px}
+.res{display:grid;grid-template-columns:1fr 200px;gap:16px;align-items:center;padding:15px 16px;margin-bottom:10px;background:var(--panel);box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.res:hover{background:var(--panel2)}
+.res .l{display:flex;gap:14px;min-width:0}
+.res .ico{flex:0 0 auto}
+.res h3{font-size:14.5px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.res .by{font-family:var(--mono);font-size:11px;color:var(--ink3);margin-top:2px}
+.res p{margin-top:7px;font-size:12.5px;color:var(--ink2);line-height:1.65;max-width:64ch}
+.res .tags{margin-top:9px}
+.res .r{display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.res .stat{font-family:var(--mono);font-size:11px;color:var(--ink3);text-align:right;line-height:1.8}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 14px;background:#6d6d6d;color:#fff;font-weight:600;font-size:13px;border:0;cursor:pointer;
+  box-shadow:inset -3px -3px 0 0 rgba(0,0,0,.42),inset 3px 3px 0 0 rgba(255,255,255,.2),0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.btn:hover{background:#7d7d7d}
+.btn.g{background:var(--grass);color:#0c1108}
+.btn.g:hover{background:var(--grass2)}
+.btn.sm{padding:6px 11px;font-size:12.5px}
+.btn.ghost{background:transparent;color:var(--ink2);box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.btn.ghost:hover{color:var(--ink1);background:var(--panel2)}
+.sel-vers{background:#0d100d;border:0;outline:0;color:var(--ink2);font-family:var(--mono);font-size:11.5px;padding:7px 9px;width:100%}
+
+/* 安装中 */
+.installing{display:flex;align-items:center;gap:12px;padding:15px 16px;margin-bottom:10px;background:var(--raised);box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.bar{display:flex;gap:2px;flex:1;min-width:0}
+.bar i{flex:1;height:12px;background:#1a1f1a;box-shadow:inset 0 0 0 1px #000}
+.bar i.on{background:var(--gold)}
+
+/* 分节标题 */
+.sec-head{display:flex;align-items:center;gap:12px;margin:30px 0 14px;padding-bottom:10px;border-bottom:3px solid #000}
+.sec-head h2{font-size:16px;font-weight:700}
+.sec-head .idx{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--ink3)}
+.sec-head .note{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink3)}
+
+/* 已安装 */
+.inst{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.item{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--panel);box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000}
+.item.dis{opacity:.6}
+.item .nm{font-size:13.5px;font-weight:700;line-height:1.3}
+.item .mt{font-family:var(--mono);font-size:10.5px;color:var(--ink3);margin-top:3px}
+.item .rt{margin-left:auto;display:flex;align-items:center;gap:9px}
+.tg-sw{flex:0 0 auto;width:40px;height:20px;background:#1a1f1a;position:relative;cursor:pointer;box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000}
+.tg-sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--stone)}
+.tg-sw.on{background:#1f3a1f}
+.tg-sw.on::after{left:22px;background:var(--grass2)}
+.link{font-family:var(--mono);font-size:11.5px;color:var(--ink3);cursor:pointer;white-space:nowrap}
+.link:hover{color:var(--grass2)}
+.link.dz:hover{color:#ff8b8b}
+
+/* 上传 */
+.drop{display:grid;place-items:center;padding:34px 20px;background:var(--panel);border:0;box-shadow:0 -3px 0 0 #000,0 3px 0 0 #000,-3px 0 0 0 #000,3px 0 0 0 #000,inset 0 0 0 3px #0b0d0b}
+.drop .in{text-align:center}
+.drop h3{font-size:14px;font-weight:700;margin-top:12px}
+.drop p{margin-top:6px;font-size:12.5px;color:var(--ink2);max-width:52ch}
+.drop .fmt{margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--ink3);line-height:1.9}
+
+.hint{font-size:12.5px;color:var(--ink2);line-height:1.7}
+
+.tag-plan{position:fixed;right:14px;bottom:12px;padding:5px 10px;background:var(--raised);font-family:var(--mono);font-size:10.5px;color:var(--ink3);box-shadow:0 -2px 0 0 #000,0 2px 0 0 #000,-2px 0 0 0 #000,2px 0 0 0 #000;z-index:9}
+
+@media(max-width:1000px){.inst{grid-template-columns:1fr}.res{grid-template-columns:1fr}.res .stat{text-align:left}}
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .side{border-right:0;border-bottom:3px solid #000}
+  .main{padding:16px 16px 30px;min-width:0}
+  .side{min-width:0}
+  .res,.item,.drop,.filters,.search,.sbox{min-width:0}
+  .res h3,.res p,.item .nm{overflow-wrap:anywhere}
+  code{word-break:break-all}
+  .srcs{width:100%}
+  .src{flex:1;text-align:center;border-bottom:0;font-size:12.5px}
+  .filters .sort{margin-left:0;width:100%}
+  .sec-head{flex-wrap:wrap}
+  .sec-head .note{margin-left:0;width:100%}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="logo">
+      <svg width="26" height="26" viewBox="0 0 16 16">
+        <rect width="16" height="16" fill="#3b2a1a"/><rect width="16" height="5" fill="#5d9c3a"/>
+        <rect x="1" y="2" width="2" height="2" fill="#7cc24f"/><rect x="6" y="1" width="2" height="2" fill="#4a7d2c"/>
+        <rect x="2" y="6" width="3" height="2" fill="#a06c34"/><rect x="8" y="8" width="4" height="2" fill="#6f4520"/>
+      </svg>
+      <div><b>ServerBox</b><br><span>v0.3 · WIN</span></div>
+    </div>
+    <p class="side-label">世界 / WORLDS</p>
+    <div class="world on">
+      <svg width="22" height="22" viewBox="0 0 16 16"><rect width="16" height="16" fill="#3b2a1a"/><rect width="16" height="5" fill="#5d9c3a"/><rect x="1" y="2" width="2" height="2" fill="#7cc24f"/><rect x="9" y="6" width="3" height="2" fill="#a06c34"/></svg>
+      <div><div class="nm">生存服 · 长期档</div><div class="sub">PAPER 1.21.4</div></div><span class="dot"></span>
+    </div>
+    <div class="world">
+      <svg width="22" height="22" viewBox="0 0 16 16"><rect width="16" height="16" fill="#3b2a1a"/><rect width="16" height="5" fill="#5d9c3a"/><rect x="4" y="1" width="2" height="2" fill="#7cc24f"/><rect x="2" y="7" width="4" height="2" fill="#a06c34"/></svg>
+      <div><div class="nm">创造服 · 建筑</div><div class="sub">FABRIC 1.20.1</div></div><span class="dot"></span>
+    </div>
+    <div class="side-foot">插件 5 个 · 需更新 1 个<br>MOD 0 个<br>来源 MODRINTH + CURSEFORGE</div>
+  </aside>
+
+  <main class="main">
+    <span class="back">
+      <svg width="12" height="12" viewBox="0 0 16 16"><rect x="6" y="3" width="2" height="10" fill="currentColor"/><rect x="4" y="6" width="2" height="4" fill="currentColor"/><rect x="2" y="7" width="2" height="2" fill="currentColor"/></svg>
+      返回控制台
+    </span>
+    <h1>插件与模组</h1>
+    <p class="lead">正在为 <b>生存服 · Paper 1.21.4</b> 挑选 —— 搜索结果已经帮你过滤掉了不兼容这个版本的东西。</p>
+
+    <div class="search">
+      <label class="sbox">
+        <svg width="15" height="15" viewBox="0 0 16 16"><rect x="2" y="2" width="8" height="2" fill="#6b7769"/><rect x="2" y="2" width="2" height="8" fill="#6b7769"/><rect x="10" y="4" width="2" height="6" fill="#6b7769"/><rect x="4" y="10" width="6" height="2" fill="#6b7769"/><rect x="11" y="11" width="3" height="3" fill="#6b7769"/></svg>
+        <input placeholder="搜插件名 / 功能关键词，比如「防熊」「经济」">
+      </label>
+      <div class="srcs">
+        <span class="src on">全部<span class="c">128</span></span>
+        <span class="src">Modrinth<span class="c">96</span></span>
+        <span class="src">CurseForge<span class="c">32</span></span>
+        <span class="src">本地上传</span>
+      </div>
+    </div>
+
+    <div class="filters">
+      <span class="fl">筛选</span>
+      <span class="fchip on">兼容 1.21.4</span>
+      <span class="fchip">管理</span>
+      <span class="fchip">经济</span>
+      <span class="fchip on">保护防熊</span>
+      <span class="fchip">性能</span>
+      <span class="fchip">世界生成</span>
+      <span class="fchip">中文可用</span>
+      <span class="sort">排序：<span style="color:var(--ink1)">下载量</span> · 最近更新 · 名字</span>
+    </div>
+
+    <div class="results">
+      <div class="res">
+        <div class="l">
+          <svg class="ico" width="40" height="40" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="2" y="2" width="12" height="12" fill="#4aedd9"/><rect x="2" y="2" width="12" height="3" fill="#8ff6ea"/><rect x="4" y="7" width="8" height="1" fill="#0f6b60"/><rect x="7" y="8" width="2" height="4" fill="#0f6b60"/><rect x="4" y="11" width="8" height="1" fill="#0f6b60"/></svg>
+          <div>
+            <h3>LuckPerms <span class="chip g">已安装</span></h3>
+            <div class="by">by Luck · 权限管理</div>
+            <p>服务器圈的事实标准权限插件。给玩家分组、设权限节点，几乎所有需要「谁能做什么」的场合都靠它。</p>
+            <div class="tags"><span class="chip">1.21.4 兼容</span><span class="chip">服务端</span><span class="chip">中文文档</span><span class="chip">4.4 MB</span></div>
+          </div>
+        </div>
+        <div class="r">
+          <div class="stat">下载 48.2M · 更新于 3 天前<br>来源 Modrinth</div>
+          <button class="btn ghost sm">已安装 · 管理</button>
+        </div>
+      </div>
+
+      <div class="res">
+        <div class="l">
+          <svg class="ico" width="40" height="40" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="2" y="2" width="12" height="12" fill="#9aa39b"/><rect x="2" y="2" width="12" height="3" fill="#c4ccc4"/><rect x="5" y="5" width="6" height="7" fill="#5c665c"/><rect x="6" y="6" width="4" height="2" fill="#2b322b"/></svg>
+          <div>
+            <h3>CoreProtect</h3>
+            <div class="by">by Intelli · 保护防熊</div>
+            <p>记录每一个方块的放置与破坏。谁炸了你的房子、谁偷了箱子里的钻石，一查日志就知道，还能一键回滚。</p>
+            <div class="tags"><span class="chip">1.21.4 兼容</span><span class="chip">服务端</span><span class="chip">占磁盘</span><span class="chip">1.8 MB</span></div>
+          </div>
+        </div>
+        <div class="r">
+          <select class="sel-vers"><option>1.21.4 · v22.4</option><option>1.21.4 · v22.3</option></select>
+          <button class="btn g sm">安装</button>
+        </div>
+      </div>
+
+      <div class="installing">
+        <svg width="28" height="28" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="2" y="2" width="12" height="12" fill="#c8823c"/><rect x="2" y="2" width="12" height="3" fill="#e0a05c"/><rect x="5" y="7" width="6" height="2" fill="#8a5522"/><rect x="5" y="10" width="4" height="2" fill="#8a5522"/></svg>
+        <div style="min-width:0">
+          <div style="font-size:13.5px;font-weight:700">EssentialsX · 正在安装</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--ink3);margin-top:3px">下到 <code>plugins/EssentialsX-2.20.1.jar</code> · 3.2 / 5.1 MB · 8.1 MB/s</div>
+        </div>
+        <div class="bar"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+
+      <div class="res">
+        <div class="l">
+          <svg class="ico" width="40" height="40" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="2" y="2" width="12" height="12" fill="#8b5a2b"/><rect x="2" y="2" width="12" height="3" fill="#a87540"/><rect x="3" y="6" width="10" height="1" fill="#5e3a19"/><rect x="3" y="9" width="10" height="1" fill="#5e3a19"/><rect x="7" y="6" width="2" height="4" fill="#f2c14e"/></svg>
+          <div>
+            <h3>Vault <span class="chip w">依赖</span></h3>
+            <div class="by">by MilkBowl · 经济接口</div>
+            <p>经济插件和权限插件之间的桥。你装了任何带商店、金钱、地皮的功能，基本都需要先装它，它自己不带功能。</p>
+            <div class="tags"><span class="chip">1.21.4 兼容</span><span class="chip">服务端</span><span class="chip">180 KB</span></div>
+          </div>
+        </div>
+        <div class="r">
+          <div class="stat">下载 31.7M · 更新于 2 个月前<br>来源 Modrinth</div>
+          <button class="btn g sm">安装</button>
+        </div>
+      </div>
+
+      <div class="res" style="opacity:.72">
+        <div class="l">
+          <svg class="ico" width="40" height="40" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="2" y="2" width="12" height="12" fill="#7a6a5a"/><rect x="2" y="2" width="12" height="3" fill="#9c8b78"/><rect x="5" y="6" width="6" height="2" fill="#4a3f34"/><rect x="5" y="10" width="4" height="2" fill="#4a3f34"/></svg>
+          <div>
+            <h3>PlayerShopX</h3>
+            <div class="by">by 某作者 · 经济</div>
+            <p>玩家自己开店铺卖东西，带 GUI 菜单和挂牌收购。</p>
+            <div class="tags"><span class="chip d">只支持到 1.20.6</span><span class="chip">服务端</span></div>
+          </div>
+        </div>
+        <div class="r">
+          <div class="stat">下载 2.1M · 最后更新 1 年前<br>来源 CurseForge</div>
+          <button class="btn ghost sm" disabled style="opacity:.5;cursor:default">版本不兼容</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-head"><span class="idx">已安装</span><h2>这台服务器上装了 5 个</h2><span class="note">关掉开关即时生效，不用重装</span></div>
+    <div class="inst">
+      <div class="item">
+        <svg width="26" height="26" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="2" y="2" width="12" height="12" fill="#4aedd9"/><rect x="4" y="7" width="8" height="1" fill="#0f6b60"/><rect x="7" y="8" width="2" height="4" fill="#0f6b60"/></svg>
+        <div><div class="nm">LuckPerms</div><div class="mt">v5.4.152 · 权限</div></div>
+        <div class="rt"><span class="link">设置</span><span class="tg-sw on"></span></div>
+      </div>
+      <div class="item">
+        <svg width="26" height="26" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="2" y="2" width="12" height="12" fill="#c8a27a"/><rect x="2" y="2" width="12" height="3" fill="#e0c09a"/><rect x="6" y="7" width="4" height="2" fill="#7a5a34"/><rect x="7" y="9" width="2" height="3" fill="#7a5a34"/></svg>
+        <div><div class="nm">EssentialsX</div><div class="mt">v2.20.1 · 基础指令 <span style="color:var(--gold)">安装中</span></div></div>
+        <div class="rt"><span class="link">设置</span><span class="tg-sw on"></span></div>
+      </div>
+      <div class="item">
+        <svg width="26" height="26" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="2" y="2" width="12" height="12" fill="#9aa39b"/><rect x="5" y="5" width="6" height="7" fill="#5c665c"/><rect x="6" y="6" width="4" height="2" fill="#2b322b"/></svg>
+        <div><div class="nm">CoreProtect</div><div class="mt">v22.2 · 保护</div></div>
+        <div class="rt"><span class="link" style="color:var(--gold)">可更新 v22.4</span><span class="tg-sw on"></span></div>
+      </div>
+      <div class="item">
+        <svg width="26" height="26" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="2" y="2" width="12" height="12" fill="#5d9c3a"/><rect x="2" y="2" width="12" height="3" fill="#7cc24f"/><rect x="4" y="8" width="8" height="2" fill="#2f5a1c"/></svg>
+        <div><div class="nm">AuthMe</div><div class="mt">v5.6.0 · 登录验证</div></div>
+        <div class="rt"><span class="link">设置</span><span class="tg-sw on"></span></div>
+      </div>
+      <div class="item dis">
+        <svg width="26" height="26" viewBox="0 0 16 16"><rect width="16" height="16" fill="#0b0d0b"/><rect x="2" y="2" width="12" height="12" fill="#c8823c"/><rect x="5" y="7" width="6" height="2" fill="#8a5522"/></svg>
+        <div><div class="nm">ShopPlugin</div><div class="mt">v1.2.0 · 商店 · 昨天崩过 3 次</div></div>
+        <div class="rt"><span class="link dz">卸载</span><span class="tg-sw"></span></div>
+      </div>
+    </div>
+
+    <div class="sec-head"><span class="idx">手动</span><h2>自己上传</h2><span class="note">从别处下的 jar / zip 也能装</span></div>
+    <div class="drop">
+      <div class="in">
+        <svg width="42" height="42" viewBox="0 0 16 16" style="margin:0 auto"><rect width="16" height="16" fill="#0b0d0b"/><rect x="3" y="2" width="10" height="12" fill="#e6e8e3"/><rect x="7" y="5" width="2" height="6" fill="#4a7d2c"/><rect x="5" y="7" width="6" height="2" fill="#4a7d2c"/></svg>
+        <h3>把文件拖到这里，或者点一下选文件</h3>
+        <p>会自动识别它是插件还是模组，检查跟 Paper 1.21.4 兼不兼容，然后塞进正确的目录。</p>
+        <div class="fmt">支持 .jar / .zip · 单文件最大 200 MB<br>插件 → plugins/ &nbsp;&nbsp;模组 → mods/</div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="tag-plan">方案 B · 插件市场</div>
+</body>
+</html>

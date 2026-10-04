@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ServerBox</title>
+    <script>
+      /* 无头截图调试探针：带 ?probe=1 时把文档宽度写进 title，
+         用 chrome --dump-dom | grep '<title>' 就能量化判断有没有横向溢出。
+         （SW==CW 即无横向溢出。CLI 跑不了任意 JS，这是最省事的通道。）
+         需要看别的计算样式时，临时往下面 t 上再拼一段即可。 */
+      if (location.search.indexOf('probe=') >= 0) {
+        addEventListener('load', function () {
+          setTimeout(function () {
+            var d = document.documentElement
+            document.title = 'SW=' + d.scrollWidth + ' CW=' + d.clientWidth + ' BW=' + document.body.scrollWidth
+          }, 1500)
+        })
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
