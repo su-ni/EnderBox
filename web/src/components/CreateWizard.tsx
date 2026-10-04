@@ -3,6 +3,7 @@ import { api } from '../api'
 import { IconBack, IconCheck, IconPlus, IconTypeBlock } from './Icons'
 import { StepInput } from './StepInput'
 import { TYPE_LABEL, javaForVersion } from '../types'
+import { lacksJava, useLocalJava } from '../useLocalJava'
 import { ServerPicker, type Picked } from './ServerPicker'
 import { DownloadBar } from './DownloadBar'
 
@@ -107,6 +108,8 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
   const [newId, setNewId] = useState('')
   const [taskId, setTaskId] = useState('')
   const [dlErr, setDlErr] = useState('')
+  // 本机 Java 的最高主版本 —— 判断「选的这个构建在这台机器上跑不跑得起来」
+  const { max: javaMax } = useLocalJava()
   const [form, setForm] = useState({
     name: '',
     type: 'paper',
@@ -311,7 +314,11 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
               <dl className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-[13px]">
                 <dt className="eyebrow">这个版本要</dt>
                 <dd>
-                  <span className="chip chip-g">Java {java} 或更高</span>
+                  {lacksJava(java, javaMax) ? (
+                    <span className="chip chip-d">本机缺 Java {java}</span>
+                  ) : (
+                    <span className="chip chip-g">Java {java} 或更高</span>
+                  )}
                 </dd>
                 <dt className="eyebrow">数值来自</dt>
                 <dd className="text-[12.5px] text-ink-2">

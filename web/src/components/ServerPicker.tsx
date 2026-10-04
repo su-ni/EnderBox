@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type FetchBuild, type FetchSource, type GameVersion } from '../api'
+import { javaShortage, lacksJava, useLocalJava } from '../useLocalJava'
 import { IconRefresh } from './Icons'
 import { fmtSize, fmtTime } from './ui'
 
@@ -18,9 +19,14 @@ function isStable(b: FetchBuild) {
  * 所以「直接取列表第一个」会把测试版塞给新手。没有稳定构建时才退回最新的，
  * 并且界面上必须明说 —— 用户有权知道自己拿的是测试版。
  */
-function defaultBuild(list: FetchBuild[]): FetchBuild | null {
+function defaultBuild(list: FetchBuild[], runnable: (b: FetchBuild) => boolean): FetchBuild | null {
   if (list.length === 0) return null
-  return list.find(isStable) ?? list[0]
+  // 先把「本机装不了它要的 Java」的构建排掉 —— 默认给一个下完起不来的包毫无意义。
+  // 全都跑不起来时（比如最新版要 Java 25、这台只有 21）才退回全列表，
+  // 同时界面上会明确说清楚缺哪个 Java。
+  const usable = list.filter(runnable)
+  const pool = usable.length > 0 ? usable : list
+  return pool.find(isStable) ?? pool[0]
 }
 
 export type Picked = {
@@ -64,6 +70,9 @@ export function ServerPicker({
   const [version, setVersion] = useState(value?.version ?? '')
   const [loading, setLoading] = useState('')
   const [err, setErr] = useState('')
+
+  // 本机有哪些 Java。选构建时就要比对，别让人白下 50MB 才发现起不来。
+  const { max: javaMax, maxRef: javaMaxRef } = useLocalJava()
 
   // 支持的类型 + 该类型能用的下载源。Paper 挂 BMCLAPI 是没意义的（那个路径 404），
   // 所以可选源由后端按类型给，前端不猜。
@@ -126,7 +135,8 @@ export function ServerPicker({
         const d = await api.fetchBuilds(type, ver, mirror, 20)
         const list = d.items ?? []
         setBuilds(list)
-        const def = defaultBuild(list)
+        // 读 ref 而不是 state：加载函数不能因为 javaMax 变化而重建（会连带重拉列表）
+        const def = defaultBuild(list, (b) => !lacksJava(b.javaMajor, javaMaxRef.current))
         if (def) {
           onPick({
             version: ver,
@@ -153,6 +163,10 @@ export function ServerPicker({
     // 只在版本或镜像变化时重拉，不在 onPick 变化时（父组件每次渲染都可能换引用）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version, type, mirror])
+
+  // 本机缺这个构建要的 Java 吗。javaMax 为 null（还没问到）时不提示
+  const javaMissing = (major: number) => lacksJava(major, javaMax)
+  const pickedMissing = value !== null && javaMissing(value.javaMajor)
 
   const unsupported = src && !src.available
 
@@ -243,6 +257,13 @@ export function ServerPicker({
             <p className="text-[12.5px] text-ink-2">这个版本没有可下载的构建。</p>
           ) : (
             <>
+              {pickedMissing && (
+                <p className="mb-3 border-l-[3px] border-danger bg-[#1c1314] px-4 py-2.5 text-[12.5px] leading-relaxed text-[#ffc2c2]">
+                  <b className="text-ink-1">{javaShortage(value?.javaMajor ?? 0, javaMax)}</b>
+                  ，下下来也起不来。先把 Java {value?.javaMajor} 装好（设置页的「Java 运行时」里点
+                  「重新扫描」就能认出来），或者换一个低一些的版本。
+                </p>
+              )}
               {!builds.some(isStable) && (
                 <p className="mb-3 border-l-[3px] border-warn bg-[#1a1812] px-4 py-2.5 text-[12.5px] leading-relaxed text-[#e7dcb2]">
                   <b className="text-ink-1">{version} 目前一个稳定构建都没有</b>
@@ -283,7 +304,10 @@ export function ServerPicker({
                       </span>
                     )}
                     <span className="mono-meta shrink-0">{fmtSize(b.size)}</span>
-                    <span className="mono-meta shrink-0">需要 Java {b.javaMajor || '?'}</span>
+                    <span className={`mono-meta shrink-0${javaMissing(b.javaMajor) ? ' text-[#ffc2c2]' : ''}`}>
+                      需要 Java {b.javaMajor || '?'}
+                    </span>
+                    {javaMissing(b.javaMajor) && <span className="chip chip-d shrink-0">跑不起来</span>}
                     <span className="mono-meta ml-auto shrink-0">{b.time ? fmtTime(b.time) : ''}</span>
                   </button>
                 )

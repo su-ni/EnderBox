@@ -50,6 +50,8 @@ Go 单 exe 守护进程 + React/TS/Tailwind v4 + Wails（**未开始**）。多�
 7. 缩略图只发现疑点，定论走 getComputedStyle/grep 构建产物。
 8. 批改正则别只匹配行首，改完用测试复验（见 properties_test.go 的教训：漏 Group 零报错）。
 9. 接第三方 API 前先打真接口（skill `external-api-probe`）。
+10. **补丁脚本必须写成幂等**：沙箱会重跑，且「在锚点前后插入」的编辑其锚点在插入后依然存在 →
+   会被插两遍（`redeclared in this block` / 组件里出现两份）。凡是插入式编辑，先判 `count(new)==1` 就 return。
 
 ## 后端接口已实现（均实测）
 preflight 六项体检 / eula / fix(accept_eula·sync_port·rescan_java) / PUT 实例（整体覆盖）/
@@ -59,7 +61,9 @@ server-jar 下载 / start 体检不过回 409+整份报告 / 全局设置+鉴权
 **真 Paper 1.21.4 全流程已跑通**（2026-10-04）：下载→体检→EULA→启动→命令→停服，就绪 18.2s(首)/11.6s(二)。
 
 **待人拍板的待办**：
-- 26.3（最新版）构建全是 BETA 且要 **Java 25**（本机无）。前端只警告「零稳定构建」，
-  「本机没这个 Java」要到启动体检才拦 —— 用户会白下 54MB。可考虑选构建时就比对本机 Java。
 - `PaperVersions()` 给每个版本都标 `stable:true`（只看名字有无 `-`，没看构建 channel），与前端判定口径不一致。
-- v0.1 剩余：自动备份（P0）、崩溃日志智能分析（P1）。
+- v0.1 剩余：自动备份（P0，用户已点名下一个做）、崩溃日志智能分析（P1）。
+
+**已做**：选版本/构建时就比对本机 Java（`web/src/useLocalJava.ts`）。
+`null`=还没问到（闭嘴）、`0`=真没有（报警）必须分开；`maxRef` 给「加载时挑默认项」用，避免加载函数重建。
+配置页分组可用 `?g=__server__` 直达「服务端文件」组；建一个目标版本的实例就能借 `preferVersion` 自动选中它，免点击。
