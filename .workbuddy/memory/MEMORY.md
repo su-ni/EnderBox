@@ -52,11 +52,22 @@ Go 单 exe 守护进程 + React/TS/Tailwind v4 + Wails（**未开始**）。多�
 9. 接第三方 API 前先打真接口（skill `external-api-probe`）。
 10. **补丁脚本必须写成幂等**：沙箱会重跑，且「在锚点前后插入」的编辑其锚点在插入后依然存在 →
    会被插两遍（`redeclared in this block` / 组件里出现两份）。凡是插入式编辑，先判 `count(new)==1` 就 return。
+11. **行尾别一刀切**：本仓库行尾是混的 —— `internal/**/*.go` 存 **LF**、`web/**` 存 **CRLF**。
+    python 读入默认把 `\r\n` 归一成 `\n`，写出若用 `newline='\n'` 就把整个文件压成 LF，
+    diff 里表现为「整个文件都改了」（几百行膨胀到上千行），真实改动全被淹没。
+    **改完必须 `git diff --stat` 复核**；判行尾用字节统计或 `od -c`，
+    **别用 `grep -c $'\r'`**——本轮它把纯 LF 文件报成「每行都有 CR」，据此做了错误的一刀切。
 
 ## 后端接口已实现（均实测）
 preflight 六项体检 / eula / fix(accept_eula·sync_port·rescan_java) / PUT 实例（整体覆盖）/
 properties GET|PUT（23 字段带 kind/label/hint/options，未知键只读附尾）/ fetch sources|versions|builds|tasks /
 server-jar 下载 / start 体检不过回 409+整份报告 / 全局设置+鉴权 / Paper+原版 jar 一键下载（含断点续传+SHA+轮询进度）。
+
+**服务端类型真相源**：`fetch.Sources()` 是**唯一**真相源 —— 列出全部 7 种类型并带 `available`，
+只有 paper/vanilla 能自动下载，其余 5 种标 `available:false` + 写明为什么。前端「能不能选 / 能不能下」
+全读它（`SourceOf()` 让 API 复用同一份文案）。**别在前端另写一份类型名单** ——
+曾经只返回 2 种，导致选 Forge 时 ServerPicker 的「不支持」面板判据 `src && !src.available` 永不触发（死代码），
+于是径直去拉 versions → 后端 400 → 前端画成一个点了永远一样的「重试」，用户走进死循环。
 
 **真 Paper 1.21.4 全流程已跑通**（2026-10-04）：下载→体检→EULA→启动→命令→停服，就绪 18.2s(首)/11.6s(二)。
 
@@ -65,5 +76,8 @@ server-jar 下载 / start 体检不过回 409+整份报告 / 全局设置+鉴权
 - v0.1 剩余：自动备份（P0，用户已点名下一个做）、崩溃日志智能分析（P1）。
 
 **已做**：选版本/构建时就比对本机 Java（`web/src/useLocalJava.ts`）。
+**已做**：未支持的服务端类型如实说清原因 —— `fetch.Sources()` 补全 7 种 + `SourceOf()`；
+向导第 1 步置灰不可点的类型（仍列出并写明原因，免得选完版本走到第 2 步才发现是死路）；
+ServerPicker 的「不支持」面板加了 `srcReady`（问过源站没有）才生效，**避免把网络失败误报成「不支持」**。
 `null`=还没问到（闭嘴）、`0`=真没有（报警）必须分开；`maxRef` 给「加载时挑默认项」用，避免加载函数重建。
 配置页分组可用 `?g=__server__` 直达「服务端文件」组；建一个目标版本的实例就能借 `preferVersion` 自动选中它，免点击。
