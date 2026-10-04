@@ -1,3 +1,4 @@
+import { maybeDelay } from './dev'
 import type { Instance, Metrics } from './types'
 
 export type PluginItem = {
@@ -170,6 +171,8 @@ export class PreflightBlocked extends Error {
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  // 只有 ?slow= 时才等待。默认 0，正常路径上是个已 resolve 的 Promise。
+  await maybeDelay(path)
   const r = await fetch('/api' + path, { credentials: 'same-origin', ...init })
   if (!r.ok) {
     let msg = r.statusText

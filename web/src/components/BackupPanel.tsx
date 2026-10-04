@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type BackupItem } from '../api'
 import { IconSave, IconTrash, IconWarn } from './Icons'
-import { DangerZone, Empty, Field, ListRow, NotReady, SectionHead, fmtSize, fmtTime } from './ui'
+import { DangerZone, Empty, Field, ListRow, NotReady, SectionHead, SkeletonList, fmtSize, fmtTime } from './ui'
 import type { Instance } from '../types'
 
 const PREVIEW_RESTORE = new URLSearchParams(location.search).has('restore')
@@ -17,6 +17,9 @@ export function BackupPanel({ instance, onToast }: Props) {
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const [pick, setPick] = useState<BackupItem | null>(null)
+  /* 首屏标记。没有它的话，数据回来之前界面会先写「还没有备份」—— 那是句假话，
+     而且恰好撒在用户最在意的地方（存档）。 */
+  const [loading, setLoading] = useState(true)
 
   const reload = useCallback(async () => {
     try {
@@ -29,12 +32,15 @@ export function BackupPanel({ instance, onToast }: Props) {
       if (PREVIEW_RESTORE) setPick((prev) => prev ?? list[0] ?? null)
     } catch (e) {
       setErr((e as Error).message)
+    } finally {
+      setLoading(false)
     }
   }, [instance.id])
 
   useEffect(() => {
     setItems([])
     setPick(null)
+    setLoading(true)
     reload()
   }, [reload])
 
@@ -121,7 +127,13 @@ export function BackupPanel({ instance, onToast }: Props) {
         <SectionHead
           idx="02"
           title="备份文件"
-          note={items.length > 0 ? `${items.length} 份 · 共 ${fmtSize(total)}` : "还没有备份"}
+          note={
+            loading
+              ? '正在读取…'
+              : items.length > 0
+                ? `${items.length} 份 · 共 ${fmtSize(total)}`
+                : '还没有备份'
+          }
           right={
             <button type="button" className="btn btn-ghost btn-sm" onClick={reload}>
               刷新
@@ -129,7 +141,9 @@ export function BackupPanel({ instance, onToast }: Props) {
           }
         />
 
-        {items.length === 0 ? (
+        {loading ? (
+          <SkeletonList rows={3} />
+        ) : items.length === 0 ? (
           <Empty>世界越大越舍不得丢。先手动点一次上面那颗按钮试试。</Empty>
         ) : (
           <div className="stagger px-card">

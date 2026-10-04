@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type GlobalSettings, type MirrorOption } from '../api'
 import { IconCheck, IconRefresh, IconShield, IconTrash, IconWarn } from './Icons'
-import { Field, NotReady, SectionHead, ToggleRow } from './ui'
+import { Field, NotReady, SectionHead, SkeletonFields, ToggleRow } from './ui'
 
 /**
  * 「访问安全」面板。
@@ -125,7 +125,7 @@ export function AccessPanel({ onToast }: { onToast: (m: string) => void }) {
       </p>
     )
   }
-  if (!cfg) return <p className="text-[13px] text-ink-3">读取中…</p>
+  if (!cfg) return <SkeletonFields rows={4} />
 
   // 只有「暴露在局域网 且 没开保护」才算危险。只开保护但没暴露，是用户自己的选择。
   const risky = cfg.runtime.exposed && !cfg.requireAuth
@@ -395,7 +395,7 @@ export function SourcePanel({ onToast }: { onToast: (m: string) => void }) {
       </p>
     )
   }
-  if (!cfg) return <p className="text-[13px] text-ink-3">读取中…</p>
+  if (!cfg) return <SkeletonFields rows={4} />
 
   return (
     <div>

@@ -169,3 +169,49 @@ export function fmtTime(iso: string): string {
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
+
+/**
+ * 骨架屏：数据还没到时的占位。
+ *
+ * 为什么不用「读取中…」三个字：文字占位会让人以为已经加载完了、只是内容为空 ——
+ * 放在「备份列表」这种地方就等于在撒谎。而且换行成文字会让页面高度先塌后跳。
+ */
+export function Skeleton({ w = '100%', h = 9 }: { w?: string; h?: number }) {
+  return <span className="sk" style={{ width: w, height: h }} aria-hidden="true" />
+}
+
+/** 列表类页面的骨架。版式刻意对齐 ListRow，数据到位时不会「跳」一下。 */
+export function SkeletonList({ rows = 3, icon = true }: { rows?: number; icon?: boolean }) {
+  return (
+    <div className="px-card" role="status" aria-busy="true" aria-label="正在读取">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="row-b flex items-center gap-3.5 px-4 py-3.5">
+          {icon && <Skeleton w="18px" h={18} />}
+          <div className="min-w-0 flex-1">
+            <Skeleton w={`${54 - i * 9}%`} h={11} />
+            <div className="mt-2">
+              <Skeleton w="36%" />
+            </div>
+          </div>
+          <Skeleton w="56px" h={22} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 表单/配置类页面的骨架：对齐「标签 → 控件」的版式 */
+export function SkeletonFields({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="px-card px-5 py-4" role="status" aria-busy="true" aria-label="正在读取">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="py-3">
+          <Skeleton w={`${32 - i * 3}%`} h={10} />
+          <div className="mt-2.5">
+            <Skeleton w="min(300px, 62%)" h={30} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}

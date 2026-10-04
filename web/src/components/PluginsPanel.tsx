@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type PluginItem } from '../api'
 import { IconPackage, IconSearch, IconTrash, IconUpload } from './Icons'
-import { Empty, ListRow, NotReady, SectionHead, Toggle, fmtSize, fmtTime } from './ui'
+import { Empty, ListRow, NotReady, SectionHead, SkeletonList, Toggle, fmtSize, fmtTime } from './ui'
 import type { Instance } from '../types'
 
 /** 模组端放 mods，插件端放 plugins —— 告诉用户往哪丢文件，别让他猜 */
@@ -21,6 +21,9 @@ export function PluginsPanel({ instance, onToast }: Props) {
   const [drag, setDrag] = useState(false)
   const [filter, setFilter] = useState('')
   const [err, setErr] = useState('')
+  /* 首屏标记。不区分「还没读到」和「读到了但目录是空的」，
+     会在数据回来之前先把「目录是空的」写出来 —— 那是句假话。 */
+  const [loading, setLoading] = useState(true)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(async () => {
@@ -31,11 +34,14 @@ export function PluginsPanel({ instance, onToast }: Props) {
       setErr('')
     } catch (e) {
       setErr((e as Error).message)
+    } finally {
+      setLoading(false)
     }
   }, [instance.id])
 
   useEffect(() => {
     setItems([])
+    setLoading(true)
     reload()
   }, [reload])
 
@@ -102,11 +108,13 @@ export function PluginsPanel({ instance, onToast }: Props) {
           idx="01"
           title="已安装"
           note={
-            fq
-              ? `${shown.length} / ${items.length}`
-              : items.length > 0
-                ? `${items.length} 个 · 启用 ${onCount} 个`
-                : "目录是空的"
+            loading
+              ? '正在读取…'
+              : fq
+                ? `${shown.length} / ${items.length}`
+                : items.length > 0
+                  ? `${items.length} 个 · 启用 ${onCount} 个`
+                  : '目录是空的'
           }
           right={
             <button type="button" className="btn btn-ghost btn-sm" onClick={reload}>
@@ -133,7 +141,9 @@ export function PluginsPanel({ instance, onToast }: Props) {
           </div>
         )}
 
-        {items.length === 0 ? (
+        {loading ? (
+          <SkeletonList rows={3} />
+        ) : items.length === 0 ? (
           <Empty>
             这个 {dirName} 目录还是空的。从下面传一个 jar，或者手动把文件丢进上面的目录再点刷新。
           </Empty>

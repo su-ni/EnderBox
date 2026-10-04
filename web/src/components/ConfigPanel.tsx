@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api, type PropertyRow } from '../api'
 import { IconSearch, IconWarn } from './Icons'
-import { NotReady, Toggle } from './ui'
+import { NotReady, SkeletonFields, Toggle } from './ui'
 import { StepInput } from './StepInput'
 import { ServerPicker, type Picked } from './ServerPicker'
 import { DownloadBar } from './DownloadBar'
@@ -556,7 +556,7 @@ export function ConfigPanel({ instance, onToast, onSaved }: Props) {
       )}
 
       {rows === null ? (
-        <p className="text-[13px] text-ink-3">读取中…</p>
+        <SkeletonFields rows={6} />
       ) : hitGroups.length === 0 ? (
         <p className="py-5 text-[13px] text-ink-2">没有匹配「{query.trim()}」的字段。</p>
       ) : (

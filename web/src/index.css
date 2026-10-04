@@ -878,6 +878,19 @@ input[type="search"]::-webkit-search-cancel-button {
       -3px 0 0 0 #000,
       3px 0 0 0 #000;
   }
+
+  /* ── 骨架屏 ──
+     用透明度脉动，不用渐变扫光：这套设计明确禁渐变，而且扫光在深色底上
+     会拖出一条明显的亮带噪声。body.no-anim 会把动画一起关掉（退化成静态块）。 */
+  .sk {
+    display: block;
+    background: #2f352f;
+    animation: sk-pulse 1.25s ease-in-out infinite;
+  }
+  /* 断连指示点：闪得比骨架慢一点，是「还在重试」而不是「正在加载」 */
+  .blip {
+    animation: sk-pulse 1.6s ease-in-out infinite;
+  }
 }
 
 @keyframes rise {
@@ -934,6 +947,15 @@ input[type="search"]::-webkit-search-cancel-button {
   animation: fadeUp 320ms var(--ease-out) both;
 }
 
+@keyframes sk-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+  }
+  50% {
+    opacity: 0.88;
+  }
+}
 @keyframes blink {
   50% {
     opacity: 0;

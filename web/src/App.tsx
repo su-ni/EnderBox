@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, PreflightBlocked, type AuthStatus, type Preflight } from './api'
 import { BackupPanel } from './components/BackupPanel'
 import { ConfigPanel } from './components/ConfigPanel'
+import { ConnectionBanner } from './components/ConnectionBanner'
 import { CreateWizard } from './components/CreateWizard'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { PageFrame } from './components/PageFrame'
+import { Skeleton } from './components/ui'
 import { IconKill, IconMenu, IconPlay, IconStop, IconTrash, IconTypeBlock } from './components/Icons'
 import { LoginScreen } from './components/LoginScreen'
 import { LogConsole } from './components/LogConsole'
@@ -46,6 +50,13 @@ export default function App() {
   const [histCpu, setHistCpu] = useState<number[]>([])
   const [histMem, setHistMem] = useState<number[]>([])
   const [online, setOnline] = useState(false)
+  /* 有没有问过第一遍。没这个标记的话，页面刚打开那一瞬间会先闪一下「连不上」——
+     首屏就报错是最伤信任的形态。 */
+  const [probed, setProbed] = useState(false)
+  /* 上一次「确认断开」没有。判据不能直接用 online —— 它的初值是 false，
+     首次成功加载会被误判成「从断开恢复」，于是刚打开面板就弹一句
+     「已重新连上守护进程」（根本没断过）。必须用「问过 + 没连上」。 */
+  const prevDown = useRef(false)
   const [view, setView] = useState<'board' | 'create'>(START_CREATE ? 'create' : 'board')
   const [page, setPage] = useState<Page>(initialPage)
   const [drawer, setDrawer] = useState(START_DRAWER)
@@ -67,6 +78,8 @@ export default function App() {
       setActiveId((prev) => (list.some((i) => i.id === prev) ? prev : (list[0]?.id ?? '')))
     } catch {
       setOnline(false)
+    } finally {
+      setProbed(true)
     }
   }, [])
 
@@ -75,6 +88,15 @@ export default function App() {
     const t = setInterval(refresh, POLL_MS)
     return () => clearInterval(t)
   }, [refresh])
+
+  // 断→通的时候说一声。只报「坏了」不报「好了」，用户会一直以为还断着，
+  // 然后继续点一堆注定失败的按钮。
+  useEffect(() => {
+    const down = probed && !online
+    const wasDown = prevDown.current
+    prevDown.current = down
+    if (wasDown && !down) setToast('已重新连上守护进程')
+  }, [online, probed])
 
   // 指标轮询：只采当前选中的实例；峰值在客户端攒，后端不存历史
   useEffect(() => {
@@ -244,21 +266,25 @@ export default function App() {
   const peakCpu = histCpu.length ? Math.max(...histCpu) : 0
   const peakMem = histMem.length ? Math.max(...histMem) : 0
 
+  // 侧栏单独包边界：世界列表崩了不该把整个面板带走 ——
+  // 它是「切到别处去」的最后一条退路。
   const side = (extra?: { onClose: () => void }) => (
-    <WorldList
-      instances={instances}
-      activeId={activeId}
-      onSelect={(id) => {
-        setActiveId(id)
-        setView('board')
-        setDrawer(false)
-      }}
-      onNew={() => {
-        setView('create')
-        setDrawer(false)
-      }}
-      {...extra}
-    />
+    <ErrorBoundary title="世界列表">
+      <WorldList
+        instances={instances}
+        activeId={activeId}
+        onSelect={(id) => {
+          setActiveId(id)
+          setView('board')
+          setDrawer(false)
+        }}
+        onNew={() => {
+          setView('create')
+          setDrawer(false)
+        }}
+        {...extra}
+      />
+    </ErrorBoundary>
   )
 
   // 开了访问保护又没通过验证 → 只给登录界面。
@@ -273,7 +299,10 @@ export default function App() {
   }
 
   return (
-    <div className="relative grid h-full min-h-0 grid-cols-1 grid-rows-1 md:grid-cols-[236px_1fr]">
+    <div className="flex h-full min-h-0 flex-col">
+      <ConnectionBanner down={probed && !online} onRetry={refresh} />
+
+      <div className="relative grid min-h-0 flex-1 grid-cols-1 grid-rows-1 md:grid-cols-[236px_1fr]">
       {/* 桌面侧栏：常驻 */}
       <div className="hidden min-h-0 border-r-[3px] border-black md:flex md:flex-col">{side()}</div>
 
@@ -292,21 +321,20 @@ export default function App() {
       )}
 
       {view === 'create' ? (
-        <CreateWizard
-          onDone={(newId) => {
-            setView('board')
-            if (newId) setActiveId(newId)
-            refresh()
-            setToast('世界建好了 —— 把服务端 jar 放进实例目录，然后点「启动」')
-          }}
-          onCancel={() => setView('board')}
-          onError={setToast}
-        />
+        <ErrorBoundary title="新建向导" onReset={() => setView('board')}>
+          <CreateWizard
+            onDone={(newId) => {
+              setView('board')
+              if (newId) setActiveId(newId)
+              refresh()
+              setToast('世界建好了 —— 把服务端 jar 放进实例目录，然后点「启动」')
+            }}
+            onCancel={() => setView('board')}
+            onError={setToast}
+          />
+        </ErrorBoundary>
       ) : (
-        <main
-          key={page}
-          className="anim-fade scroll-thin flex min-h-0 min-w-0 flex-col overflow-y-auto px-4 pt-4 pb-6 md:px-[26px] md:pt-5"
-        >
+        <PageFrame key={page} title={active?.name}>
           {/* 页面导航 + 移动端汉堡 */}
           <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b-[3px] border-black pb-3">
             <button
@@ -338,7 +366,18 @@ export default function App() {
 
           {page === 'settings' && <SettingsPanel instances={instances} onToast={setToast} />}
 
-          {page !== 'settings' && !active && (
+          {/* 还没问过第一遍时是第三种状态：既不是「没有世界」也不是「连不上」。
+              以前这里直接按 online=false 渲染成「连不上守护进程」—— 首屏就谎报故障。 */}
+          {page !== 'settings' && !active && !probed && (
+            <div className="px-card flex flex-1 flex-col justify-center gap-3 p-8">
+              <h1 className="text-[20px] font-bold text-ink-1">正在连接守护进程…</h1>
+              <div className="max-w-[320px]">
+                <Skeleton h={10} />
+              </div>
+            </div>
+          )}
+
+          {page !== 'settings' && !active && probed && (
             <div className="px-card flex flex-1 flex-col justify-center gap-3 p-8">
               <h1 className="text-[20px] font-bold text-ink-1">
                 {online ? '还没有世界' : '连不上守护进程'}
@@ -483,7 +522,7 @@ export default function App() {
               )}
             </>
           )}
-        </main>
+        </PageFrame>
       )}
 
       {toast && (
@@ -494,6 +533,7 @@ export default function App() {
           {toast}
         </div>
       )}
+      </div>
     </div>
   )
 }
