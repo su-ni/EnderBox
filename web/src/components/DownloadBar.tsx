@@ -84,6 +84,9 @@ export function DownloadBar({
           {failed ? (installing ? '安装失败' : '下载失败') : done ? '服务端文件已就绪' : task.step}
         </span>
         {task.resumed && !done && <span className="chip">续传中</span>}
+        {!done && !failed && !installing && (task.threads ?? 0) > 1 && (
+          <span className="chip">{task.threads} 线程</span>
+        )}
         {done && task.sha && (
           <span className={`chip ${task.verified ? 'chip-g' : 'chip-w'}`}>
             {task.verified ? '校验通过' : '未校验'}
@@ -117,7 +120,7 @@ export function DownloadBar({
           ? task.err
           : done
             ? task.phase === 'install'
-              ? `装好了${task.sha ? '，安装器的校验和与源站一致' : ''}，服务端文件已经自动指向该启动的那个 jar。记得到概览页点启动。`
+              ? `装好了${task.sha ? '，安装器的校验和与源站一致' : ''}，服务端文件已经自动指向该启动的那个文件（可能是 jar，也可能是启动参数文件）。记得到概览页点启动。`
               : `文件已写入实例目录${task.sha ? `，SHA 与源站一致` : ''}。记得到概览页点启动。`
             : installing
               ? '正在安装：这一步要下库文件、还要给服务端打补丁，所以比下载本身慢。安装器的输出会写进这个世界的日志（[forge] 开头那些行）。'

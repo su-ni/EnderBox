@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -27,15 +28,21 @@ type ForgeInstallOpts struct {
 	Tag        string // 1.20.4-49.0.30 —— 用来认产物文件名
 	Installer  string // installer jar 的绝对路径
 	JavaMajor  int    // 这个版本要求的 Java，出错时用来给「装不上」一个可操作的解释
+	// MirrorURL 库文件下载镜像（必须带结尾斜杠）。装 Forge 要再下一百多 MB 的库，
+	// 走官方源在国内是「能下但慢且爱断」；installer 自带的 --mirror 选项就是干这个的，
+	// 不用我们自己去接管它那套 processor 流程（HMCL 那么做是因为它连安装器都不跑）。
+	// 空串 = 用安装器自己的默认源。
+	MirrorURL string
 }
 
 // InstallForge 跑一遍 installer，返回**该拿来启动的那个 jar 的文件名**（相对实例目录），
 // 顺便把它写进实例配置。
 //
-// 为什么必须由产物决定、而不是由版本号推断：装出来的结构分两代，
+// 为什么必须由产物决定、而不是由版本号推断：装出来的结构分好几代，
 // 差别写在 installer 自己的 install_profile.json 里（spec=1 出 shim、spec=0 出
-// forge-<版本>.jar），上游哪天再改一版，按版本号写的推断就会静默指错文件。
-// 所以流程是「跑完 → 看目录里实际有什么 → 按实况决定」（见 findForgeLaunchJar）。
+// forge-<版本>.jar），而且实测发现**同是 spec=1 也有不给 jar、只给参数文件的**
+// （1.20.1-47.4.26）。按版本号写的推断一定会静默指错文件，
+// 所以流程是「跑完 → 看目录里实际有什么 → 按实况决定」（见 findForgeLaunchTarget）。
 func (m *Manager) InstallForge(o ForgeInstallOpts, onProgress func(string)) (string, error) {
 	inst, ok := m.st.Get(o.InstanceID)
 	if !ok {
@@ -52,7 +59,12 @@ func (m *Manager) InstallForge(o ForgeInstallOpts, onProgress func(string)) (str
 	m.Log(o.InstanceID, fmt.Sprintf("[ServerBox] 开始安装 Forge %s（要下载库文件，这一步比下载本身慢）", o.Tag))
 	onProgress("正在准备安装")
 
-	cmd := exec.CommandContext(ctx, o.JavaPath, "-jar", o.Installer, "--installServer", inst.Dir)
+	args := []string{"-jar", o.Installer, "--installServer", inst.Dir}
+	if o.MirrorURL != "" {
+		args = append(args, "--mirror", o.MirrorURL)
+		m.Log(o.InstanceID, fmt.Sprintf("[ServerBox] 库文件走镜像：%s", o.MirrorURL))
+	}
+	cmd := exec.CommandContext(ctx, o.JavaPath, args...)
 	cmd.Dir = inst.Dir
 
 	// installer 的输出是按行给的（实测 1.20.4 有 29698 行），全塞进实例日志会把
@@ -142,14 +154,14 @@ func (m *Manager) InstallForge(o ForgeInstallOpts, onProgress func(string)) (str
 		m.Log(o.InstanceID, "[ServerBox] 注意：安装器退出码是 0，但没打「installed successfully」，接着按目录实况判断")
 	}
 
-	launch, err := findForgeLaunchJar(inst.Dir, o.Tag)
+	launch, err := findForgeLaunchTarget(inst.Dir, o.Tag)
 	if err != nil {
 		return "", err
 	}
 
 	inst.JarPath = launch
 	// 顺手把 Forge 版本记进 loaderVersion。概览页要显示「Forge 1.20.4-49.2.0」这种东西，
-	// 而这个信息只藏在文件名里（forge-1.20.4-49.2.0-shim.jar），不记一笔就得让前端去啃字符串。
+	// 而这个信息只藏在版本串里（1.20.4-49.2.0 → 49.2.0），不记一笔就得让前端去啃字符串。
 	if i := strings.LastIndex(o.Tag, "-"); i > 0 && i < len(o.Tag)-1 {
 		inst.LoaderVersion = o.Tag[i+1:]
 	}
@@ -201,21 +213,32 @@ func forgeInstallError(runErr error, tail []string, javaMajor int) error {
 	return fmt.Errorf("%s", msg)
 }
 
-// findForgeLaunchJar 按目录实况决定启动哪个 jar。
+// findForgeLaunchTarget 按目录实况决定「拿什么启动」，返回**相对实例目录**的路径
+// （可能是 jar 名，也可能是参数文件路径）。
 //
-// 实测两代产物在实例根目录各留一个「直接 -jar 就能起来」的 jar：
+// 实测三代产物，只有前两代的根目录里有能直接 -jar 的东西：
 //
-//	spec=1（1.17+） forge-<tag>-shim.jar      真身在 libraries/ 里，这个只是引子
-//	spec=0（≤1.16.5）forge-<tag>.jar + minecraft_server.<MC>.jar
+//	spec=1 的一部分构建  forge-<tag>-shim.jar   只是个引子，真身在 libraries/ 里
+//	spec=0（≤1.16.5）    forge-<tag>.jar（本身可启动）+ minecraft_server.<MC>.jar
+//	1.20.1-47.4.26 实测  **根目录一个 jar 都没有** —— 启动靠 libraries/ 里的参数文件：
+//	                     java @user_jvm_args.txt @libraries/net/minecraftforge/forge/<tag>/win_args.txt
+//	                     （那个文件里带着 -p <完整 classpath> 和主类）
 //
-// 先按名字认；名字对不上（上游改了命名）就退回扫目录，但只在「排除掉安装器之后
-// 只剩一个 jar」时才认 —— 1.16.5 那种目录里躺着两个 jar 的情况下瞎猜，
-// 猜中的那个是原版 jar，启动起来就是「你的模组全没了」。
-func findForgeLaunchJar(dir, tag string) (string, error) {
+// 所以顺序是：先找能 -jar 的（最省事、最少出错），找不到再看安装器自己写的启动脚本
+// 引用的参数文件。**两条都要有**，不能只留一条 —— 1.20.1 是模组包里最常见的版本之一，
+// 少了第二条，它装完了也起不来。
+//
+// 名字对不上（上游改了命名）就退回扫目录，但只在「排除掉安装器之后只剩一个 jar」时才认 ——
+// 1.16.5 那种目录里躺着两个 jar 的情况下瞎猜，猜中的那个是原版 jar，启动起来就是「你的模组全没了」。
+func findForgeLaunchTarget(dir, tag string) (string, error) {
 	for _, name := range []string{"forge-" + tag + "-shim.jar", "forge-" + tag + ".jar"} {
 		if st, err := os.Stat(filepath.Join(dir, name)); err == nil && !st.IsDir() {
 			return name, nil
 		}
+	}
+
+	if argsFile, ok := findForgeArgsFile(dir); ok {
+		return argsFile, nil
 	}
 
 	entries, err := os.ReadDir(dir)
@@ -237,11 +260,48 @@ func findForgeLaunchJar(dir, tag string) (string, error) {
 		return jars[0], nil
 	}
 	if len(jars) == 0 {
-		return "", fmt.Errorf("安装器跑完了，但实例目录里一个能启动的 jar 都没有 —— " +
-			"这一版 Forge 的产物结构和我们认的不一样，把安装器的输出发出来看看")
+		return "", fmt.Errorf("安装器跑完了，但实例目录里既没有能启动的 jar、" +
+			"也没有它该生成的启动脚本（run.bat / run.sh）—— 这一版 Forge 的产物结构" +
+			"和我们认的不一样，把安装器的输出发出来看看")
 	}
 	return "", fmt.Errorf("安装器跑完了，但目录里有 %d 个 jar（%s），认不出该启动哪个。"+
 		"去「配置」页手动把服务端文件填成 Forge 的那个", len(jars), strings.Join(jars, "、"))
+}
+
+// findForgeArgsFile 从安装器生成的启动脚本里读出它引用的那个参数文件（相对实例目录）。
+//
+// 为什么要读脚本、而不是直接拼 libraries/net/minecraftforge/forge/<tag>/win_args.txt：
+// 那是安装器的约定，上游一改我们就瞎了；而 run.bat 是安装器自己写出来的，写的就是它自己的真相。
+//
+// ⚠ 必须把 user_jvm_args.txt 排除掉：它的后缀同样是 _args.txt，而且在脚本里**排在前面**。
+// 不排掉就会拿它去启动 —— java 会把一个纯注释文件当启动参数，报一个完全看不懂的错。
+func findForgeArgsFile(dir string) (string, bool) {
+	scripts := []string{"run.sh", "run.bat"}
+	if runtime.GOOS == "windows" {
+		// Windows 要 win_args.txt（classpath 用 `;` 分隔），Linux/macOS 要 unix_args.txt（用 `:`）。
+		// 隔了平台的参数文件拿去用，jar 全找不到。
+		scripts = []string{"run.bat", "run.sh"}
+	}
+	for _, script := range scripts {
+		b, err := os.ReadFile(filepath.Join(dir, script))
+		if err != nil {
+			continue
+		}
+		for _, tok := range strings.Fields(string(b)) {
+			t := strings.Trim(tok, "\"'")
+			if !strings.HasPrefix(t, "@") {
+				continue
+			}
+			t = t[1:]
+			if !strings.HasSuffix(t, "_args.txt") || strings.HasSuffix(t, "user_jvm_args.txt") {
+				continue
+			}
+			if st, err := os.Stat(filepath.Join(dir, filepath.FromSlash(t))); err == nil && !st.IsDir() {
+				return t, true
+			}
+		}
+	}
+	return "", false
 }
 
 // interestingLine 判断这行值不值得写进实例日志。

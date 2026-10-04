@@ -138,7 +138,7 @@ func TestFindForgeLaunchJarPicksShimForModern(t *testing.T) {
 	touch(t, dir, "forge-1.20.4-49.2.0-installer.jar")
 	mkdir(t, dir, "libraries")
 
-	got, err := findForgeLaunchJar(dir, "1.20.4-49.2.0")
+	got, err := findForgeLaunchTarget(dir, "1.20.4-49.2.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestFindForgeLaunchJarPicksForgeJarNotVanilla(t *testing.T) {
 	touch(t, dir, "forge-1.16.5-36.2.39-installer.jar")
 	mkdir(t, dir, "libraries")
 
-	got, err := findForgeLaunchJar(dir, "1.16.5-36.2.39")
+	got, err := findForgeLaunchTarget(dir, "1.16.5-36.2.39")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestFindForgeLaunchJarRefusesToGuess(t *testing.T) {
 	dir := t.TempDir()
 	touch(t, dir, "aaa.jar")
 	touch(t, dir, "bbb.jar")
-	if _, err := findForgeLaunchJar(dir, "1.20.4-49.2.0"); err == nil {
+	if _, err := findForgeLaunchTarget(dir, "1.20.4-49.2.0"); err == nil {
 		t.Error("两个无法区分的 jar，应该报错而不是猜一个")
 	} else if !strings.Contains(err.Error(), "2") {
 		t.Errorf("报错里应该说清有几个候选，实际：%v", err)
@@ -182,7 +182,7 @@ func TestFindForgeLaunchJarFallsBackToSoleJar(t *testing.T) {
 	dir := t.TempDir()
 	touch(t, dir, "forge-something-new.jar")
 	touch(t, dir, "forge-something-new-installer.jar")
-	got, err := findForgeLaunchJar(dir, "1.20.4-49.2.0")
+	got, err := findForgeLaunchTarget(dir, "1.20.4-49.2.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestFindForgeLaunchJarFallsBackToSoleJar(t *testing.T) {
 func TestFindForgeLaunchJarErrorsWhenInstallProducedNothing(t *testing.T) {
 	dir := t.TempDir()
 	touch(t, dir, "forge-1.20.4-49.2.0-installer.jar") // 只有安装器，说明装没成功
-	if _, err := findForgeLaunchJar(dir, "1.20.4-49.2.0"); err == nil {
+	if _, err := findForgeLaunchTarget(dir, "1.20.4-49.2.0"); err == nil {
 		t.Error("目录里没有任何可启动的 jar，必须报错")
 	}
 }

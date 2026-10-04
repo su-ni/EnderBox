@@ -1,6 +1,9 @@
 package fetch
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // 这些是从真实 maven-metadata.xml 里抄下来的脏数据（实测 2026-10-04，5058 条里有 35 条）。
 // 它们混在版本列表里会切出「1.9-12.16.0.1938」这种根本不存在的 MC 版本，
@@ -132,7 +135,7 @@ func TestAssembleForgeBuildsPutsOfficialOnesFirst(t *testing.T) {
 	// 它必须出现在列表里，但只能排在官方那两个后面
 	maven := []string{"49.2.9", "49.2.8", "49.2.0", "49.0.30"}
 
-	got := assembleForgeBuilds("1.20.4", promos, maven, 20, 17, "mojang")
+	got := assembleForgeBuilds("1.20.4", promos, maven, 20, 17, "mojang", forgeMavenBase)
 	if len(got) != 4 {
 		t.Fatalf("拿到 %d 条，期望 4 条（官方 2 条 + 历史 2 条，重复的要并掉）", len(got))
 	}
@@ -161,7 +164,7 @@ func TestAssembleForgeBuildsPutsOfficialOnesFirst(t *testing.T) {
 	}
 
 	// limit 只留官方那两条时，也不能把推荐挤掉
-	if got2 := assembleForgeBuilds("1.20.4", promos, maven, 2, 17, "mojang"); len(got2) != 2 || got2[0].Channel != "RECOMMENDED" {
+	if got2 := assembleForgeBuilds("1.20.4", promos, maven, 2, 17, "mojang", forgeMavenBase); len(got2) != 2 || got2[0].Channel != "RECOMMENDED" {
 		t.Errorf("limit=2 时应该只剩官方推荐 + 官方最新，实际 %+v", got2)
 	}
 }
@@ -170,7 +173,7 @@ func TestAssembleForgeBuildsOnlyLatest(t *testing.T) {
 	// 有些版本官方只给了 -latest 没有 -recommended（实测 26.3 就是这样）。
 	// 这时第一条是「最新」，界面上不该因此报「一个能用的构建都没有」。
 	promos := map[string]string{"26.3-latest": "66.0.9"}
-	got := assembleForgeBuilds("26.3", promos, []string{"66.0.9", "66.0.8"}, 20, 21, "mojang")
+	got := assembleForgeBuilds("26.3", promos, []string{"66.0.9", "66.0.8"}, 20, 21, "mojang", forgeMavenBase)
 	if len(got) != 2 {
 		t.Fatalf("拿到 %d 条，期望 2 条：%+v", len(got), got)
 	}
@@ -186,5 +189,96 @@ func TestForgeInstallTagMatchesUpstreamLayout(t *testing.T) {
 	// Forge 在 install_profile.json 的 path 字段里用的就是这个形状：net.minecraftforge:forge:1.20.4-49.0.30
 	if got := forgeInstallTag("1.20.4", "49.0.30"); got != "1.20.4-49.0.30" {
 		t.Errorf("forgeInstallTag = %q，期望 1.20.4-49.0.30", got)
+	}
+}
+
+// 镜像的基地址必须真的透到下载地址里 —— 否则用户选了镜像、界面显示的地址却还是官方的，
+// 「换了源」就只是个心理安慰。
+func TestForgeBuildsUseMavenBase(t *testing.T) {
+	const base = "https://bmclapi2.bangbang93.com/maven"
+	got := assembleForgeBuilds("1.20.4", map[string]string{"1.20.4-recommended": "49.2.0"}, nil, 20, 17, "mojang", base)
+	if len(got) != 1 {
+		t.Fatalf("拿到 %d 条，期望 1 条", len(got))
+	}
+	want := base + "/1.20.4-49.2.0/forge-1.20.4-49.2.0-installer.jar"
+	if got[0].URL != want {
+		t.Errorf("下载地址 = %s，期望 %s", got[0].URL, want)
+	}
+}
+
+// 结尾斜杠是硬要求：安装器拿它直接拼库路径，少了斜杠会拼出 404（实测 52 个库全挂）。
+func TestForgeMirrorURLAlwaysTrailingSlash(t *testing.T) {
+	if got := ForgeMirrorURL("bmclapi"); got != "https://bmclapi2.bangbang93.com/maven/" {
+		t.Errorf("ForgeMirrorURL(bmclapi) = %q", got)
+	}
+	if got := ForgeMirrorURL("direct"); got != "" {
+		t.Errorf("官方直连不该给镜像地址，拿到 %q", got)
+	}
+	if got := ForgeMirrorURL("nonsense"); got != "" {
+		t.Errorf("认不出的镜像应该退回官方，拿到 %q", got)
+	}
+}
+
+// 校验和的候选顺序：**先给跟 jar 同源的那个**，再退到另一个。
+// 顺序就是这条修复本身 —— 校验和的意义是证明「这一份」jar 是好的，同源才不会打架。
+func TestForgeSHAURLsFollowTheJarSource(t *testing.T) {
+	got := forgeSHAURLs("1.20.1-47.4.26", "bmclapi")
+	want := []string{
+		"https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/1.20.1-47.4.26/forge-1.20.1-47.4.26-installer.jar.sha1",
+		"https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.4.26/forge-1.20.1-47.4.26-installer.jar.sha1",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("候选 %d 个，期望 %d 个：%v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("第 %d 个候选是 %s，期望 %s", i, got[i], want[i])
+		}
+	}
+
+	// 直连时不该重复列同一个地址
+	if g := forgeSHAURLs("1.20.4-49.2.0", "direct"); len(g) != 1 {
+		t.Errorf("直连时应该只有 1 个候选，实际 %v", g)
+	}
+}
+
+// 镜像的制品目录必须含完整 group 路径。这里踩过一次大的：只给到 .../maven，
+// 而拼 URL 的代码只会在后面接 /<tag>/<文件名>，结果拼出
+// .../maven/1.20.1-47.4.26/forge-...jar → 404，整个镜像下不动。
+func TestForgeMavenBaseForKeepsGroupPath(t *testing.T) {
+	got := forgeMavenBaseFor("bmclapi")
+	if !strings.HasSuffix(got, "/net/minecraftforge/forge") {
+		t.Errorf("镜像的制品目录少了 group 路径：%s", got)
+	}
+	if want := "https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge"; got != want {
+		t.Errorf("forgeMavenBaseFor(bmclapi) = %s，期望 %s", got, want)
+	}
+	// 直连没有镜像时，必须退回官方那个常量
+	if got := forgeMavenBaseFor("direct"); got != forgeMavenBase {
+		t.Errorf("直连应该用官方制品目录，实际 %s", got)
+	}
+}
+
+// --mirror 要的是 maven 根（完整库路径由安装器自己接），和制品目录不是一回事。
+func TestForgeMirrorRootIsMavenRootWithSlash(t *testing.T) {
+	if got := ForgeMirrorURL("bmclapi"); got != "https://bmclapi2.bangbang93.com/maven/" {
+		t.Errorf("ForgeMirrorURL(bmclapi) = %q，--mirror 需要的是 maven 根且带结尾斜杠", got)
+	}
+}
+
+// Forge 的默认源必须是镜像（官方那条 Cloudflare 路径实测会被掐断），
+// 而原版的默认源必须还是官方直连 —— 这个顺序就是前端的默认值，别搞反。
+func TestMirrorsForOrdering(t *testing.T) {
+	fg := MirrorsFor(KindForge)
+	if len(fg) < 2 || fg[0].ID != "bmclapi" {
+		t.Fatalf("Forge 的镜像列表应该以 bmclapi 开头，实际 %+v", fg)
+	}
+	if vs := MirrorsFor(KindVanilla); vs[0].ID != "direct" {
+		t.Errorf("原版的默认源应该还是 direct，实际 %s", vs[0].ID)
+	}
+	for _, m := range MirrorsFor(KindPaper) {
+		if m.ID == "bmclapi" {
+			t.Errorf("Paper 不该出现 BMCLAPI 选项（那路径 404）")
+		}
 	}
 }

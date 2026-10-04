@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -52,6 +54,10 @@ type Task struct {
 	// 继续画字节数只会让人以为卡住了。只有 Forge 会走到 install。
 	Phase string `json:"phase"`
 
+	// Threads 这次用了几个连接并行下载（0/1 表示单连接）。纯展示用：
+	// 用户提过「想要多线程」，那就把「真的开了几条」如实说给他。
+	Threads int `json:"threads"`
+
 	cancel context.CancelFunc
 }
 
@@ -62,6 +68,32 @@ type Manager struct {
 	sem   chan struct{}
 	seq   int64
 }
+
+// 下载重试与分片的调参。
+//
+// 重试：家用宽带连国外源站时，连接被中途掐断是**常态**（对方边缘节点换回源、
+// 或者中间设备超时清理），不是「源站挂了」。实测用户那边报的就是
+// `wsarecv: An existing connection was forcibly closed by the remote host` ——
+// 这类错误重连一次多半就好，所以必须自动重试，而不是把一句英文报错丢给用户。
+//
+// 分片：门槛定在 2 MB。再小的文件切了不划算 —— 多开连接本身有开销
+// （TLS 握手、每个分片各走一次镜像的 302 跳转），省下的时间还不够抵消。
+// 上限 4 条：家用宽带的瓶颈在出口带宽，线程再多只是互相抢；
+// 而且镜像有限流（BMCLAPI 实测 60 秒内只准 10 次请求），分片太碎会自己把自己限死。
+const (
+	dlAttempts  = 4
+	segMinSize  = 2 << 20
+	segMaxParts = 4
+	segMinChunk = 1 << 20 // 每片至少 1 MB，避免切出一堆碎片
+)
+
+// permError 标记「重试也没用」的失败（4xx 这种）。重试只对连接类故障有意义。
+type permError struct{ msg string }
+
+func (e *permError) Error() string { return e.msg }
+
+// errNoRange 服务端不支持 Range。分片和续传都靠它，遇到就得退回单连接从头下。
+var errNoRange = errors.New("服务端不支持分段下载")
 
 func NewManager() *Manager {
 	return &Manager{
@@ -188,7 +220,7 @@ func (m *Manager) Start(opts Options) (*Task, error) {
 	return snap, nil
 }
 
-// run 真正的下载流程。分三步走，每步都写进 Step ——
+// run 真正的下载流程。分四步走，每步都写进 Step ——
 // 「卡在 87%」和「卡在校验」是两种完全不同的故障，界面必须能分辨。
 func (m *Manager) run(ctx context.Context, id string, opts Options) {
 	defer func() {
@@ -201,112 +233,37 @@ func (m *Manager) run(ctx context.Context, id string, opts Options) {
 
 	part := opts.DestPath + ".part"
 
-	// ── 断点续传：.part 还在就从它的大小接着下 ──
-	// 一个 Paper jar 有 50 MB，家里网抖一下从头再来很伤
-	var offset int64
-	if st, err := os.Stat(part); err == nil && st.Size() > 0 {
-		offset = st.Size()
-	}
-
-	m.set(id, func(t *Task) {
-		if offset > 0 {
-			t.Step = "续传中"
-			t.Resumed = true
-			t.Done = offset
-		} else {
-			t.Step = "下载中"
-		}
-	})
-
-	req, err := newRequest(opts.Build.URL)
-	if err != nil {
+	// ── 下载（带自动重试）──
+	if err := m.fetchToPart(ctx, id, opts, part); err != nil {
 		m.fail(id, err)
-		return
-	}
-	if offset > 0 {
-		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
-	}
-	// 走 dlClient：不设总超时，否则慢网下大文件必失败（见 source.go 里的说明）
-	resp, err := dlClient.Do(req.WithContext(ctx))
-	if err != nil {
-		if ctx.Err() != nil {
-			m.fail(id, fmt.Errorf("已取消"))
-			return
-		}
-		m.fail(id, fmt.Errorf("下载失败：%w", err))
-		return
-	}
-	defer resp.Body.Close()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-		// 服务端不支持 Range（或我们没要），那就从头来
-		offset = 0
-	case http.StatusPartialContent:
-		// 正常续传
-	case http.StatusRequestedRangeNotSatisfiable:
-		// .part 比远端文件还大，说明它是上一次失败留下的脏数据，删掉重来
-		resp.Body.Close()
-		_ = os.Remove(part)
-		m.fail(id, fmt.Errorf("本地残留的临时文件比远端文件还大，已删除，请重试"))
-		return
-	default:
-		m.fail(id, fmt.Errorf("下载地址返回 HTTP %d（%s）", resp.StatusCode, hostOf(opts.Build.URL)))
-		return
-	}
-
-	if resp.ContentLength > 0 {
-		total := resp.ContentLength + offset
-		m.set(id, func(t *Task) { t.Total = total })
-	}
-
-	flags := os.O_CREATE | os.O_WRONLY
-	if offset > 0 {
-		flags |= os.O_APPEND
-	} else {
-		flags |= os.O_TRUNC
-	}
-	f, err := os.OpenFile(part, flags, 0o644)
-	if err != nil {
-		m.fail(id, fmt.Errorf("无法写入 %s：%w", part, err))
-		return
-	}
-
-	// 一边写盘一边算校验和。已经续传的那部分要先把老数据喂进 hash，
-	// 否则校验值永远是错的 —— 这个坑很隐蔽：文件下完了但校验不通过，看起来像源站的问题。
-	var h hash.Hash
-	switch strings.ToLower(opts.Build.SHAKind) {
-	case "sha1":
-		h = sha1.New()
-	default:
-		h = sha256.New()
-	}
-	if offset > 0 {
-		if old, err := os.Open(part); err == nil {
-			_, _ = io.Copy(h, old)
-			old.Close()
-		}
-	}
-
-	written, cpErr := m.copy(ctx, id, f, resp.Body, h, offset)
-	_ = f.Close()
-	if cpErr != nil {
-		m.fail(id, cpErr)
 		return
 	}
 
 	// ── 校验 ──
+	// 校验和改成「下完之后通读一遍算」而不是「边下边算」，是因为现在会重试、
+	// 会分片：分片是乱序落盘的，边下边算的 hash 顺序必然是错的；重试则会让
+	// 「已经算进去的那一段」和「文件里实际还在的那一段」对不上（hash 状态没法回滚）。
+	// 通读一遍多花的是本地磁盘时间（50 MB 也就零点几秒），换来的是逻辑上不可能算错。
 	m.set(id, func(t *Task) { t.Step = "校验中" })
 	if opts.Build.SHA != "" {
-		got := hex.EncodeToString(h.Sum(nil))
+		got, err := hashFile(part, opts.Build.SHAKind)
+		if err != nil {
+			m.fail(id, fmt.Errorf("读取下载文件失败：%w", err))
+			return
+		}
 		if !strings.EqualFold(got, opts.Build.SHA) {
-			_ = os.Remove(part)
+			removePart(part)
 			m.fail(id, fmt.Errorf(
 				"文件校验不通过，已删除。期望 %s…，实际 %s…（多半是下载过程中被截断，重试一次通常就好）",
-				opts.Build.SHA[:12], got[:12]))
+				clip(opts.Build.SHA, 12), clip(got, 12)))
 			return
 		}
 		m.set(id, func(t *Task) { t.Verified = true })
+	}
+
+	var written int64
+	if st, err := os.Stat(part); err == nil {
+		written = st.Size()
 	}
 
 	// ── 落盘：rename 是原子的，避免出现「半个 jar 被当成完整的」──
@@ -343,7 +300,7 @@ func (m *Manager) run(ctx context.Context, id string, opts Options) {
 			t.Step = "开始安装"
 			// 安装阶段的进度不是字节数，把下载留下的数字清掉 ——
 			// 否则界面会停在「100% / 18.9 MB」不动，看起来像卡死
-			t.Total, t.Done, t.Percent, t.Rate = 0, 0, 0, 0
+			t.Total, t.Done, t.Percent, t.Rate, t.Threads = 0, 0, 0, 0, 0
 		})
 		err := opts.PostInstall(ctx, func(step string) {
 			m.set(id, func(t *Task) { t.Step = step })
@@ -368,13 +325,469 @@ func (m *Manager) run(ctx context.Context, id string, opts Options) {
 	})
 }
 
-// copy 带进度上报的复制。每 200ms 更新一次进度就够 ——
+// fetchToPart 反复尝试把文件下到 part，直到成功或用完重试次数。
+//
+// 只重试**连接类**故障：4xx（地址错了、版本被撤了）重试一百次也没用，
+// 只会让用户多等几十秒才看到同一句错。
+func (m *Manager) fetchToPart(ctx context.Context, id string, opts Options, part string) error {
+	var lastErr error
+	for attempt := 1; attempt <= dlAttempts; attempt++ {
+		if attempt > 1 {
+			d := backoffDelay(attempt)
+			m.set(id, func(t *Task) {
+				t.Step = fmt.Sprintf("连接被中断，%d 秒后重试（第 %d 次）", int(d.Seconds()), attempt)
+			})
+			if !sleepCtx(ctx, d) {
+				return fmt.Errorf("已取消")
+			}
+		}
+		err := m.downloadOnce(ctx, id, opts, part)
+		if err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return fmt.Errorf("已取消")
+		}
+		var pe *permError
+		if errors.As(err, &pe) {
+			return err
+		}
+		lastErr = err
+	}
+	return fmt.Errorf("%w（已自动重试 %d 次仍失败；可以先重试，或者在「下载源」里换一个镜像）",
+		lastErr, dlAttempts-1)
+}
+
+// downloadOnce 一次尝试。已下到的部分走续传，够大且支持 Range 就走分片。
+func (m *Manager) downloadOnce(ctx context.Context, id string, opts Options, part string) error {
+	// 上一轮留下的分片临时文件还在 → 接着分片下（每个分片自己记着自己的进度）
+	if len(findSegIndices(part)) > 0 {
+		return m.attemptSegmented(ctx, id, opts, part, nil)
+	}
+
+	var offset int64
+	if st, err := os.Stat(part); err == nil && st.Size() > 0 {
+		offset = st.Size()
+	}
+	if offset > 0 {
+		m.set(id, func(t *Task) {
+			t.Resumed = true
+			t.Done = offset
+			t.Step = "续传中"
+		})
+	}
+
+	req, err := newRequest(opts.Build.URL)
+	if err != nil {
+		return &permError{err.Error()}
+	}
+	// 即使从零开始也带 Range —— 带上服务端才回 206，我们才能从 Content-Range 里
+	// 读到文件总大小，进而决定要不要分片。不带的话永远只拿到 200，
+	// 于是「多线程下载」这条路径一次都不会走到（踩过：装了个看似正常的单线程）。
+	req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+	// 走 dlClient：不设总超时，否则慢网下大文件必失败（见 source.go 里的说明）
+	resp, err := dlClient.Do(req.WithContext(ctx))
+	if err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("已取消")
+		}
+		return fmt.Errorf("下载失败：%w", err)
+	}
+
+	switch resp.StatusCode {
+	case http.StatusPartialContent:
+		total := totalFromContentRange(resp)
+		// 从零开始、文件够大、而且服务端确实支持 Range → 分片并行下。
+		// 这里必须从零：.part 里已有的那一段是顺序写下的，和分片的位置对不上。
+		if offset == 0 && total >= segMinSize {
+			resp.Body.Close()
+			return m.attemptSegmented(ctx, id, opts, part, &segPlan{total: total})
+		}
+		if total > 0 {
+			m.set(id, func(t *Task) { t.Total = total })
+		}
+		return m.downloadStream(ctx, id, part, resp, offset, total)
+
+	case http.StatusOK:
+		// 服务端不认 Range，把整个文件从头给了回来。那就老老实实从头写。
+		if offset > 0 {
+			offset = 0
+		}
+		m.set(id, func(t *Task) {
+			t.Step = "下载中"
+			if resp.ContentLength > 0 {
+				t.Total = resp.ContentLength
+			}
+		})
+		return m.downloadStream(ctx, id, part, resp, 0, resp.ContentLength)
+
+	case http.StatusRequestedRangeNotSatisfiable:
+		// .part 比远端文件还大，说明它是上一次失败留下的脏数据，删掉重来
+		resp.Body.Close()
+		removePart(part)
+		return fmt.Errorf("本地残留的临时文件比远端文件还大，已删除，正在重新下载")
+
+	default:
+		resp.Body.Close()
+		// 一律当可重试：BMCLAPI 这类镜像背后是一堆节点轮着给（实测每次落到不同域名），
+		// 某个节点抽风回 404 是常事，换一次就换到好的了。真正的「版本不存在」在上一步
+		// 取 .sha1 时就已经被拦下了，不会走到这里。
+		return fmt.Errorf("下载地址返回 HTTP %d（%s）", resp.StatusCode, hostOfResp(resp))
+	}
+}
+
+// downloadStream 单连接写入。offset 是已经躺在 part 里的字节数（0 表示从头写）。
+func (m *Manager) downloadStream(ctx context.Context, id, part string, resp *http.Response, offset, total int64) error {
+	defer resp.Body.Close()
+
+	m.set(id, func(t *Task) {
+		t.Threads = 0
+		if offset == 0 {
+			t.Step = "下载中"
+		}
+	})
+
+	flags := os.O_CREATE | os.O_WRONLY
+	if offset > 0 {
+		flags |= os.O_APPEND
+	} else {
+		flags |= os.O_TRUNC
+	}
+	f, err := os.OpenFile(part, flags, 0o644)
+	if err != nil {
+		return fmt.Errorf("无法写入 %s：%w", part, err)
+	}
+	defer f.Close()
+
+	done, err := m.copyProgress(ctx, id, f, resp.Body, offset)
+	if err != nil {
+		return err
+	}
+	m.set(id, func(t *Task) {
+		t.Done = done
+		if total > 0 {
+			t.Percent = float64(done) / float64(total) * 100
+		}
+	})
+	return nil
+}
+
+// attemptSegmented 跑分片下载；万一服务端其实不支持 Range（某些镜像会把
+// 范围请求当普通请求、回一整份），就清掉分片退回单连接。
+func (m *Manager) attemptSegmented(ctx context.Context, id string, opts Options, part string, plan *segPlan) error {
+	err := m.downloadSegmented(ctx, id, opts, part, plan)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, errNoRange) {
+		removeSegFiles(part)
+		return m.singleStream(ctx, id, opts, part)
+	}
+	return err
+}
+
+// singleStream 重新发一个完整请求，单连接下到底。
+// 只在「本来想分片、但服务端不支持」时兜底用。
+func (m *Manager) singleStream(ctx context.Context, id string, opts Options, part string) error {
+	req, err := newRequest(opts.Build.URL)
+	if err != nil {
+		return &permError{err.Error()}
+	}
+	resp, err := dlClient.Do(req.WithContext(ctx))
+	if err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("已取消")
+		}
+		return fmt.Errorf("下载失败：%w", err)
+	}
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
+		resp.Body.Close()
+		return &permError{fmt.Sprintf("下载地址返回 HTTP %d（%s）", resp.StatusCode, hostOf(opts.Build.URL))}
+	}
+	total := resp.ContentLength
+	if total <= 0 {
+		total = totalFromContentRange(resp)
+	}
+	return m.downloadStream(ctx, id, part, resp, 0, total)
+}
+
+// segRange 一个分片在最终文件里的位置（闭区间）
+type segRange struct{ start, end int64 }
+
+func (r segRange) len() int64 { return r.end - r.start + 1 }
+
+// segPlan 分片方案。total 是远端文件总大小。
+type segPlan struct{ total int64 }
+
+// segPath 第 i 个分片的临时文件。用**独立文件**而不是往同一个 part 里
+// WriteAt，是因为独立文件天然带续传状态（文件多大就是下了多少），
+// 不会出现「中间挖了个洞但文件尺寸看着像下完了」这种最难查的坏法。
+func segPath(part string, i int) string { return fmt.Sprintf("%s.%d", part, i) }
+
+// findSegIndices 找出 part 旁边还没合并的分片号（升序）。
+func findSegIndices(part string) []int {
+	entries, err := os.ReadDir(filepath.Dir(part))
+	if err != nil {
+		return nil
+	}
+	prefix := filepath.Base(part) + "."
+	var idx []int
+	for _, e := range entries {
+		n := e.Name()
+		if !strings.HasPrefix(n, prefix) {
+			continue
+		}
+		if i, err := strconv.Atoi(n[len(prefix):]); err == nil && i >= 0 {
+			idx = append(idx, i)
+		}
+	}
+	sort.Ints(idx)
+	return idx
+}
+
+// planSegments 把 [0,total) 均分成若干片，余数摊给前面几片。
+func planSegments(total int64) []segRange {
+	n := segMaxParts
+	if max := int(total / segMinChunk); max < n {
+		n = max
+	}
+	if n < 2 {
+		n = 2
+	}
+	base := total / int64(n)
+	rem := total % int64(n)
+	var out []segRange
+	var at int64
+	for i := 0; i < n; i++ {
+		size := base
+		if int64(i) < rem {
+			size++
+		}
+		if size <= 0 {
+			continue
+		}
+		out = append(out, segRange{start: at, end: at + size - 1})
+		at += size
+	}
+	return out
+}
+
+// downloadSegmented 多连接并行下载。
+//
+// plan 为 nil 表示「从已有的分片文件续传」—— 这时总量得重新问一次源站
+// （分片文件只记进度，不记总量）。
+func (m *Manager) downloadSegmented(ctx context.Context, id string, opts Options, part string, plan *segPlan) error {
+	if plan == nil {
+		total, err := m.probeTotal(ctx, opts.Build.URL)
+		if err != nil {
+			return err
+		}
+		plan = &segPlan{total: total}
+		// 残留的分片和这次的总量对不上（上游换过文件，或者上次是别的分片方案），
+		// 整组丢掉重下 —— 硬拼出来的必然是坏文件，而且要到校验那一步才暴露。
+		if segFilesMismatch(part, plan.total) {
+			removeSegFiles(part)
+		}
+	}
+	if plan.total < segMinSize {
+		removeSegFiles(part)
+		return m.singleStream(ctx, id, opts, part)
+	}
+
+	parts := planSegments(plan.total)
+	if len(parts) < 2 {
+		removeSegFiles(part)
+		return m.singleStream(ctx, id, opts, part)
+	}
+
+	m.set(id, func(t *Task) {
+		t.Total = plan.total
+		t.Threads = len(parts)
+		t.Step = fmt.Sprintf("多线程下载（%d 线程）", len(parts))
+	})
+
+	// 每片的当前进度先按本地文件大小读出来，之后由各自的 worker 递增
+	sizes := make([]int64, len(parts))
+	for i, p := range parts {
+		if st, err := os.Stat(segPath(part, i)); err == nil {
+			s := st.Size()
+			if s > p.len() {
+				s = p.len()
+			}
+			sizes[i] = s
+		}
+	}
+
+	var wmu sync.Mutex
+	report := func() {
+		wmu.Lock()
+		var sum int64
+		for _, s := range sizes {
+			sum += s
+		}
+		wmu.Unlock()
+		m.set(id, func(t *Task) {
+			t.Done = sum
+			if t.Total > 0 {
+				t.Percent = float64(sum) / float64(t.Total) * 100
+			}
+		})
+	}
+	report()
+
+	stopTicker := make(chan struct{})
+	go func() {
+		tk := time.NewTicker(200 * time.Millisecond)
+		defer tk.Stop()
+		for {
+			select {
+			case <-stopTicker:
+				return
+			case <-tk.C:
+				report()
+			}
+		}
+	}()
+	defer close(stopTicker)
+
+	ctx2, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var (
+		wg       sync.WaitGroup
+		emu      sync.Mutex
+		firstErr error
+	)
+	for i, p := range parts {
+		have := sizes[i]
+		if have >= p.len() {
+			continue // 这片已经下完，只等合并
+		}
+		i, p, have := i, p, have
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := m.segWorker(ctx2, opts.Build.URL, segPath(part, i), p, have, func(n int64) {
+				wmu.Lock()
+				sizes[i] += n
+				wmu.Unlock()
+			})
+			if err != nil {
+				emu.Lock()
+				if firstErr == nil {
+					firstErr = err
+				}
+				emu.Unlock()
+				cancel() // 一片挂了，别的也别白跑
+			}
+		}()
+	}
+	wg.Wait()
+	report()
+
+	if firstErr != nil {
+		return firstErr
+	}
+
+	m.set(id, func(t *Task) { t.Step = "合并分片" })
+	return concatSegments(part, len(parts))
+}
+
+// segWorker 下第 i 片。have 是这片已经有的字节数（接着它往后要）。
+func (m *Manager) segWorker(ctx context.Context, url, spath string, p segRange, have int64, onDelta func(int64)) error {
+	req, err := newRequest(url)
+	if err != nil {
+		return &permError{err.Error()}
+	}
+	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", p.start+have, p.end))
+	resp, err := dlClient.Do(req.WithContext(ctx))
+	if err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("已取消")
+		}
+		return fmt.Errorf("分片下载失败：%w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		// 我们要的是某一段，它却回了整份 —— 说明它根本不认 Range
+		return errNoRange
+	}
+	if resp.StatusCode != http.StatusPartialContent {
+		return &permError{fmt.Sprintf("分片请求返回 HTTP %d（%s）", resp.StatusCode, hostOf(url))}
+	}
+
+	f, err := os.OpenFile(spath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return fmt.Errorf("无法写入分片文件 %s：%w", spath, err)
+	}
+	defer f.Close()
+
+	_, err = m.copyProgress(ctx, "", f, resp.Body, 0, func(n int64) { onDelta(n) })
+	return err
+}
+
+// concatSegments 把所有分片按顺序拼成 part，拼完删掉分片文件。
+func concatSegments(part string, n int) error {
+	out, err := os.OpenFile(part, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return fmt.Errorf("无法写入 %s：%w", part, err)
+	}
+	defer out.Close()
+
+	for i := 0; i < n; i++ {
+		sp := segPath(part, i)
+		in, err := os.Open(sp)
+		if err != nil {
+			return fmt.Errorf("缺少分片 %s，无法合并（重新下载一次）", filepath.Base(sp))
+		}
+		if _, err := io.Copy(out, in); err != nil {
+			in.Close()
+			return fmt.Errorf("合并分片失败：%w", err)
+		}
+		in.Close()
+		_ = os.Remove(sp)
+	}
+	return nil
+}
+
+// probeTotal 问一次源站文件有多大（Range: bytes=0-0 只会拿回 1 个字节）。
+func (m *Manager) probeTotal(ctx context.Context, url string) (int64, error) {
+	req, err := newRequest(url)
+	if err != nil {
+		return 0, &permError{err.Error()}
+	}
+	req.Header.Set("Range", "bytes=0-0")
+	resp, err := dlClient.Do(req.WithContext(ctx))
+	if err != nil {
+		if ctx.Err() != nil {
+			return 0, fmt.Errorf("已取消")
+		}
+		return 0, fmt.Errorf("下载失败：%w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusPartialContent {
+		return 0, errNoRange
+	}
+	total := totalFromContentRange(resp)
+	if total <= 0 {
+		return 0, errNoRange
+	}
+	return total, nil
+}
+
+// copyProgress 带进度上报的复制。每 200ms 更新一次进度就够 ——
 // 每个 64 KB 块都写一次 task 会让轮询返回一堆没人看得清的中间值。
-func (m *Manager) copy(ctx context.Context, id string, dst io.Writer, src io.Reader, h hash.Hash, offset int64) (int64, error) {
+// id 为空表示这是个分片 worker（进度汇总由调用方自己算）。
+func (m *Manager) copyProgress(ctx context.Context, id string, dst io.Writer, src io.Reader, base int64, onDelta ...func(int64)) (int64, error) {
 	buf := make([]byte, 64*1024)
-	var done int64
+	done := base
 	lastAt := time.Now()
-	lastDone := int64(0)
+	lastDone := done
+	var delta func(int64)
+	if len(onDelta) > 0 {
+		delta = onDelta[0]
+	}
 
 	for {
 		if ctx.Err() != nil {
@@ -385,18 +798,19 @@ func (m *Manager) copy(ctx context.Context, id string, dst io.Writer, src io.Rea
 			if _, werr := dst.Write(buf[:n]); werr != nil {
 				return done, fmt.Errorf("写盘失败：%w", werr)
 			}
-			h.Write(buf[:n])
 			done += int64(n)
+			if delta != nil {
+				delta(int64(n))
+			}
 
-			if time.Since(lastAt) >= 200*time.Millisecond {
-				cur := done + offset
-				rate := int64(float64(cur-lastDone) / time.Since(lastAt).Seconds())
-				lastAt, lastDone = time.Now(), cur
+			if id != "" && time.Since(lastAt) >= 200*time.Millisecond {
+				rate := int64(float64(done-lastDone) / time.Since(lastAt).Seconds())
+				lastAt, lastDone = time.Now(), done
 				m.set(id, func(t *Task) {
-					t.Done = cur
+					t.Done = done
 					t.Rate = rate
 					if t.Total > 0 {
-						t.Percent = float64(cur) / float64(t.Total) * 100
+						t.Percent = float64(done) / float64(t.Total) * 100
 					}
 				})
 			}
@@ -418,4 +832,121 @@ func (m *Manager) fail(id string, err error) {
 		t.Err = msg
 		t.Step = "失败"
 	})
+}
+
+// ── 小工具 ──
+
+// totalFromContentRange 从 `Content-Range: bytes 0-0/8837089` 里取总大小。
+// 取不到返回 0（调用方按「大小未知」处理，不假装知道）。
+func totalFromContentRange(resp *http.Response) int64 {
+	cr := resp.Header.Get("Content-Range")
+	i := strings.LastIndex(cr, "/")
+	if i < 0 || i == len(cr)-1 {
+		return 0
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(cr[i+1:]), 10, 64)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
+
+// hostOfResp 报错时用**最终落地的主机名**（跟完跳转之后的），
+// 而不是我们请求的那个。镜像是一条跳转链，写源站名会让人查错地方。
+func hostOfResp(resp *http.Response) string {
+	if resp.Request != nil && resp.Request.URL != nil {
+		return resp.Request.URL.Host
+	}
+	return ""
+}
+
+// hashFile 通读文件算校验和。kind 是 sha1 / sha256（默认 sha256）。
+func hashFile(path, kind string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	var h hash.Hash
+	if strings.EqualFold(kind, "sha1") {
+		h = sha1.New()
+	} else {
+		h = sha256.New()
+	}
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// segFilesMismatch 判断残留的分片文件能不能配上这次的分片方案。
+// 任何一处对不上（片数不同、编号断档、某片比它该有的长度还大）都算脏数据。
+func segFilesMismatch(part string, total int64) bool {
+	ranges := planSegments(total)
+	idx := findSegIndices(part)
+	if len(idx) == 0 {
+		return false
+	}
+	if len(idx) != len(ranges) {
+		return true
+	}
+	for n, i := range idx {
+		if i != n {
+			return true
+		}
+		st, err := os.Stat(segPath(part, i))
+		if err != nil || st.Size() > ranges[n].len() {
+			return true
+		}
+	}
+	return false
+}
+
+// removeSegFiles 只清分片临时文件。退回单连接时要清 ——
+// 不然下一轮 findSegIndices 还会看见它们，又拐回分片那条路。
+func removeSegFiles(part string) {
+	for _, i := range findSegIndices(part) {
+		_ = os.Remove(segPath(part, i))
+	}
+}
+
+// removePart 把 part 和分片临时文件一起清掉，换源重下时用。
+func removePart(part string) {
+	removeSegFiles(part)
+	_ = os.Remove(part)
+}
+
+// backoffDelay 第 attempt 次尝试前等多久：第 2 次等 1 秒，之后翻倍。
+// 别等太久 —— 用户就坐在屏幕前面看着进度条。
+func backoffDelay(attempt int) time.Duration {
+	if attempt < 2 {
+		return 0
+	}
+	d := time.Second << uint(attempt-2)
+	if d > 8*time.Second {
+		d = 8 * time.Second
+	}
+	return d
+}
+
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	if d <= 0 {
+		return ctx.Err() == nil
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
+}
+
+// clip 截断长串用于报错信息，短串原样返回。
+func clip(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }

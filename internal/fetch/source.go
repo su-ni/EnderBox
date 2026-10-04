@@ -124,14 +124,38 @@ type Mirror struct {
 	For []Kind `json:"for,omitempty"`
 	// MojangBase 换掉原版元数据的基地址（BMCLAPI 用）。不给前端看。
 	MojangBase string `json:"-"`
+	// ForgeMavenBase Forge 的 maven **制品目录**（到 group/artifact 为止，不带结尾斜杠），
+	// 用来拼安装器 jar / .sha1 的地址，例如 .../net/minecraftforge/forge。
+	// ⚠ 别只给到 .../maven —— 代码只会在它后面接 /<tag>/<文件名>，
+	// 少给一段 group 路径就会拼出一个 404 的地址（这里踩过，镜像整个下不动）。
+	ForgeMavenBase string `json:"-"`
+	// ForgeMirrorRoot 传给 Forge 安装器 `--mirror` 的地址（maven 根，**必须带结尾斜杠**）。
+	// 它和 ForgeMavenBase 不是一回事：--mirror 后面接的是**完整库路径**
+	// （com/mojang/... 、org/ow2/asm/...），所以只能给到根，不能给到制品目录。
+	ForgeMirrorRoot string `json:"-"`
+	// DefaultFor 这些类型默认用它（排在可选列表最前，前端选完类型自动选中的就是它）。
+	// 单独拎出来是因为「谁该当默认」逐类型不同：原版一直走官方直连就挺好，
+	// 而 Forge 的官方下载实测会被 Cloudflare 边缘节点中途掐断，镜像明显更稳。
+	DefaultFor []Kind `json:"-"`
 }
 
+// 实测记录（2026-10-04，别凭记忆改）：
+//   - BMCLAPI 镜像了 Forge 的 maven：安装器 jar、.sha1、maven-metadata.xml 都在，
+//     而且安装器的 sha1 与官方**逐字节一致**（1.20.1-47.4.26 = 27b38c97…dea3），
+//     支持 Range（206），走的是另一条 Cloudflare 缓存路径，比官方那条原站边缘快且稳。
+//   - 但它镜像的 promotions_slim.json 是**过期**的（它写 1.1-latest=1.3.2.6，
+//     官方已是 1.3.4.29），所以版本表 / 推荐构建仍然只认官方 files.minecraftforge.net。
+//   - BMCLAPI 有限流（实测 60 秒内 10 次短请求额度），分片别切太碎。
 var Mirrors = []Mirror{
 	{ID: "direct", Label: "官方直连", For: nil},
 	{
-		ID: "bmclapi", Label: "BMCLAPI 镜像（仅原版）",
-		For:        []Kind{KindVanilla},
-		MojangBase: "https://bmclapi2.bangbang93.com",
+		ID:              "bmclapi",
+		Label:           "BMCLAPI 镜像",
+		For:             []Kind{KindVanilla, KindForge},
+		MojangBase:      "https://bmclapi2.bangbang93.com",
+		ForgeMavenBase:  "https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge",
+		ForgeMirrorRoot: "https://bmclapi2.bangbang93.com/maven/",
+		DefaultFor:      []Kind{KindForge},
 	},
 }
 
@@ -146,21 +170,53 @@ func mirrorByID(id string) Mirror {
 
 // MirrorsFor 返回某个类型可用的镜像。给 Paper 挂 BMCLAPI 是没意义的（那路径 404），
 // 所以这里按类型过滤，界面上也就不会出现「选了镜像反而更糟」的情况。
+// DefaultFor 命中的排在前面 —— 前端「选完类型自动选中 mirrors[0]」，顺序就是默认值。
 func MirrorsFor(k Kind) []Mirror {
-	var out []Mirror
+	var preferred, rest []Mirror
 	for _, m := range Mirrors {
-		if len(m.For) == 0 {
-			out = append(out, m)
+		if !mirrorApplies(m, k) {
 			continue
 		}
-		for _, f := range m.For {
-			if f == k {
-				out = append(out, m)
-				break
-			}
+		if containsKind(m.DefaultFor, k) {
+			preferred = append(preferred, m)
+		} else {
+			rest = append(rest, m)
 		}
 	}
-	return out
+	return append(preferred, rest...)
+}
+
+func mirrorApplies(m Mirror, k Kind) bool {
+	return len(m.For) == 0 || containsKind(m.For, k)
+}
+
+func containsKind(ks []Kind, k Kind) bool {
+	for _, x := range ks {
+		if x == k {
+			return true
+		}
+	}
+	return false
+}
+
+// ForgeMirrorURL 给 Forge 安装器 --mirror 用的地址（maven 根）。
+// 必须是**带结尾斜杠**的：安装器是拿它直接和库路径相拼的，少了斜杠会拼成
+// `.../mavennet/minecraftforge/...` 这种 404（实测踩过，52 个库全 FileNotFound）。
+// 没有可用镜像时返回空串，安装器就用它自己的默认源。
+func ForgeMirrorURL(mirror string) string {
+	root := mirrorByID(mirror).ForgeMirrorRoot
+	if root == "" {
+		return ""
+	}
+	return strings.TrimRight(root, "/") + "/"
+}
+
+// forgeMavenBaseFor Forge 的 maven 制品目录（不带结尾斜杠），用来拼安装器 jar / .sha1 的 URL。
+func forgeMavenBaseFor(mirror string) string {
+	if b := mirrorByID(mirror).ForgeMavenBase; b != "" {
+		return strings.TrimRight(b, "/")
+	}
+	return forgeMavenBase
 }
 
 // Sources 返回支持的服务端类型。没接的也列出来并说明原因 ——
@@ -176,7 +232,8 @@ func Sources() []Source {
 		{Type: KindVelocity, Label: "Velocity", Available: true,
 			Note: "和 Paper 用同一个源站，直连可用。"},
 		{Type: KindForge, Label: "Forge", Available: true,
-			Note: "官方源直连可用。它和别家不一样：下的是安装器，下完还要在本机跑一遍才算装好 —— " +
+			Note: "默认走 BMCLAPI 镜像（官方那条 Cloudflare 路径实测会被中途掐断，镜像的文件与官方逐字节一致）。" +
+				"它和别家不一样：下的是安装器，下完还要在本机跑一遍才算装好 —— " +
 				"这一步会再下几十到一百多 MB 的库文件（实测 1.20.4 全流程 34 秒、1.12.2 31 秒）。" +
 				"所以会比别的类型慢一截，但只慢这一次。"},
 		{Type: KindNeoForge, Label: "NeoForge", Available: false,
@@ -237,11 +294,7 @@ func newRequest(url string) (*http.Request, error) {
 // getJSON 拉一个 JSON。错误信息带上 HTTP 状态码 ——
 // 只报「请求失败」的话，403 和 404 在排查时完全是两回事。
 func getJSON(url string, out any) error {
-	req, err := newRequest(url)
-	if err != nil {
-		return err
-	}
-	resp, err := apiClient.Do(req)
+	resp, err := doWithRetry(apiClient, url)
 	if err != nil {
 		return fmt.Errorf("%s 连不上：%w", hostOf(url), err)
 	}
@@ -254,6 +307,33 @@ func getJSON(url string, out any) error {
 		return fmt.Errorf("%s 返回的内容解析失败：%w", hostOf(url), err)
 	}
 	return nil
+}
+
+// httpAttempts 元数据类小请求（JSON / XML / 校验和）的重试次数。
+// 这些请求本来是毫秒级的，偶尔断一下重连就好；不重试的话，一次抖动就会让
+// 整个「选版本」界面报错，而用户对着那句报错完全不知道该干嘛。
+const httpAttempts = 3
+
+// doWithRetry 发一次 GET，**只在请求本身失败时**（连不上、被掐断、超时）重试。
+// 拿到 4xx/5xx 是上游的明确回答，重试只是让用户多等两秒看到同一句话。
+func doWithRetry(client *http.Client, url string) (*http.Response, error) {
+	var lastErr error
+	for attempt := 1; attempt <= httpAttempts; attempt++ {
+		if attempt > 1 {
+			time.Sleep(time.Duration(attempt-1) * 700 * time.Millisecond)
+		}
+		// 每次都要新建 request：上一次那个可能已经把 body 读掉了，复用会拿到空响应
+		req, err := newRequest(url)
+		if err != nil {
+			return nil, err // 是 URL 本身有问题，重试无意义
+		}
+		resp, err := client.Do(req)
+		if err == nil {
+			return resp, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
 }
 
 func hostOf(u string) string {

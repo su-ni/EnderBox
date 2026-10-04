@@ -285,16 +285,22 @@ func (m *Manager) Preflight(id string) PreflightResult {
 	return res
 }
 
-// findAnyJar 在实例目录里找有没有别的 jar，用来提示「是不是名字填错了」
+// findAnyJar 在实例目录里找有没有别的 jar，用来提示「是不是名字填错了」。
+// 安装器（-installer.jar）要排除：它是安装工具、不是「能启动的服务端文件」，
+// 把它当答案递给用户，他照着填进去只会得到一句「Invalid or corrupt jarfile」。
 func findAnyJar(inst Instance) string {
 	entries, err := os.ReadDir(inst.Dir)
 	if err != nil {
 		return ""
 	}
 	for _, e := range entries {
-		if !e.IsDir() && jarRe.MatchString(e.Name()) {
-			return e.Name()
+		if e.IsDir() || !jarRe.MatchString(e.Name()) {
+			continue
 		}
+		if strings.HasSuffix(strings.ToLower(e.Name()), "-installer.jar") {
+			continue
+		}
+		return e.Name()
 	}
 	return ""
 }

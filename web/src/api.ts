@@ -90,6 +90,8 @@ export type DownloadTask = {
    * 这一段没有「下了多少字节」这回事，界面要继续画字节数会让人以为卡死了。
    */
   phase?: string
+  /** 这次用了几个连接并行下载（0/1 = 单连接）。大文件走多线程时会 >1。 */
+  threads?: number
   startedAt: string
   endedAt?: string
 }

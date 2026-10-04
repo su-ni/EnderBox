@@ -142,7 +142,7 @@ func ForgeBuilds(mirror, gameVersion string, limit int) ([]Build, error) {
 	// Java 要求算一次就够（vanillaMeta 内部有缓存，但没必要在循环里反复进锁）
 	javaMajor, javaFrom := forgeJava(mirror, gameVersion)
 
-	out := assembleForgeBuilds(gameVersion, promos, all, limit, javaMajor, javaFrom)
+	out := assembleForgeBuilds(gameVersion, promos, all, limit, javaMajor, javaFrom, forgeMavenBaseFor(mirror))
 	if len(out) == 0 {
 		return nil, fmt.Errorf("Forge 没有为 %s 出过任何构建", gameVersion)
 	}
@@ -155,9 +155,12 @@ func ForgeBuilds(mirror, gameVersion string, limit int) ([]Build, error) {
 // 后段里出现比官方「最新」号更大的版本是正常的（出了但官方升级表还没标）——
 // 界面上专门有一句话说明这件事，不要为了让列表「看起来整齐」把那些版本藏掉。
 //
+// mavenBase 是下载地址的基地址（可能是镜像）—— 传进来而不是写死，是为了让
+// 「界面上看到的地址」和「真的会去下的地址」永远是同一个。
+//
 // 抽成纯函数是为了能测：这段排序是「新手第一个看到什么」的直接决定者，
 // 而它错起来很安静 —— 列表照样出得来，只是默认选中的是另一个版本。
-func assembleForgeBuilds(gameVersion string, promos map[string]string, mavenVersions []string, limit, javaMajor int, javaFrom string) []Build {
+func assembleForgeBuilds(gameVersion string, promos map[string]string, mavenVersions []string, limit, javaMajor int, javaFrom, mavenBase string) []Build {
 	recommended := promos[gameVersion+"-recommended"]
 	latest := promos[gameVersion+"-latest"]
 
@@ -181,7 +184,7 @@ func assembleForgeBuilds(gameVersion string, promos map[string]string, mavenVers
 			Label:     label,
 			Channel:   channel,
 			Name:      "forge-" + tag + "-installer.jar",
-			URL:       forgeMavenBase + "/" + tag + "/forge-" + tag + "-installer.jar",
+			URL:       mavenBase + "/" + tag + "/forge-" + tag + "-installer.jar",
 			SHAKind:   "sha1",
 			JavaMajor: javaMajor,
 			JavaFrom:  javaFrom,
@@ -212,10 +215,13 @@ func assembleForgeBuilds(gameVersion string, promos map[string]string, mavenVers
 
 // ForgeInstaller 按 tag（形如 1.20.4-49.0.30）取一个能交给下载器的构建。
 //
+// mirror 决定从哪个 maven 下（BMCLAPI 镜像与官方逐字节一致，且更稳）。
+// 校验和从**同一个** maven 取：它跟着文件走，从别处取反而要担心两边对不上。
+//
 // 顺手把源站的 sha1 取回来：**不能因为「省一次请求」就把校验和丢掉** ——
 // 十几 MB 的库文件都要跑安装，先坏在这里最亏。这个请求同时也起到
 // 「这个版本到底存不存在」的作用：拿不到 sha1 就直接拒绝，好过下到一半 404。
-func ForgeInstaller(tag string) (Build, error) {
+func ForgeInstaller(tag, mirror string) (Build, error) {
 	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		return Build{}, fmt.Errorf("没有指定要装哪个 Forge 版本")
@@ -223,18 +229,12 @@ func ForgeInstaller(tag string) (Build, error) {
 	if !validForgeTag(tag) {
 		return Build{}, fmt.Errorf("Forge 版本号看起来不对：%s（期望形如 1.20.4-49.0.30）", tag)
 	}
-	url := forgeMavenBase + "/" + tag + "/forge-" + tag + "-installer.jar"
+	base := forgeMavenBaseFor(mirror)
+	url := base + "/" + tag + "/forge-" + tag + "-installer.jar"
 
-	sha, err := getText(url + ".sha1")
+	sha, err := forgeInstallerSHA(tag, mirror)
 	if err != nil {
-		return Build{}, fmt.Errorf("源站上没有 %s 这个安装器（%s）", tag, err)
-	}
-	sha = strings.TrimSpace(sha)
-	if i := strings.IndexAny(sha, " \t"); i > 0 {
-		sha = sha[:i] // 有的仓库会把文件名跟在后面
-	}
-	if len(sha) != 40 {
-		return Build{}, fmt.Errorf("%s 的校验和看起来不对：%q", tag, sha)
+		return Build{}, fmt.Errorf("取不到 %s 这个版本的校验和（%s）—— 版本号可能不存在，也可能是网络问题", tag, err)
 	}
 
 	mc := tag[:strings.LastIndex(tag, "-")]
@@ -342,13 +342,48 @@ func compareDotted(a, b string) int {
 	return 0
 }
 
+// forgeInstallerSHA 取安装器的 sha1。来源按顺序试：**官方 → 镜像**。
+//
+// 为什么校验和要优先跟 jar 同源：校验和的意义就是「证明这一份 jar 是好的」，
+// 从别处取的值万一和这份文件对不上，我们就会把完好的版本判成坏的。
+// 同源不会出现这种分歧。另一个源只当兜底 —— 大文件被掐断的时候，
+// 那个 40 字节的小请求往往是通的（用户报的故障正是「8.8 MB 的安装器传到一半被 RST」）。
+func forgeInstallerSHA(tag, mirror string) (string, error) {
+	var lastErr error
+	for _, u := range forgeSHAURLs(tag, mirror) {
+		raw, err := getText(u)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		sha := strings.TrimSpace(raw)
+		if i := strings.IndexAny(sha, " \t"); i > 0 {
+			sha = sha[:i] // 有的仓库会把文件名跟在后面
+		}
+		if len(sha) != 40 {
+			lastErr = fmt.Errorf("%s 给的校验和不对：%q", hostOf(u), sha)
+			continue
+		}
+		return sha, nil
+	}
+	return "", lastErr
+}
+
+// forgeSHAURLs 校验和的候选地址：先给跟 jar 同源的那个，再退到另一个。
+// 抽出来是为了能测住这个顺序 —— 顺序反了不会报错，
+// 只会在两边不一致时静默地拿错那个当权威值。
+func forgeSHAURLs(tag, mirror string) []string {
+	base := forgeMavenBaseFor(mirror)
+	urls := []string{base + "/" + tag + "/forge-" + tag + "-installer.jar.sha1"}
+	if base != forgeMavenBase {
+		urls = append(urls, forgeMavenBase+"/"+tag+"/forge-"+tag+"-installer.jar.sha1")
+	}
+	return urls
+}
+
 // getText 拉一段纯文本（maven-metadata.xml 是 XML、.sha1 是一行十六进制，都不适合 getJSON）。
 func getText(url string) (string, error) {
-	req, err := newRequest(url)
-	if err != nil {
-		return "", err
-	}
-	resp, err := apiClient.Do(req)
+	resp, err := doWithRetry(apiClient, url)
 	if err != nil {
 		return "", fmt.Errorf("%s 连不上：%w", hostOf(url), err)
 	}

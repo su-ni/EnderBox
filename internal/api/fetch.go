@@ -269,7 +269,7 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if err == nil {
-			build, err = fetch.ForgeInstaller(body.Tag)
+			build, err = fetch.ForgeInstaller(body.Tag, body.Mirror)
 		}
 	case fetch.KindVelocity:
 		if body.Build > 0 {
@@ -363,6 +363,9 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 				Tag:        build.Tag,
 				Installer:  dest,
 				JavaMajor:  build.JavaMajor,
+				// 库文件也走同一个源。选了 BMCLAPI 却让安装器去官方下库，
+				// 等于「因为官方慢所以换镜像」只换了一半。
+				MirrorURL: fetch.ForgeMirrorURL(body.Mirror),
 			}, report)
 			return ierr
 		}

@@ -388,9 +388,9 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
                 {form.type === 'forge'
                   ? 'Forge 分两步走：先把安装器下下来，再在本机跑一遍它 —— 那一步会再下几十到一百多 MB 的库文件，'
                     + '装完整个实例目录大概几百 MB（实测 1.20.4 是 160 MB、1.12.2 是 33 MB）。全程自动，'
-                  : '创建后直接从源站下到实例目录里，支持断点续传；源站提供校验和的会校验一遍。'
+                  : '创建后直接从源站下到实例目录里：大文件走多线程，连接被掐断会自动重试、接着已有进度下；源站提供校验和的会校验一遍。'
                     + '下完会自动把端口和标语写进 server.properties —— 也就是你在下一步填的那些值。'}
-                {form.type === 'forge' && '装完「服务端文件」会自动指向该启动的那个 jar，你不用自己认。'}
+                {form.type === 'forge' && '装完「服务端文件」会自动指向该启动的那个文件（有的是 jar，有的是启动参数文件），你不用自己认。'}
               </p>
               {picked && (
                 <dl className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-[13px]">
@@ -550,7 +550,7 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
               [
                 '服务端文件',
                 form.type === 'forge'
-                  ? `${form.jarPath.trim() || 'server.jar'} → 装完自动改成 Forge 的启动 jar`
+                  ? `${form.jarPath.trim() || 'server.jar'} → 装完自动改成 Forge 的启动方式`
                   : form.jarPath.trim() || '（还没填）',
               ],
               ['开机自启 / 崩溃重启', `${form.autoStart ? '开' : '关'} / ${form.autoRestart ? '开' : '关'}`],

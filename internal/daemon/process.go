@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -61,7 +62,18 @@ func buildArgs(inst *Instance) []string {
 	if inst.JVMArgs != "" {
 		args = append(args, strings.Fields(inst.JVMArgs)...)
 	}
-	args = append(args, "-jar", resolveJar(*inst))
+	// Forge 新版（1.20.1-47.4.26 这种）根本不产出 jar：启动方式是安装器生成的参数文件
+	// （run.bat 里那句 `java @user_jvm_args.txt @libraries/.../win_args.txt`）。
+	// 这时要发 `@<文件>` 而不是 `-jar <文件>` —— java 对这两者的处理完全不同，
+	// 用 -jar 打开一个 .txt 只会得到「Invalid or corrupt jarfile」。
+	target := resolveJar(*inst)
+	if isArgsFile(target) {
+		// 用配置里存的那个路径（相对实例目录），别换成绝对路径：参数文件里写的是
+		// 相对 classpath（libraries/...），java 按 cwd 解析，而 cwd 就是实例目录。
+		args = append(args, "@"+inst.JarPath)
+	} else {
+		args = append(args, "-jar", target)
+	}
 	// nogui 是 Minecraft **服务端**的参数（别开那个图形界面）。
 	// 代理端（Velocity / BungeeCord）既没有界面、也没有这个参数，
 	// 塞进去只会被它当成未知参数。
@@ -69,6 +81,12 @@ func buildArgs(inst *Instance) []string {
 		args = append(args, "nogui")
 	}
 	return args
+}
+
+// isArgsFile 这个「服务端文件」其实是 java 的参数文件（@file），不是 jar。
+// Forge 1.17+ 的一部分构建就是这么发的（见 daemon.findForgeArgsFile）。
+func isArgsFile(p string) bool {
+	return strings.HasSuffix(strings.ToLower(filepath.FromSlash(p)), "_args.txt")
 }
 
 // isProxy 代理端：自己不开世界，只把玩家转发给后面的服务器。
