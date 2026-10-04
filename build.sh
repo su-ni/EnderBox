@@ -18,7 +18,11 @@ fi
 (cd web && npx tsc -b --force && npx vite build)
 
 echo "==> 2/3 把产物放进可 embed 的位置（internal/webui/dist）"
-rm -rf internal/webui/dist
+# 清掉上一轮产物：用 git clean 而不是 rm。
+# 这个目录里除了 .gitkeep（入库的哨兵文件，保证全新 clone 也能编译）之外
+# 全都是没入库的构建产物，而 git clean 天生只动未跟踪文件 —— 语义正好，
+# 也不会让 .gitkeep 在 git 里显示成「已删除」制造假 diff。
+git clean -fdxq internal/webui/dist
 mkdir -p internal/webui/dist
 cp -r web/dist/. internal/webui/dist/
 echo "    文件数：$(find internal/webui/dist -type f | wc -l)"

@@ -7,8 +7,16 @@ bin/
 
 # Node
 node_modules/
-dist/
+web/dist/
 .vite/
+
+# go:embed 的目标目录：build.sh 会把 web/dist 复制到这里再编译。
+# 目录内容全部忽略（构建产物），但**.gitkeep 必须留在库里** ——
+# 否则全新 clone 后 go build 会因为 `pattern all:dist: no matching files found` 直接失败。
+# 「没打包前端」时用户看到的说明页内置在 offline.go 里，不靠这个目录里的文件，
+# 所以 build.sh 反复重建这个目录不会跟 git 打架。
+internal/webui/dist/*
+!internal/webui/dist/.gitkeep
 
 # 运行时数据（存档与备份，绝不入库）
 data/
