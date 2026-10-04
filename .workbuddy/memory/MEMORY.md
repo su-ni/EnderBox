@@ -8,7 +8,7 @@
 
 ## 技术栈
 Go 单 exe 守护进程 + React/TS/Tailwind v4 + Wails（**未开始**）。多实例、Job Object 托管子进程、SSE 推日志。
-**后端不托管前端（embed 未做），单 exe 还不能开箱即用** —— 这是 P0 唯一硬门槛。
+**单 exe（前端已 go:embed 内嵌）已落地并实测**（`internal/webui`，`build.sh` 一键出包）。
 
 ## 目录要点
 `internal/daemon`（实例/进程/preflight 体检/日志落盘/properties）、`internal/api`、`internal/fetch`（jar 下载）、
@@ -19,6 +19,16 @@ Go 单 exe 守护进程 + React/TS/Tailwind v4 + Wails（**未开始**）。多�
 - **鉴权**（internal/settings + api/auth.go）：默认不挡人（requireAuth=false+回环豁免），只在「非回环+无保护」红警告；会话用 **Cookie**（EventSource 设不了请求头）；不看 X-Forwarded-For；令牌只存 sha256；改密码必须旧密码且 revokeAll。前端 401 广播 `sbx-need-auth`，登录闸门在 App 渲染之前。
 - **下载源**（实测 2026-10-04）：PaperMC 真地址 `fill.papermc.io/v3`（api.papermc.io 全废）；下载域名 `fill-data.papermc.io`；下载项键名 `server:default`；builds 顶层是数组；**默认选最新 STABLE 构建**（26.3 零 STABLE）；Java 要求以原版元数据 `javaVersion.majorVersion` 为准；BMCLAPI 只镜像原版；续传必须先把 .part 喂进 hash。
 - **产品原则**：①不静默失败，没接的明说卡在哪；②错误必须可操作（preflight 每条带 fix）。
+- **进程路径三原则**（真机联调撞出来的，别改回）：
+  ①服务端 jar 一律走 `resolveJar()`/`JarPathOf()`，**任何地方都别直接读 `inst.JarPath`**（可能是空的，
+  java 会收到空 `-jar` 秒崩，而体检那边用 resolveJar 会说「没问题」——自相矛盾，最伤信任）。
+  ②`Process.Kill/Stop` 必须置 `intentional=true`；收尾 goroutine 只认这个标记判「崩溃 vs 正常停止」，
+  **别拿 status 当依据**（Kill 想让状态立刻可读写 Stopped，会被 goroutine 覆盖成 Crashed，
+  还会触发自动重启 + 写假崩溃档）。
+  ③**Oracle `javapath\java.exe` 是转发器**，会再 spawn 子进程跑真 JVM。必须把 java 路径归一到
+  `<java.home>/bin/java`（`probeJava` 用 `-XshowSettings:properties` 读），否则 PID/内存全读错
+  （壳 10MB vs 真身 1.3GB）。厂商判定也读权威属性 `java.vendor`，**别对整份输出做子串扫描**
+  （`java.library.path` 里混着 Microsoft.DesktopAppInstaller，会把 Oracle 认成 Microsoft）。
 - store.Store 的 All() 遍历 map 顺序随机，用前必须自己排序。
 
 ## UI 规范（用户拍板）
@@ -45,3 +55,11 @@ Go 单 exe 守护进程 + React/TS/Tailwind v4 + Wails（**未开始**）。多�
 preflight 六项体检 / eula / fix(accept_eula·sync_port·rescan_java) / PUT 实例（整体覆盖）/
 properties GET|PUT（23 字段带 kind/label/hint/options，未知键只读附尾）/ fetch sources|versions|builds|tasks /
 server-jar 下载 / start 体检不过回 409+整份报告 / 全局设置+鉴权 / Paper+原版 jar 一键下载（含断点续传+SHA+轮询进度）。
+
+**真 Paper 1.21.4 全流程已跑通**（2026-10-04）：下载→体检→EULA→启动→命令→停服，就绪 18.2s(首)/11.6s(二)。
+
+**待人拍板的待办**：
+- 26.3（最新版）构建全是 BETA 且要 **Java 25**（本机无）。前端只警告「零稳定构建」，
+  「本机没这个 Java」要到启动体检才拦 —— 用户会白下 54MB。可考虑选构建时就比对本机 Java。
+- `PaperVersions()` 给每个版本都标 `stable:true`（只看名字有无 `-`，没看构建 channel），与前端判定口径不一致。
+- v0.1 剩余：自动备份（P0）、崩溃日志智能分析（P1）。

@@ -22,6 +22,10 @@ type Process struct {
 	errMsg    string
 	done      chan struct{}
 	players   map[string]struct{}
+	// intentional 人为停服标记。收尾 goroutine 靠它区分「崩溃」和「正常停止」——
+	// 不能拿 status 当依据：Kill 要让状态立刻可读会先写成 Stopped，
+	// 而 goroutine 只认 Stopping，于是「强制停止」被误记成崩溃、还会触发自动重启。
+	intentional bool
 
 	logs *LogBuffer
 	job  jobHandle
@@ -57,7 +61,7 @@ func buildArgs(inst *Instance) []string {
 	if inst.JVMArgs != "" {
 		args = append(args, strings.Fields(inst.JVMArgs)...)
 	}
-	args = append(args, "-jar", inst.JarPath, "nogui")
+	args = append(args, "-jar", resolveJar(*inst), "nogui")
 	return args
 }
 
@@ -96,6 +100,7 @@ func (p *Process) Start(javaPath string) error {
 	now := time.Now()
 	p.startedAt = &now
 	p.errMsg = ""
+	p.intentional = false
 	p.done = make(chan struct{})
 
 	// 挂到 Job Object，保证崩了也能把整棵进程树带走
@@ -107,7 +112,7 @@ func (p *Process) Start(javaPath string) error {
 	go func() {
 		err := cmd.Wait()
 		p.mu.Lock()
-		if p.status != StatusStopping {
+		if !p.intentional {
 			p.status = StatusCrashed
 			if err != nil {
 				p.errMsg = err.Error()
@@ -157,6 +162,7 @@ func (p *Process) Stop(timeout time.Duration) error {
 		return nil
 	}
 	p.status = StatusStopping
+	p.intentional = true
 	p.mu.Unlock()
 
 	_ = p.Send("stop")
@@ -178,7 +184,13 @@ func (p *Process) Kill() error {
 	}
 	terminateJob(p.job)
 	_ = p.cmd.Process.Kill()
-	p.status = StatusStopped
+	select {
+	case <-p.done:
+		// 收尾 goroutine 已经跑完并定过状态了（真的崩了 / 早就停了），别覆盖它的结论
+	default:
+		p.intentional = true
+		p.status = StatusStopped
+	}
 	return nil
 }
 

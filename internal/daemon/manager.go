@@ -149,6 +149,12 @@ func (m *Manager) Create(inst *Instance) error {
 	if inst.Port == 0 {
 		inst.Port = 25565
 	}
+	// jarPath 留空的话兜一个默认名 —— 前端向导会填 "server.jar"，
+	// 但 API / 导入来的实例可能没有。启动时 buildArgs 会走 resolveJar 兜底，
+	// 这里补上是为了让配置页 / 概览页显示的也是真实名字，而不是一片空白。
+	if inst.JarPath == "" {
+		inst.JarPath = "server.jar"
+	}
 	inst.CreatedAt = time.Now()
 	return m.st.Put(inst.ID, *inst)
 }
