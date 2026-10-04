@@ -65,7 +65,7 @@
 | 服务端下载：Fabric / NeoForge / Forge | Fabric 走 Meta API（`/v2/versions/loader/{game}`，装法是一个 loader jar + 一个 launcher jar，和 Paper 不一样）、NeoForge 走 maven 的 installer、Forge 是 installer 两段式（要先跑 installer 生成启动脚本）。**这三个都不能简单套 Paper 那套「下一个 jar 就完事」**，得各自写。 | `fetch.Sources()` 里已经把它们标成「还不支持」并说明原因，界面上是明确报错而不是静默失败 |
 | ~~全局设置持久化 + 鉴权~~ | ✅ **已完成并实测**（2026-10-04 下午）。见下方专节 | — |
 | **自动备份调度器** | 用**单个**定时器按分钟粒度扫，不要每实例一个 goroutine；保留份数清理**不碰** `pre-restore-*`；改策略立刻生效 | 备份页「自动备份」只剩一段说明（假的禁用控件已拿掉） |
-| **embed 前端 → 单 exe** | ⚠️ **代码已落地，但从未实测**（2026-10-04 盘点修正）。`internal/webui/webui.go` 已有 `go:embed all:dist` + SPA 回落 + `index.html` 不缓存 + `Built()` 探测；`cmd/server/main.go` 已把 `webui.Handler()` 挂上、`/api/` 与前端分流、`-open` 自动开浏览器也已实现；`build.sh` 负责把 `web/dist` 搬到 `internal/webui/dist` 再编译，并注入版本号。**缺的只是跑一次 `./build.sh` 并真跑起来验收** —— 现存 `bin/serverbox.exe`（13:10 构建）里不含 `assets/`，说明从没出过带真前端的版本 |
+| ~~embed 前端 → 单 exe~~ | ✅ **已完成并实测**（2026-10-04 15:05）。见下方专节 | — |
 
 ### 后端 P1 · 让服务器真的可控
 
@@ -88,9 +88,11 @@
 
 | 项 | 说明 |
 | --- | --- |
-| 后端不托管前端 | **代码已就位**（`internal/webui` + `build.sh` + `-open`），但一次带真前端的构建都没跑过。待办是「跑 `./build.sh` + 实测双击启动」，不是「从零实现」 |
+| ~~后端不托管前端~~ | ✅ **已解决并实测**。`./build.sh` 产出 8.7M 单 exe，双击即出面板（真前端已内嵌） |
 | Wails 桌面壳未开始 | 托盘常驻、单实例、开机自启都依赖它 |
-| git 仓库零提交 | 2026-10-04 `fdf6d0b` 已补首个提交（118 文件）。此前七轮产出全部处于未版本化状态 |
+| ~~git 仓库零提交~~ | ✅ 已补。首个提交 `fdf6d0b`（118 文件），此后每轮改动都有 commit |
+| git 作者是占位身份 | 提交者是 `Builder <builder@example.com>`。推 GitHub 前应改成本人身份并 `git commit --amend --reset-author` |
+| `go:embed` 目标目录必须留哨兵文件 | `internal/webui/dist/.gitkeep` 不能删：全新 clone 下没有它，`go build` 会直接报 `pattern all:dist: no matching files found`。`build.sh` 用 `git clean -fdx` 清产物就是为了不碰它 |
 | 实例删除不清理磁盘目录 | **刻意的**：删配置不动存档，界面上有说明。要做「连目录一起删」得再给一次强确认 |
 | `store.Store` 是 map，`All()` 顺序随机 | 用之前必须自己排序。`Manager.List()` 已按 `CreatedAt` 升序修好 |
 | `ResolveJava` 每次都重新扫 Java | 一次要起好几个 `java -version` 子进程。目前只在体检和启动时调用，量可接受；如果以后轮询就得上 TTL 缓存 |
@@ -196,6 +198,48 @@
 - 配置页新增「服务端文件」组：换版本 / 重下一份。**默认版本取实例当前的 MC 版本**，不是最新的。
 
 ---
+
+## 单 exe（前端内嵌）：已落地并实测
+
+代码在 `internal/webui/`，构建入口 `build.sh`，挂载在 `cmd/server/main.go`。
+
+### 交付形态
+
+`./build.sh` 三步：`tsc -b --force` + `vite build` → 把 `web/dist` 复制到 `internal/webui/dist`
+→ `go build` 注入 `git describe` 版本号。产出 `bin/serverbox.exe`（约 8.7 MB）。
+
+### 几个不显然的设计
+
+| 决策 | 理由 |
+| --- | --- |
+| `go:embed all:dist` 而非 `dist` | 要带上 `.gitkeep` 这类点文件，否则全新 clone 下 dist 里没有「可匹配的文件」，编译直接失败 |
+| 目录里必须留 `.gitkeep` | `go:embed` 要求目标目录**存在且非空**。少了它 → `pattern all:dist: no matching files found`。这个坑真踩过：`.gitignore` 里一条 `dist/` 把它排除了，仓库提交后全新 clone 编译不过 |
+| `build.sh` 用 `git clean -fdx` 清产物，不用 `rm -rf` | ① `git clean` 只动未跟踪文件，天然不会删掉已入库的 `.gitkeep`；② 用 `rm -rf` 会让 `.gitkeep` 在 git 里显示成「已删除」，每次构建制造假 diff；③ 本机的安全删除钩子在中文路径下会失败并**拒绝删除**，旧产物会残留 |
+| 「没打包前端」的说明页内置成 Go 字符串（`offline.go`） | 若放成 `dist/` 里的文件，每次构建都会覆盖它，还会造出「`assets/` 已存在但 index 是占位页」的自相矛盾状态（`Built()` 会据此声称前端已内嵌）。内置后永不缺失、git 也干净 |
+| 按「末段是否带扩展名」区分 SPA 回落 | 不区分的话，`/nope.js` 会拿到 200 + `text/html`，浏览器只报「Expected a JavaScript module script…」，把「文件没了」这个真问题藏起来。本项目的页面状态全在 query 里，路径永远只有 `/`，这个判据不会误伤 |
+| `assets/` 长缓存、`index.html` 禁缓存 | 前端产物带内容哈希可以放心 immutable；而 index.html 一旦被缓存，更新后会拿到旧壳去引用已消失的 assets —— 表现为「打开是白页面」 |
+
+### 实测记录（真跑 exe + curl，不是读代码）
+
+**A 模式**（没跑过 build.sh 的裸 `go build`）：
+- `/` → 200，2990B 说明页，含「跑 ./build.sh」的指引
+- `/nope.js` → **404**（不是首页 HTML）
+- `/api/health` → 200
+
+**B 模式**（`./build.sh` 产出的 8.7M 单 exe）：
+- 启动日志打印「面板地址 http://localhost:23399（前端已内嵌）」，`Built()` 判定正确
+- `/` → 200，1177B 真前端，引用 `assets/index-DzZUC1Ya.js` / `index-DELbXiPM.css`
+- `/assets/index-DzZUC1Ya.js` → 200，323135B，`Cache-Control: public, max-age=31536000, immutable`
+- `/nope.js`、`/assets/index-DEADBEEF.js`、`/nope.png` → **404**
+- `/some/deep/link`、`/?page=config` → 200 首页（前端路由回落仍正常）
+- `/api/health` `/api/instances` → 200 JSON；`/api/definitely-not-real` → **404 而非 HTML**（接口隔离正确）
+- 无头 Chrome 三档断点（1440 / 1024 / 520）截图渲染正常，`?probe=1` 读回 `SW==CW`，无横向溢出
+
+**可编译性**：从零 `git clone` → 裸 `go build ./cmd/server` 通过；跑起来 `/` 回说明页、`/x.js` 回 404。
+
+---
+
+
 
 ## UI 重做的两轮（记下来，免得以后不知道现在这样是为什么）
 
