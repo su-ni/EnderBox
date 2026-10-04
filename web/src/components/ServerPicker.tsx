@@ -5,19 +5,22 @@ import { IconRefresh } from './Icons'
 import { fmtSizeMaybe, fmtTime } from './ui'
 
 /**
- * 哪些通道算「稳定可用」。
- * 原版没有通道概念（为空）。⚠ Velocity 用的是 RECOMMENDED —— 实测 3.5.1 是 RECOMMENDED、
- * 3.4.0 与 4.2.0 是 STABLE。只认 STABLE 的话，会把 Velocity 的推荐版误报成测试版，
- * 还会误触发下面那条「一个稳定构建都没有」的警告。
+ * 哪些通道算「可以放心选」。
+ * 原版没有通道概念（为空）。⚠ 上游各家用的词不一样，实测：
+ *   Velocity 3.5.1 → RECOMMENDED，3.4.0 / 4.2.0 → STABLE
+ *   Forge          → 官方自己摆出来的两个是 RECOMMENDED（推荐）和 LATEST（最新）
+ * 只认 STABLE 的话，会把上面这些上游自己推荐的版本误报成「测试版」，
+ * 还会误触发下面那条「一个稳定构建都没有」的警告 —— 等于用文案骗用户。
  */
 function isStable(b: FetchBuild) {
-  return b.channel === '' || b.channel === 'STABLE' || b.channel === 'RECOMMENDED'
+  return b.channel === '' || b.channel === 'STABLE' || b.channel === 'RECOMMENDED' || b.channel === 'LATEST'
 }
 
 /** 通道的显示文案。上游各家用的词不一样，这里统一成人话。 */
 function channelLabel(ch: string) {
   if (ch === 'STABLE') return '稳定'
   if (ch === 'RECOMMENDED') return '推荐'
+  if (ch === 'LATEST') return '最新'
   return ch
 }
 
@@ -44,6 +47,8 @@ function defaultBuild(list: FetchBuild[], runnable: (b: FetchBuild) => boolean):
 export type Picked = {
   version: string
   build: number
+  /** 上游的稳定标识（Forge 用它回源站定位；别的类型不需要） */
+  tag?: string
   javaMajor: number
   /** javaMajor 的来源，确认页要如实说明；空=按旧口径兜底 */
   javaFrom?: string
@@ -78,6 +83,9 @@ export function ServerPicker({
   preferVersion?: string
 }) {
   const [src, setSrc] = useState<FetchSource | null>(null)
+  // 支持的全部类型。只为了在「这个类型走不通」时能如实列出「现在能走的有哪些」——
+  // 写死一份名单的话，哪天后端接了新类型，这句提示就会变成假话。
+  const [allSrc, setAllSrc] = useState<FetchSource[]>([])
   // 「问过源站支持哪些类型了」没有。只有问过之后才有资格判定「这个类型不支持」——
   // 网络失败时 src 也是 null，那不能当成「不支持」，得让下面的请求去报真正的网络错。
   const [srcReady, setSrcReady] = useState(false)
@@ -102,6 +110,7 @@ export function ServerPicker({
         if (!alive) return
         const s = (d.items ?? []).find((x) => x.type === type) ?? null
         setSrc(s)
+        setAllSrc(d.items ?? [])
         setSrcReady(true)
         if (s && s.mirrors.length > 0) setMirror(s.mirrors[0].id)
       })
@@ -163,6 +172,7 @@ export function ServerPicker({
           onPick({
             version: ver,
             build: def.id,
+            tag: def.tag,
             javaMajor: def.javaMajor,
             javaFrom: def.javaFrom,
             size: def.size,
@@ -206,7 +216,10 @@ export function ServerPicker({
           {src?.note || '这个类型后端不认，可能是参数传错了。'}
         </p>
         <p className="mt-2 text-[12px] leading-relaxed text-ink-3">
-          现在能自动下载的只有 Paper 和原版。想用这个类型，得自己把服务端文件装好再放进实例目录。
+          {allSrc.some((s) => s.available)
+            ? `现在能自动下载的有 ${allSrc.filter((s) => s.available).map((s) => s.label).join('、')}。`
+            : ''}
+          想用这个类型，得自己把服务端文件装好再放进实例目录。
         </p>
       </div>
     )
@@ -244,7 +257,9 @@ export function ServerPicker({
         游戏版本
         {versions && (
           <span className="mono-meta ml-3 font-normal">
-            {versions.length} 个正式版 · 已滤掉快照与预发布
+            {type === 'forge'
+              ? `${versions.length} 个版本 · 取自 Forge 官方的推荐表`
+              : `${versions.length} 个正式版 · 已滤掉快照与预发布`}
           </span>
         )}
       </p>
@@ -286,6 +301,12 @@ export function ServerPicker({
             {type === 'fabric' && (
               <span className="mono-meta ml-3 font-normal">Fabric 固定用最新的稳定 Loader，没得挑</span>
             )}
+            {type === 'forge' && (
+              <span className="mono-meta ml-3 font-normal">
+                前两个是 Forge 官方升级表里标的推荐 / 最新，后面按版本号从新到旧排 ——
+                所以后面的历史构建里可能出现比官方「最新」号还大的版本
+              </span>
+            )}
           </p>
           {loading === 'builds' ? (
             <p className="text-[12.5px] text-ink-3">正在取 {version} 的构建…</p>
@@ -307,6 +328,13 @@ export function ServerPicker({
                   想稳一点就换一个老一些的版本，比如 1.21.4 这种已经全量稳定的。
                 </p>
               )}
+              {type === 'forge' && (
+                <p className="mb-3 border-l-[3px] border-cyan bg-[#131b1a] px-4 py-2.5 text-[12.5px] leading-relaxed text-ink-2">
+                  Forge 跟别家不一样：下的是<b className="text-ink-1">安装器</b>，下完还要在本机跑一遍才算装好。
+                  这一步会再下几十到一百多 MB 的库文件（实测 1.20.4 全流程 34 秒、1.12.2 31 秒），
+                  全程自动，装完服务端文件会自动指到对的那个 jar，不用你管。
+                </p>
+              )}
               <div className="px-card">
               {builds.map((b) => {
                 const on = value?.build === b.id && value?.version === version
@@ -319,6 +347,7 @@ export function ServerPicker({
                       onPick({
                         version,
                         build: b.id,
+                        tag: b.tag,
                         javaMajor: b.javaMajor,
                         javaFrom: b.javaFrom,
                         size: b.size,
@@ -351,7 +380,9 @@ export function ServerPicker({
               })}
                 {builds.length >= 20 && (
                   <p className="mono-meta px-4 py-2.5">
-                    只列出最近 20 个构建。更老的版本用的人少，需要的话直接去源站下再手动放进实例目录。
+                    {type === 'forge'
+                      ? '只列出 20 个。整合包锁了更老的 Forge 版本的话，去源站下那个版本的安装器，放进实例目录再跑一遍就行。'
+                      : '只列出最近 20 个构建。更老的版本用的人少，需要的话直接去源站下再手动放进实例目录。'}
                   </p>
                 )}
               </div>

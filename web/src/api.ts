@@ -58,6 +58,12 @@ export type FetchBuild = {
   javaMajor: number
   /** 构建行的显示名（Fabric 用它显示 Loader 版本）；留空则按 #编号/官方 显示 */
   label?: string
+  /**
+   * 上游对这个构建的稳定标识，下载时按它回源站定位。
+   * Forge 必须用它 —— 版本号不是整数（49.0.30、14.23.5.2860），塞不进 id，
+   * 而按 id 定位会在上游加了新构建之后悄悄下成另一个版本。
+   */
+  tag?: string
   /** javaMajor 是哪来的：mojang=官方元数据、versionline=按版本线推断 */
   javaFrom?: string
 }
@@ -78,6 +84,12 @@ export type DownloadTask = {
   err?: string
   sha: string
   verified: boolean
+  /**
+   * 当前处于哪一段：download=在下文件，install=下完之后的安装步骤。
+   * 只有 Forge 会走到 install（它下的是安装器，还得真跑一遍）——
+   * 这一段没有「下了多少字节」这回事，界面要继续画字节数会让人以为卡死了。
+   */
+  phase?: string
   startedAt: string
   endedAt?: string
 }
@@ -248,8 +260,10 @@ export const api = {
     ),
 
   /** 发起下载，返回任务快照（202）。之后按 task.id 轮询。 */
-  downloadServerJar: (id: string, body: { type: string; version: string; build?: number; mirror?: string }) =>
-    req<DownloadTask>(`/instances/${id}/server-jar`, jsonInit('POST', body)),
+  downloadServerJar: (
+    id: string,
+    body: { type: string; version: string; build?: number; mirror?: string; tag?: string },
+  ) => req<DownloadTask>(`/instances/${id}/server-jar`, jsonInit('POST', body)),
 
   fetchTask: (taskId: string) => req<DownloadTask>(`/fetch/tasks/${enc(taskId)}`),
 

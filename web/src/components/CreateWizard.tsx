@@ -6,6 +6,7 @@ import { TYPE_LABEL, javaForVersion } from '../types'
 import { lacksJava, useLocalJava } from '../useLocalJava'
 import { ServerPicker, type Picked } from './ServerPicker'
 import { DownloadBar } from './DownloadBar'
+import { fmtSizeMaybe } from './ui'
 
 type Props = {
   onDone: (newId?: string) => void
@@ -20,6 +21,13 @@ const STEPS = [
   { t: '基本信息', s: '名称 · 端口 · 内存' },
   { t: '确认创建', s: '检查并开服' },
 ]
+
+/**
+ * URL 上**显式**点了版本才优先选它（?view=create&type=forge&mc=1.20.4）。
+ * 没点就交给 ServerPicker 按原设计落到最新版本 —— 对「新建」来说最新是好默认值。
+ * 这个口子主要是给深链和截图核对用的：无头浏览器点不了按钮，只能靠 URL 直达某一步。
+ */
+const URL_MC = new URLSearchParams(location.search).get('mc') ?? ''
 
 /** 每种服务端一句人话解释 —— 新手就卡在「这些名词都是啥」这一步 */
 const TYPE_INFO: Record<string, { desc: string; chips: { t: string; tone?: 'g' | 'w' | 'd' }[] }> = {
@@ -128,15 +136,22 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
       alive = false
     }
   }, [])
-  const [form, setForm] = useState({
-    name: '',
-    type: 'paper',
-    mcVersion: '1.21.4',
-    jarPath: 'server.jar',
-    maxMem: 4096,
-    port: 25565,
-    autoStart: true,
-    autoRestart: true,
+  // 类型能从 URL 预置：?view=create&type=forge
+  // 和上面的 step 同一个套路 —— 除了让「新建时直达某个加载器」可分享，
+  // 也让这个向导的每一步都能被无头浏览器直接截到（否则点不了按钮就进不去）。
+  // 类型必须校验：手改 URL 可以塞任意字符串，直接吃下去会把后端搞懵。
+  const [form, setForm] = useState(() => {
+    const t = new URLSearchParams(location.search).get('type') ?? ''
+    return {
+      name: '',
+      type: t in TYPE_LABEL ? t : 'paper',
+      mcVersion: URL_MC || '1.21.4',
+      jarPath: 'server.jar',
+      maxMem: 4096,
+      port: 25565,
+      autoStart: true,
+      autoRestart: true,
+    }
   })
 
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }))
@@ -190,6 +205,7 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
           type: form.type,
           version: form.mcVersion,
           build: picked?.build ?? 0,
+          tag: picked?.tag ?? '',
           mirror: picked?.mirror ?? '',
         })
         setTaskId(t.id)
@@ -314,6 +330,7 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
           <ServerPicker
             type={form.type}
             value={picked}
+            preferVersion={URL_MC || undefined}
             onPick={(p) => {
               setPicked(p)
               set('mcVersion', p.version)
@@ -368,17 +385,19 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
                 <span className="chip chip-g ml-auto">自动下载</span>
               </div>
               <p className="text-[12.5px] leading-relaxed text-ink-2">
-                创建后直接从源站下到实例目录里，支持断点续传；源站提供校验和的会校验一遍。
-                下完会自动把端口和标语写进 server.properties —— 也就是你在下一步填的那些值。
+                {form.type === 'forge'
+                  ? 'Forge 分两步走：先把安装器下下来，再在本机跑一遍它 —— 那一步会再下几十到一百多 MB 的库文件，'
+                    + '装完整个实例目录大概几百 MB（实测 1.20.4 是 160 MB、1.12.2 是 33 MB）。全程自动，'
+                  : '创建后直接从源站下到实例目录里，支持断点续传；源站提供校验和的会校验一遍。'
+                    + '下完会自动把端口和标语写进 server.properties —— 也就是你在下一步填的那些值。'}
+                {form.type === 'forge' && '装完「服务端文件」会自动指向该启动的那个 jar，你不用自己认。'}
               </p>
               {picked && (
                 <dl className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-[13px]">
-                  <dt className="eyebrow">将下载</dt>
+                  <dt className="eyebrow">{form.type === 'forge' ? '先下载' : '将下载'}</dt>
                   <dd className="mono-value break-all">{picked.name}</dd>
-                  <dt className="eyebrow">大小</dt>
-                  <dd className="mono-value">
-                    {picked.size > 0 ? `${(picked.size / 1048576).toFixed(1)} MB` : '源站没给'}
-                  </dd>
+                  <dt className="eyebrow">{form.type === 'forge' ? '安装器大小' : '大小'}</dt>
+                  <dd className="mono-value">{fmtSizeMaybe(picked.size)}</dd>
                 </dl>
               )}
             </div>
@@ -447,10 +466,21 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
       )}
 
       {step === 4 && phase !== 'idle' && (
-        <StepBody title={phase === 'downloading' ? '正在准备服务端' : '服务端下载没成功'}>
+        <StepBody
+          title={
+            phase === 'downloading'
+              ? form.type === 'forge'
+                ? '正在下载并安装 Forge'
+                : '正在准备服务端'
+              : form.type === 'forge'
+                ? 'Forge 没能装好'
+                : '服务端下载没成功'
+          }
+        >
           <div className="px-card p-4">
             <p className="mb-3.5 text-[12.5px] leading-relaxed text-ink-2">
               世界已经建好了。这一步是在把服务端文件下到实例目录里 ——
+              {form.type === 'forge' && ' Forge 还要在下载完之后多跑一遍安装，进度条会显示到哪一步了；'}
               下完了回概览页点启动就能开服。
             </p>
             {phase === 'downloading' && taskId && (
@@ -472,6 +502,7 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
                           type: form.type,
                           version: form.mcVersion,
                           build: picked?.build ?? 0,
+                          tag: picked?.tag ?? '',
                           mirror: picked?.mirror ?? '',
                         })
                         setTaskId(t.id)
@@ -501,11 +532,27 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
           <div className="px-card">
             {[
               ['服务端', `${TYPE_LABEL[form.type]} ${form.mcVersion}`],
-              ['构建', picked ? (picked.build > 0 ? `#${picked.build}（${picked.name}）` : picked.name) : '（还没选）'],
+              // Forge 的 id 只是列表里的行号（它的版本号不是整数），显示成「#1」会让人以为那是构建号。
+              // 它有意义的身份是 tag，也就是 1.20.4-49.0.30 这种。
+              [
+                '构建',
+                picked
+                  ? form.type === 'forge'
+                    ? picked.tag || picked.name
+                    : picked.build > 0
+                      ? `#${picked.build}（${picked.name}）`
+                      : picked.name
+                  : '（还没选）',
+              ],
               ['运行环境', `自动挑一个够用的 Java（这个版本需要 ${java}+）`],
               ['世界名称', form.name.trim() || '（还没填）'],
               ['监听端口', String(form.port)],
-              ['服务端文件', form.jarPath.trim() || '（还没填）'],
+              [
+                '服务端文件',
+                form.type === 'forge'
+                  ? `${form.jarPath.trim() || 'server.jar'} → 装完自动改成 Forge 的启动 jar`
+                  : form.jarPath.trim() || '（还没填）',
+              ],
               ['开机自启 / 崩溃重启', `${form.autoStart ? '开' : '关'} / ${form.autoRestart ? '开' : '关'}`],
             ].map(([k, v]) => (
               <div
@@ -561,7 +608,16 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
 
           <p className="mt-3.5 text-[12.5px] leading-relaxed text-ink-2">
             点下面的按钮会：建目录写配置 → 写 eula.txt →{' '}
-            <b className="text-ink-1">把服务端下载进去</b>。下完回概览页点「启动」就行。
+            {form.type === 'forge' ? (
+              <>
+                <b className="text-ink-1">下安装器并自动装好 Forge</b>（这一步比别的类型慢一截，因为装的过程还要下库文件）
+              </>
+            ) : (
+              <>
+                <b className="text-ink-1">把服务端下载进去</b>
+              </>
+            )}
+            。下完回概览页点「启动」就行。
             启动前它会先体检一遍（jar 在不在、Java 够不够、端口占没占），有问题会把清单和修复按钮直接摆出来。
           </p>
         </StepBody>

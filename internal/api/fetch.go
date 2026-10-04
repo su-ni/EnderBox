@@ -1,9 +1,11 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -83,6 +85,8 @@ func (s *Server) fetchVersions(w http.ResponseWriter, r *http.Request) {
 		vs, err = fetch.VanillaVersions(s.mirrorOf(r))
 	case fetch.KindFabric:
 		vs, err = fetch.FabricVersions()
+	case fetch.KindForge:
+		vs, err = fetch.ForgeVersions()
 	case fetch.KindVelocity:
 		vs, err = fetch.VelocityVersions()
 	}
@@ -121,6 +125,8 @@ func (s *Server) fetchBuilds(w http.ResponseWriter, r *http.Request) {
 		bs, err = fetch.VanillaBuilds(s.mirrorOf(r), ver)
 	case fetch.KindFabric:
 		bs, err = fetch.FabricBuilds(s.mirrorOf(r), ver)
+	case fetch.KindForge:
+		bs, err = fetch.ForgeBuilds(s.mirrorOf(r), ver, limit)
 	case fetch.KindVelocity:
 		bs, err = fetch.VelocityBuilds(ver, limit)
 	}
@@ -194,6 +200,10 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 		Version string `json:"version"`
 		Build   int    `json:"build"`
 		Mirror  string `json:"mirror"`
+		// Tag 上游对某个构建的稳定标识。Forge 必须带：它的版本号不是整数
+		// （49.0.30 / 14.23.5.2860），只能按字符串回源站定位，
+		// 靠 build 序号会因为上游加了新构建而错位成另一个版本。
+		Tag string `json:"tag"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, 400, "请求体解析失败: "+err.Error())
@@ -244,6 +254,23 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 		if err == nil && len(bs) > 0 {
 			build = bs[0]
 		}
+	case fetch.KindForge:
+		// Forge 少了 tag 就没法准确定位（版本号不是整数），所以前端必须带。
+		// 真没带也不报错 —— 退回「这个版本的推荐构建」，那是最合理的默认，
+		// 报错只会让用户对着一个他无从下手的信息发呆。
+		if body.Tag == "" {
+			var bs []fetch.Build
+			if bs, err = fetch.ForgeBuilds(body.Mirror, body.Version, 20); err == nil {
+				if len(bs) > 0 {
+					body.Tag = bs[0].Tag
+				} else {
+					err = fmt.Errorf("Forge 没有为 %s 出过任何构建", body.Version)
+				}
+			}
+		}
+		if err == nil {
+			build, err = fetch.ForgeInstaller(body.Tag)
+		}
 	case fetch.KindVelocity:
 		if body.Build > 0 {
 			var bs []fetch.Build
@@ -281,15 +308,22 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dest := daemon.JarPathOf(inst)
+	isForge := fetch.Kind(body.Type) == fetch.KindForge
+	if isForge {
+		// Forge 下的**不是**实例要启动的那个 jar，而是安装器。要是还落在 JarPathOf 上，
+		// 就会拿安装器覆盖掉真正该启动的文件，然后启动时一脸茫然。
+		// 该启动哪个由装完之后按目录实况决定（daemon.InstallForge 会写回实例配置）。
+		dest = filepath.Join(inst.Dir, build.Name)
+	}
 	// 记下这次下的到底是什么 —— 下载完顺手把这个信息落到实例配置里，
 	// 之后「概览」页就能显示「Paper 1.21.4 build 232」而不是一个光秃秃的文件名
 	jarName := build.Name
 
-	task, err := s.dl.Start(fetch.Options{
+	opts := fetch.Options{
 		InstanceID: id,
 		Build:      build,
 		DestPath:   dest,
-		OnDone: func(o fetch.Options) error {
+		OnDone: func(o fetch.Options, written int64) error {
 			// ① 服务端第一次启动会读 server.properties。文件不存在时按实例配置生成一份，
 			//    否则用户在向导里选的端口根本不生效 —— 服务端会用默认 25565。
 			//    已经存在就一个字都不动，那是用户自己的配置。
@@ -300,12 +334,41 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 			if werr := s.mgr.WritePropertiesIfAbsent(id, props); werr != nil {
 				return fmt.Errorf("写 server.properties 失败：%w", werr)
 			}
-			// ② 往实例控制台写一行，让用户在日志里能看见「什么时候换了服务端文件」
+			// ② 往实例控制台写一行，让用户在日志里能看见「什么时候换了服务端文件」。
+			//    大小用真正落盘的字节数，不用 build.Size —— 列表里那个多数时候是 0，
+			//    写出来就是「0 字节的安装器」这种一眼假的记录。
 			s.mgr.Log(id, fmt.Sprintf("[ServerBox] 服务端文件已就绪：%s（%d 字节，校验%s）",
-				jarName, build.Size, map[bool]string{true: "通过", false: "未提供"}[build.SHA != ""]))
+				jarName, written, map[bool]string{true: "通过", false: "未提供"}[build.SHA != ""]))
 			return nil
 		},
-	})
+	}
+
+	if isForge {
+		// 第二阶段：把 installer 真跑一遍。挂在同一个任务里 ——
+		// 「下个 Forge」对用户就是一件事，拆成两个任务等于让他自己知道要点第二次。
+		wantJava := build.JavaMajor
+		if wantJava <= 0 {
+			// 拿不到权威值就按 8 起步，ResolveJava 会在这个基础上往上取更高的
+			wantJava = 8
+		}
+		opts.PostInstall = func(ctx context.Context, report func(string)) error {
+			rt, jerr := s.mgr.ResolveJava(wantJava)
+			if jerr != nil {
+				return fmt.Errorf("本机没有能跑 Forge 安装器的 Java：%w", jerr)
+			}
+			_, ierr := s.mgr.InstallForge(daemon.ForgeInstallOpts{
+				Ctx:        ctx,
+				InstanceID: id,
+				JavaPath:   rt.Path,
+				Tag:        build.Tag,
+				Installer:  dest,
+				JavaMajor:  build.JavaMajor,
+			}, report)
+			return ierr
+		}
+	}
+
+	task, err := s.dl.Start(opts)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return

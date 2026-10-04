@@ -11,8 +11,11 @@ Go 单 exe 守护进程 + React/TS/Tailwind v4 + Wails（**未开始**）。多�
 **单 exe（前端已 go:embed 内嵌）已落地并实测**（`internal/webui`，`build.sh` 一键出包）。
 
 ## 目录要点
-`internal/daemon`（实例/进程/preflight 体检/日志落盘/properties）、`internal/api`、`internal/fetch`（jar 下载）、
+`internal/daemon`（实例/进程/preflight 体检/日志落盘/properties/**forge.go 跑安装器+认启动 jar**）、
+`internal/api`、`internal/fetch`（jar 下载；**forge.go 版本表/构建列表/安装器下载**）、
 `internal/settings`（鉴权）、`web/src/components`、`docs/BACKEND-PLAN.md`（**剩余工作权威清单**）、`tools/fakeserver`。
+`internal/daemon/testdata/forge-installer-sample.txt` = **1.20.4 安装器真实输出**的抽样（1204 行），
+给日志过滤规则做回归 —— 别手写样本，见工作守则 12。
 
 ## 关键决策（别改回）
 - **崩溃重启护栏**：退避 5s→20s→60s，3 次后停下给人话提示；跑满 180s 才清零；崩溃存最后 200 行到 `data/logs/<id>-crash-*.log`。
@@ -46,8 +49,17 @@ Go 单 exe 守护进程 + React/TS/Tailwind v4 + Wails（**未开始**）。多�
   前端 `isStable()` 必须两个都放行，否则会把推荐版误报成测试版 + 误触发「零稳定构建」警告。
   Java 要求上游**不给**，按版本线推断（读 jar 字节码实测：3.4.0→17、3.5.1→21、4.2.0→25；
   class major − 44 = Java 版本）。三档跨度说明**取固定值一定是错的**。见 `velocityJava()`。
-- **未接的三家（探明结论，别再重复探测）**：
-  Forge：maven 可达，installer 两段式（要跑安装器 + 改用 `@args.txt` 启动，动启动模型）。
+- **Forge（已接入，2026-10-04）**：`maven.minecraftforge.net` 官方源**直连可用**，和 NeoForge 不是一回事（别混为一谈）。
+  它是**两段式**：下的只是 installer，必须在本机再跑 `java -jar installer.jar --installServer <dir>` 才产出服务端
+  （这一步再下 100 MB 左右库文件；实测 1.20.4 全流程 42s、1.12.2 38s）。
+  产物分两代，**必须按目录实况决定启动哪个 jar，不许按版本号推断**：
+    `spec=1`（1.17+）→ 根目录 `forge-<tag>-shim.jar`（真身在 libraries/）
+    `spec=0`（≤1.16.5）→ 根目录 `forge-<tag>.jar` + `minecraft_server.<MC>.jar`（**认错成后者 = 模组全没了**）
+  两代根目录那个 jar 都能直接 `-jar` 启动，**不需要 win_args.txt**。
+  版本表取 `promotions_slim.json`（官方推荐/最新），构建表取 `maven-metadata.xml`（含 35 条垃圾版本，要按
+  `validForgeTag` 滤掉）；排序 = 官方推荐/最新在前，其余按**分段数值**从新到旧（字符串排序会把 49.9 排到 49.2.10 后面）。
+  版本号不是整数（`49.2.0`），塞不进 `Build.ID`，所以加了 `Build.Tag` 字符串做稳定标识。
+- **未接的两家（探明结论，别再重复探测）**：
   NeoForge：`maven.neoforged.net` 在本机**只解析出 IPv6、连接被重置**，打不通。
   BungeeCord：`ci.md-5.net` 301 到 `hub.spigotmc.org`；jar 有 26 MB 而实测 ~80 KB/s
   （两分钟只跑到 9.9 MB）→ 和「30 秒开服」的承诺直接冲突，且是滚动构建、没有游戏版本概念。
@@ -65,7 +77,9 @@ Go 单 exe 守护进程 + React/TS/Tailwind v4 + Wails（**未开始**）。多�
 - 动效 140/220/300ms，`cubic-bezier(.16,.84,.44,1)` 不许弹跳；留 `body.no-anim` 开关；滚动容器只做 opacity 动画（transform 会毁 sticky）。
 - 配置页：左分组导航+右侧一组，滚到底切组，搜索切全部命中；`.crow` 标签列 330px 控件紧随；滚轮劫持前先判断面板能否滚。
 - 数值用 StepInput（禁 `<input type=number>`）；滚动条全局统一。
-- 可寻址状态：`?page= ?view=create&step=N ?nosse=1 ?g= ?q= ?probe=1 ?drawer=1 ?restore=1`。
+- 可寻址状态：`?page= ?view=create&step=N ?view=create&type=forge&mc=1.20.4 ?nosse=1 ?g= ?q= ?probe=1 ?drawer=1 ?restore=1`。
+  向导的 `type`/`mc` 是这轮加的 —— 深链可分享，也是无头浏览器**唯一**能进到「第 2 步的某个类型」的入口（点不了按钮）。
+  `preferVersion` 只在 URL 显式点名时才传，别改成总是传：新建向导默认落到最新版本是**刻意**的。
 
 ## 工作守则（血泪）
 1. Edit 会假成功 → 小改动用 python replace + grep 回验；反复失败就 Read+Write 重写。
@@ -84,6 +98,16 @@ Go 单 exe 守护进程 + React/TS/Tailwind v4 + Wails（**未开始**）。多�
     diff 里表现为「整个文件都改了」（几百行膨胀到上千行），真实改动全被淹没。
     **改完必须 `git diff --stat` 复核**；判行尾用字节统计或 `od -c`，
     **别用 `grep -c $'\r'`**——本轮它把纯 LF 文件报成「每行都有 CR」，据此做了错误的一刀切。
+12. **要过滤第三方输出时，样本必须逐字抄自真输出，并固化成 fixture**。
+    这轮 `interestingLine` 第三版单测全绿、真机灌进 11736 行噪音，原因只有一个：
+    **样本是我按想象手写的裸路径**，而真输出前面还挂着动词（`Copying xxx.class`）。
+    正确姿势：把原始输出整个抓下来 → 按形状抽样存 `testdata/` → 断言「过滤后只剩 N 条」，
+    任何一族噪音漏过去都会让测试变红。配套三条：
+    ①**先按形状排噪音，再按关键字找信号，顺序不能反**；
+    ②任何关键字规则都会在「合法名字里含 fail/exception」上翻车（`DefaultUncaughtExceptionHandler.class`、
+      guava 的 `failureaccess` 都是活例子）；
+    ③动词规则里必须要求路径含 `/` 或 `.`，否则 `Patching failed` 这种真报错会被一起吃掉。
+    真输出里数出来的噪音族（29733 行）：Copying 11736 / Reading patch 1421 / Patching 1420 / Checksum: 1420 / Can't Find Class 557。
 
 ## 后端接口已实现（均实测）
 preflight 六项体检 / eula / fix(accept_eula·sync_port·rescan_java) / PUT 实例（整体覆盖）/
@@ -91,7 +115,8 @@ properties GET|PUT（23 字段带 kind/label/hint/options，未知键只读附�
 server-jar 下载 / start 体检不过回 409+整份报告 / 全局设置+鉴权 / Paper+原版 jar 一键下载（含断点续传+SHA+轮询进度）。
 
 **服务端类型真相源**：`fetch.Sources()` 是**唯一**真相源 —— 列出全部 7 种类型并带 `available`，
-只有 paper/vanilla 能自动下载，其余 5 种标 `available:false` + 写明为什么。前端「能不能选 / 能不能下」
+现为 **paper / vanilla / fabric / velocity / forge 五种可自动下载**，NeoForge 与 BungeeCord 标
+`available:false` + 写明为什么。前端「能不能选 / 能不能下」
 全读它（`SourceOf()` 让 API 复用同一份文案）。**别在前端另写一份类型名单** ——
 曾经只返回 2 种，导致选 Forge 时 ServerPicker 的「不支持」面板判据 `src && !src.available` 永不触发（死代码），
 于是径直去拉 versions → 后端 400 → 前端画成一个点了永远一样的「重试」，用户走进死循环。
@@ -103,7 +128,9 @@ server-jar 下载 / start 体检不过回 409+整份报告 / 全局设置+鉴权
 - v0.1 剩余：自动备份（P0，用户已点名下一个做）、崩溃日志智能分析（P1）。
 
 **已做**：选版本/构建时就比对本机 Java（`web/src/useLocalJava.ts`）。
-**已做**：未支持的服务端类型如实说清原因**已做**：服务端直连下载覆盖 **paper / vanilla / fabric / velocity** 四种。
+**已做**：未支持的服务端类型如实说清原因**已做**：服务端直连下载覆盖 **paper / vanilla / fabric / velocity / forge** 五种。
+Forge 是唯一的两段式（下安装器 → 本机跑安装 → 自动把 `jarPath` 指向生成的启动 jar，并回填 `loaderVersion`），
+其余四种下完即用。
 Fabric 只有一个构建（最新稳定 Loader）；Velocity 构建带真实编号（如 #615）。
 两种都走 `Build.Label` / `Build.JavaFrom`，前端据此显示「Loader 0.19.5」和如实标注 Java 数值来源。
  —— `fetch.Sources()` 补全 7 种 + `SourceOf()`；

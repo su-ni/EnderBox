@@ -11,6 +11,7 @@
 //   - Paper 的下载项键名是 "server:default"（v2 时代叫 application，别照抄老代码）
 //   - piston-meta.mojang.com / launchermeta.mojang.com 都可用
 //   - BMCLAPI 只镜像了原版那套；它的 papermc 路径是 404，别在界面上给 Paper 挂镜像
+//   - Forge 的 maven.minecraftforge.net 是**通的**，别拿 NeoForge 的结论套过去（见 forge.go）
 package fetch
 
 import (
@@ -22,19 +23,21 @@ import (
 	"time"
 )
 
-// Kind 服务端类型。目前只接了两种，其余的明确标「还没接」，不假装支持。
+// Kind 服务端类型。已经接了下载的五种在这里；剩下两种明确标「还没接」，
+// 不假装支持，也整块藏起来 —— 用户有权知道「有这个东西，只是现在走不通、卡在哪」。
 type Kind string
 
 const (
 	KindPaper   Kind = "paper"
 	KindVanilla Kind = "vanilla"
+	KindFabric  Kind = "fabric"
+	// Forge 是唯一一个「装完还要再跑一遍」的：它给的是 installer，不是服务端本身。
+	// 见 forge.go 的文件头说明。
+	KindForge    Kind = "forge"
+	KindVelocity Kind = "velocity"
 
-	// 下面这些只是「界面上认识」，还没有对应的下载实现。
-	// 单独列出来是为了让界面能如实地说「暂不支持」，而不是整块消失。
-	KindFabric     Kind = "fabric"
-	KindForge      Kind = "forge"
+	// 下面这两个只是「界面上认识」，还没有对应的下载实现。
 	KindNeoForge   Kind = "neoforge"
-	KindVelocity   Kind = "velocity"
 	KindBungeeCord Kind = "bungeecord"
 )
 
@@ -93,6 +96,11 @@ type Build struct {
 	// Label 构建行的显示名。留空时前端按「#编号」显示，没编号的显示「官方」——
 	// Fabric 那种「构建 = Loader 版本」的，编号没有意义，得让它自己给个说法。
 	Label string `json:"label,omitempty"`
+	// Tag 上游对这个构建的**身份**标识，用来在下载时重新定位到同一个东西。
+	// Forge 必须有它：它的版本号不是整数（49.0.30、14.23.5.2860），塞不进 ID，
+	// 而「列表里第几个」这种定位方式会在上游加了新构建之后悄悄错位 ——
+	// 用户选的是 A，下到的却是 B。留空表示用 ID 就够（Paper / Velocity）。
+	Tag string `json:"tag,omitempty"`
 	// JavaFrom 说明 JavaMajor 是哪来的：mojang=官方元数据（权威）、
 	// versionline=按版本线推断（上游不提供）。留空 = 前端按原口径兜底。
 	JavaFrom string `json:"javaFrom,omitempty"`
@@ -167,10 +175,12 @@ func Sources() []Source {
 			Note: "官方源直连可用。给的是一百多 KB 的启动器 jar，首次启动它会自己去下依赖 —— 所以第一次开服会慢一些，而且必须联网。"},
 		{Type: KindVelocity, Label: "Velocity", Available: true,
 			Note: "和 Paper 用同一个源站，直连可用。"},
-		{Type: KindForge, Label: "Forge", Available: false,
-			Note: "installer 两段式安装，装完由它自己生成启动脚本，还没接。"},
+		{Type: KindForge, Label: "Forge", Available: true,
+			Note: "官方源直连可用。它和别家不一样：下的是安装器，下完还要在本机跑一遍才算装好 —— " +
+				"这一步会再下几十到一百多 MB 的库文件（实测 1.20.4 全流程 34 秒、1.12.2 31 秒）。" +
+				"所以会比别的类型慢一截，但只慢这一次。"},
 		{Type: KindNeoForge, Label: "NeoForge", Available: false,
-			Note: "官方 maven 在本机连不通（只解析出 IPv6 地址，连接被重置），而且跟 Forge 一样是 installer 两段式，还没接。"},
+			Note: "官方 maven 在本机连不通（只解析出 IPv6 地址，连接被重置）。Forge 那台是通的，NeoForge 换成自己独立的主机了，两者不能互相参照。"},
 		{Type: KindBungeeCord, Label: "BungeeCord", Available: false,
 			Note: "源站能连通但实测很慢（26 MB 的 jar 两分钟只跑到 9.9 MB），而且它是滚动构建、没有游戏版本概念，暂时没接。"},
 	}

@@ -47,6 +47,11 @@ type Task struct {
 	StartedAt time.Time  `json:"startedAt"`
 	EndedAt   *time.Time `json:"endedAt,omitempty"`
 
+	// Phase 当前处于哪一段：download（在下文件）还是 install（在下完之后的安装步骤）。
+	// 前端要分开显示 —— 安装那段没有「已下载多少字节」这回事，
+	// 继续画字节数只会让人以为卡住了。只有 Forge 会走到 install。
+	Phase string `json:"phase"`
+
 	cancel context.CancelFunc
 }
 
@@ -130,7 +135,22 @@ type Options struct {
 
 	// OnDone 落盘成功后回调。让调用方在这里补后续动作（写 eula、写 server.properties、
 	// 往实例控制台写一行日志）——下载器本身不该知道实例和属性的存在。
-	OnDone func(opts Options) error
+	//
+	// written 是这次真正落盘的字节数。必须传给它：构建列表里通常没有大小
+	// （Forge 那 500 多个构建不可能一个个去问 Content-Length），
+	// 用 Build.Size 记日志会把「5.5 MB 的安装器」写成「0 字节」。
+	OnDone func(opts Options, written int64) error
+
+	// PostInstall 落盘之后的第二阶段。只有 Forge 用得上：它给的是 installer，
+	// 必须再跑一遍才产出能启动的服务端。
+	//
+	// 它跑在**同一个任务**里而不是另开一个任务 —— 对用户来说「下 Forge」就是一件事，
+	// 拆成两个任务会让他点两次、还得自己知道要点第二次。
+	// 它失败时整个任务判失败（而不是像 OnDone 那样只给个告警）：文件虽然落盘了，
+	// 但目录里没有可启动的东西，「就绪」两个字会是彻头彻尾的谎。
+	//
+	// report 用来把阶段文案写回任务，让界面显示得到过程。
+	PostInstall func(ctx context.Context, report func(step string)) error
 }
 
 // Start 起一个下载任务，立刻返回 task id。
@@ -151,6 +171,7 @@ func (m *Manager) Start(opts Options) (*Task, error) {
 		Total:     opts.Build.Size,
 		SHA:       opts.Build.SHA,
 		State:     StateRunning,
+		Phase:     "download",
 		StartedAt: time.Now(),
 		cancel:    cancel,
 	}
@@ -301,7 +322,7 @@ func (m *Manager) run(ctx context.Context, id string, opts Options) {
 
 	if opts.OnDone != nil {
 		m.set(id, func(t *Task) { t.Step = "收尾中" })
-		if err := opts.OnDone(opts); err != nil {
+		if err := opts.OnDone(opts, written); err != nil {
 			// 文件已经下好了，收尾失败不算下载失败 —— 但必须说出来，
 			// 否则用户会以为「明明好了却起不来」是玄学
 			m.set(id, func(t *Task) {
@@ -313,6 +334,30 @@ func (m *Manager) run(ctx context.Context, id string, opts Options) {
 			})
 			return
 		}
+	}
+
+	// ── 第二阶段：Forge 的 installer 要真跑一遍才算装完 ──
+	if opts.PostInstall != nil {
+		m.set(id, func(t *Task) {
+			t.Phase = "install"
+			t.Step = "开始安装"
+			// 安装阶段的进度不是字节数，把下载留下的数字清掉 ——
+			// 否则界面会停在「100% / 18.9 MB」不动，看起来像卡死
+			t.Total, t.Done, t.Percent, t.Rate = 0, 0, 0, 0
+		})
+		err := opts.PostInstall(ctx, func(step string) {
+			m.set(id, func(t *Task) { t.Step = step })
+		})
+		if err != nil {
+			if ctx.Err() != nil {
+				m.fail(id, fmt.Errorf("已取消"))
+				return
+			}
+			// 下载是成功的，但装不出来 —— 对用户来说这就是失败，不能报「就绪」
+			m.fail(id, err)
+			return
+		}
+		written = 0
 	}
 
 	m.set(id, func(t *Task) {

@@ -64,9 +64,12 @@ export function DownloadBar({
 
   const failed = task.state === 'failed'
   const done = task.state === 'done'
+  // 安装阶段（目前只有 Forge 会走到）：没有「下了多少字节」这回事，
+  // 进度条只能表示「在动」。继续画字节数会让人以为卡死在一个数字上。
+  const installing = task.phase === 'install'
   // 上游有时不给 Content-Length，这时进度条按「已下多少」显示，不假装知道百分比
   const pct = task.total > 0 ? Math.min(100, task.percent) : 0
-  const unknownTotal = task.total <= 0
+  const unknownTotal = task.total <= 0 || installing
 
   return (
     <div
@@ -78,7 +81,7 @@ export function DownloadBar({
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="text-[13px] font-semibold text-ink-1">
-          {failed ? '下载失败' : done ? '服务端文件已就绪' : task.step}
+          {failed ? (installing ? '安装失败' : '下载失败') : done ? '服务端文件已就绪' : task.step}
         </span>
         {task.resumed && !done && <span className="chip">续传中</span>}
         {done && task.sha && (
@@ -86,16 +89,20 @@ export function DownloadBar({
             {task.verified ? '校验通过' : '未校验'}
           </span>
         )}
-        {!done && !failed && task.rate > 0 && <span className="mono-meta">{fmtSize(task.rate)}/s</span>}
-        <span className="mono-meta ml-auto">
-          {unknownTotal
-            ? `已下载 ${fmtSize(task.done)}`
-            : `${fmtSize(task.done)} / ${fmtSize(task.total)}`}
-        </span>
+        {!done && !failed && !installing && task.rate > 0 && (
+          <span className="mono-meta">{fmtSize(task.rate)}/s</span>
+        )}
+        {!installing && (
+          <span className="mono-meta ml-auto">
+            {unknownTotal
+              ? `已下载 ${fmtSize(task.done)}`
+              : `${fmtSize(task.done)} / ${fmtSize(task.total)}`}
+          </span>
+        )}
       </div>
 
       {!failed && (
-        <div className="pbar mt-2.5">
+        <div className={`pbar mt-2.5${unknownTotal ? ' unknown' : ''}`}>
           <i
             style={{
               width: unknownTotal ? '100%' : `${pct}%`,
@@ -109,8 +116,12 @@ export function DownloadBar({
         {failed
           ? task.err
           : done
-            ? `文件已写入实例目录${task.sha ? `，SHA 与源站一致` : ''}。记得到概览页点启动。`
-            : '下载在后台进行，可以切到别的页面，回来还能看到进度。'}
+            ? task.phase === 'install'
+              ? `装好了${task.sha ? '，安装器的校验和与源站一致' : ''}，服务端文件已经自动指向该启动的那个 jar。记得到概览页点启动。`
+              : `文件已写入实例目录${task.sha ? `，SHA 与源站一致` : ''}。记得到概览页点启动。`
+            : installing
+              ? '正在安装：这一步要下库文件、还要给服务端打补丁，所以比下载本身慢。安装器的输出会写进这个世界的日志（[forge] 开头那些行）。'
+              : '下载在后台进行，可以切到别的页面，回来还能看到进度。'}
       </p>
     </div>
   )

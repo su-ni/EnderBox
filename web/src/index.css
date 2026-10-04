@@ -644,6 +644,13 @@ input[type="search"]::-webkit-search-cancel-button {
     background: var(--color-cyan);
     transition: width var(--dur) linear;
   }
+  /* 进度未知时：上游不给总大小（Fabric 那类没 Content-Length 的地址），
+     或者已经进入「安装」阶段（Forge 的安装器是按库文件一个个下的，没有百分比）。
+     这两种情况都不该假装知道进度 —— 让条子呼吸，配合步骤文案表示「在动」。
+     满格不动的条子会被读成「卡在 100%」，比不给条子更糟。 */
+  .pbar.unknown > i {
+    animation: sk-pulse 1.25s ease-in-out infinite;
+  }
 
   /* ── 搜索框 ── */
   .search {
