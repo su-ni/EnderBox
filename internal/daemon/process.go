@@ -6,10 +6,60 @@ import (
 	"io"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
+
+// ansiRE 匹配服务端写到 stdout 上的 ANSI 控制序列。
+//
+// 为什么必须有这个：日志**文件**里是没有颜色码的（Paper 自己写文件前剥掉了），
+// 但走管道给我们的那一路 stdout 带着全套颜色码。实测（2026-10-04，用户真机
+// F:/sbx-realrun/logs/i1791098663892.log 含 1180 个 ESC）出现过的形态：
+//
+//	\x1b[33;1m  \x1b[91m  \x1b[93m  \x1b[97m  \x1b[37m  \x1b[3m  \x1b[4m  \x1b[0m  \x1b[m（参数为空）
+//
+// 结果就是用户在界面上看到一行 `[91m[37m[4m/help` 这种鬼东西 —— 不是服务端坏了，
+// 是我们把终端控制码当正文存下来了。CSI 要排在 Fe 前面：`\x1b[` 本身也能被
+// `\x1b[@-_]`（`[` 在 0x40–0x5F 里）吃掉，顺序反了就只剥掉一个 `\x1b[` 留下 "91m"。
+var ansiRE = regexp.MustCompile(
+	`\x1b\[[0-9;?]*[ -/]*[@-~]` + // CSI：颜色、加粗、下划线…
+		`|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)` + // OSC：改窗口标题之类
+		`|\x1b[@-_]`) // 其余两字节转义
+
+// stripANSI 去掉 ANSI 控制序列，正文原样保留。
+// 不含 ESC 的行（绝大多数）走快路径，不做正则。
+func stripANSI(s string) string {
+	if !strings.ContainsRune(s, 0x1b) {
+		return s
+	}
+	return ansiRE.ReplaceAllString(s, "")
+}
+
+// normalizeConsoleLine 还原「终端上肉眼真正看到的那一行」，没内容的行返回空串。
+//
+// 服务端的控制台是终端语义：输出前先写提示符 "> "，再用 "\r  \r" 把它擦掉，
+// 而 \r 只回行首、不换行。我们按 \n 切行，于是切出来的「一行」长这样：
+//
+//	"> \r  \r[18:14:45 INFO]: /weather: A Mojang provided command."
+//
+// 取最后一个 \r 之后的内容 —— 这正是终端上的效果（\r 后的内容覆盖写在同一行）。
+// 不做这一步，日志行首就不是 [ 而是 "> \r"，
+// 前端按 "^[HH:MM:SS LEVEL]" 解析级别的正则全部落空，整屏日志都显示成 LOG 级别。
+func normalizeConsoleLine(raw string) string {
+	line := raw
+	if i := strings.LastIndexByte(line, '\r'); i >= 0 {
+		line = line[i+1:]
+	}
+	// 只剩提示符本身（">" / "> " / 纯空格）的行没有信息量。
+	// 不丢的话，服务端每输出一条日志，界面上就会多两条空行 —— 这正是之前
+	// 日志里那些孤零零的 "> " 和 "  " 的来源。
+	if strings.Trim(line, " >") == "" {
+		return ""
+	}
+	return line
+}
 
 // Process 一个正在运行（或曾经运行）的服务端进程
 type Process struct {
@@ -162,7 +212,13 @@ func (p *Process) pump(r io.Reader) {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for sc.Scan() {
-		line := sc.Text()
+		// 两步都得做，而且必须在最前面：
+		//   剥颜色码 —— track() 认「Done (」这种关键字，带码的 Done 会匹配不上；
+		//   剥提示符 —— 行首的 "> \r" 会让前端的级别正则全部落空。
+		line := normalizeConsoleLine(stripANSI(sc.Text()))
+		if line == "" {
+			continue
+		}
 		p.logs.Append(line)
 		p.track(line)
 	}
@@ -172,6 +228,10 @@ func (p *Process) pump(r io.Reader) {
 // 不回显的话，用户敲完 list 会盯着屏幕怀疑自己到底按没按回车 ——
 // 服务端对很多命令的回应要等好几秒。
 func (p *Process) Send(cmd string) error {
+	cmd = normalizeCommand(cmd)
+	if cmd == "" {
+		return fmt.Errorf("命令是空的")
+	}
 	p.mu.Lock()
 	w := p.stdin
 	p.mu.Unlock()
@@ -181,6 +241,21 @@ func (p *Process) Send(cmd string) error {
 	p.logs.Append("[ServerBox] > " + cmd)
 	_, err := io.WriteString(w, cmd+"\n")
 	return err
+}
+
+// normalizeCommand 把用户敲的东西收拾成服务端控制台认识的样子。
+//
+// 关键的一条：**服务端控制台不认开头的斜杠**。`/help` 是游戏内聊天的写法，
+// 直接喂进 stdin 会被判成「未知或不完整的命令」。这不是猜的 ——
+// 实测 2026-10-04 同一个 Paper 1.21.4：先敲 help 正常返回帮助索引，
+// 再敲 /help 立刻报 Unknown or incomplete command（错误光标就停在那根斜杠上）。
+// 用户从 wiki/攻略复制命令时几乎都带斜杠，所以在这里替他抹掉，而不是让他自己发现。
+func normalizeCommand(cmd string) string {
+	cmd = strings.TrimSpace(cmd)
+	// 只剥一层：`//foo` 在服务端没有意义，剥一层后剩下的斜杠会让服务端自己报错，
+	// 比我们猜他要什么更诚实。
+	cmd = strings.TrimPrefix(cmd, "/")
+	return strings.TrimSpace(cmd)
 }
 
 // Stop 优雅停止：先发 stop 命令，超时再强杀

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, PreflightBlocked, type AuthStatus, type Preflight } from './api'
+import { ActiveDownloads } from './components/ActiveDownloads'
 import { BackupPanel } from './components/BackupPanel'
 import { ConfigPanel } from './components/ConfigPanel'
 import { ConnectionBanner } from './components/ConnectionBanner'
 import { CreateWizard } from './components/CreateWizard'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PageFrame } from './components/PageFrame'
-import { Skeleton } from './components/ui'
+import { ConfirmDialog, Skeleton, ToggleRow } from './components/ui'
 import { IconKill, IconMenu, IconPlay, IconStop, IconTrash, IconTypeBlock } from './components/Icons'
 import { LoginScreen } from './components/LoginScreen'
 import { LogConsole } from './components/LogConsole'
@@ -24,6 +25,9 @@ const NOSSE = PARAMS.has('nosse')
 const START_CREATE = PARAMS.get('view') === 'create'
 // 直接以抽屉打开状态启动：手机上抽屉是交互态，截图工具点不了，只能靠参数
 const START_DRAWER = PARAMS.has('drawer')
+// 对话框同理 —— 无头浏览器点不了「删除」按钮，想核对弹窗长什么样只能从 URL 进。
+// 和 ?drawer=1 / ?restore=1 是同一个套路。?dialog=delete&files=1 能连勾选态一起截。
+const START_DIALOG = PARAMS.get('dialog') ?? ''
 
 const PAGES = [
   { k: 'home', label: '概览' },
@@ -68,6 +72,11 @@ export default function App() {
   const [preflight, setPreflight] = useState<Preflight | null>(null)
   const [fixing, setFixing] = useState('')
   const [starting, setStarting] = useState(false)
+  // 删除确认框。用应用内对话框而不是 window.confirm —— 后者没地方放
+  // 「同时删除世界文件」这个选项，而用户明确抱怨过这一点。
+  const [deleteOpen, setDeleteOpen] = useState(START_DIALOG === 'delete')
+  const [deleteFiles, setDeleteFiles] = useState(START_DIALOG === 'delete' && PARAMS.has('files'))
+  const [killOpen, setKillOpen] = useState(START_DIALOG === 'kill')
 
   const refresh = useCallback(async () => {
     try {
@@ -212,6 +221,12 @@ export default function App() {
 
   const running = active?.status === 'running'
 
+  // 「能不能连文件一起删」和「用户勾没勾」是两件事，必须分开算。
+  // 合成一个的话，运行中打开对话框就会看到「勾选框禁用、却显示成开」的鬼状态，
+  // 确认键还写着「删除并清空文件」—— 明明删不掉，界面却在答应你。
+  // （实例跑着时不能删文件：存档正被 JVM 按自己的节奏写。）
+  const canWipeFiles = !!active && !running && active.status !== 'starting'
+
   const act = async (verb: 'start' | 'stop' | 'kill') => {
     if (!activeId) return
     if (verb === 'start') {
@@ -250,13 +265,20 @@ export default function App() {
     }
   }
 
-  const remove = async () => {
+  const doRemove = async () => {
     if (!active) return
-    if (!window.confirm(`删除「${active.name}」？\n\n配置会被移除。服务器目录默认保留在磁盘上，不会自动清空。`)) return
+    const name = active.name
+    const wipe = deleteFiles && canWipeFiles
     try {
-      await api.removeInstance(active.id)
+      await api.removeInstance(active.id, wipe)
+      setDeleteOpen(false)
       setActiveId('')
       setLogs([])
+      // 说清楚到底删了什么。用户最怕的是「我以为只删了配置」或者「我以为文件也没了」，
+      // 而这两种理解都会让他做出错误的下一步。
+      setToast(
+        wipe ? `「${name}」已删除，磁盘上的目录也一并清空了` : `「${name}」已从列表移除，目录仍保留在磁盘上`,
+      )
       refresh()
     } catch (e) {
       setToast((e as Error).message)
@@ -301,6 +323,17 @@ export default function App() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ConnectionBanner down={probed && !online} onRetry={refresh} />
+
+      {/* 下载/安装进度与页面无关，必须挂在最外层 —— 见 ActiveDownloads 里的说明：
+          进度只存在向导组件里的话，一「切世界」就再也找不回来了。 */}
+      <ActiveDownloads
+        instances={instances}
+        onOpen={(id) => {
+          setActiveId(id)
+          setView('board')
+        }}
+        onSettled={refresh}
+      />
 
       <div className="relative grid min-h-0 flex-1 grid-cols-1 grid-rows-1 md:grid-cols-[236px_1fr]">
       {/* 桌面侧栏：常驻 */}
@@ -422,13 +455,7 @@ export default function App() {
                           <IconStop size={12} />
                           停止
                         </button>
-                        <button
-                          type="button"
-                          className="btn btn-danger"
-                          onClick={() => {
-                            if (window.confirm('强制结束不会保存地图，可能损坏存档。确定？')) act('kill')
-                          }}
-                        >
+                        <button type="button" className="btn btn-danger" onClick={() => setKillOpen(true)}>
                           <IconKill size={12} />
                           强制结束
                         </button>
@@ -444,7 +471,15 @@ export default function App() {
                         {active.status === 'stopping' ? '停止中…' : starting ? '检查中…' : '启动'}
                       </button>
                     )}
-                    <button type="button" className="btn btn-ghost" onClick={remove} aria-label="删除这个世界">
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => {
+                        setDeleteFiles(false)
+                        setDeleteOpen(true)
+                      }}
+                      aria-label="删除这个世界"
+                    >
                       <IconTrash size={12} />
                       删除
                     </button>
@@ -523,6 +558,62 @@ export default function App() {
             </>
           )}
         </PageFrame>
+      )}
+
+      {/* 删除确认：给「同时删除世界文件」一个明确的位置。
+          以前这只有一句「配置会被移除、目录保留」的提示，用户没得选 —— 于是问
+          「为什么删除不能选择删除世界文件」。 */}
+      {deleteOpen && active && (
+        <ConfirmDialog
+          title={`删除「${active.name}」`}
+          danger
+          width={540}
+          confirmLabel={deleteFiles && canWipeFiles ? '删除并清空文件' : '删除'}
+          onCancel={() => setDeleteOpen(false)}
+          onConfirm={doRemove}
+          body={
+            <>
+              配置一定会被移除。磁盘上的实例目录
+              <b className="text-ink-1">默认保留</b> —— 存档、插件都还在，日后还能自己找回来。
+            </>
+          }
+        >
+          <div className="mt-3 border-t border-line pt-1">
+            <ToggleRow
+              on={deleteFiles && canWipeFiles}
+              onChange={setDeleteFiles}
+              disabled={!canWipeFiles}
+              title="同时删除磁盘上的世界文件"
+              desc={
+                canWipeFiles
+                  ? `会清空 ${active.dir} 里的全部内容：world 存档、插件、服务端文件。删掉之后找不回来。`
+                  : '实例正在运行，先把服务端停掉，才能连文件一起删。'
+              }
+            />
+          </div>
+        </ConfirmDialog>
+      )}
+
+      {killOpen && active && (
+        <ConfirmDialog
+          title={`强制结束「${active.name}」`}
+          danger
+          confirmLabel="强制结束"
+          onCancel={() => setKillOpen(false)}
+          onConfirm={() => {
+            setKillOpen(false)
+            act('kill')
+          }}
+          body={
+            <>
+              强制结束是直接杀进程，服务端<b className="text-ink-1">来不及把地图写回磁盘</b>。
+              正在建造的建筑、刚放进箱子的物品可能丢失，存档也有损坏的风险。
+              <br />
+              <br />
+              正常做法是点「停止」——它会先让服务端自己存盘，也就十几秒的事。
+            </>
+          }
+        />
       )}
 
       {toast && (

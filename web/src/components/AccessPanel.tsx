@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type GlobalSettings, type MirrorOption } from '../api'
 import { IconCheck, IconRefresh, IconShield, IconTrash, IconWarn } from './Icons'
-import { Field, NotReady, SectionHead, SkeletonFields, ToggleRow } from './ui'
+import { Field, NotReady, SectionHead, SkeletonFields, ToggleRow, useConfirm } from './ui'
 
 /**
  * 「访问安全」面板。
@@ -25,6 +25,8 @@ export function AccessPanel({ onToast }: { onToast: (m: string) => void }) {
   // 令牌：明文只在刚生成后存在 NewToken 里
   const [tkName, setTkName] = useState('')
   const [newToken, setNewToken] = useState('')
+
+  const { dialog, confirm } = useConfirm()
 
   const load = useCallback(async () => {
     try {
@@ -74,13 +76,7 @@ export function AccessPanel({ onToast }: { onToast: (m: string) => void }) {
     }
   }
 
-  const doClearPassword = async () => {
-    if (
-      !window.confirm(
-        '清除密码会同时关掉访问保护。\n\n局域网里任何人都能打开这个面板、启停你的服务器。确定要继续吗？',
-      )
-    )
-      return
+  const doClearPasswordNow = async () => {
     setBusy('pw')
     try {
       setCfg(await api.setPassword({ old: oldPw, disable: true }))
@@ -91,6 +87,24 @@ export function AccessPanel({ onToast }: { onToast: (m: string) => void }) {
     } finally {
       setBusy('')
     }
+  }
+
+  const doClearPassword = () => {
+    confirm({
+      title: '清除密码',
+      danger: true,
+      confirmLabel: '清除并关闭保护',
+      run: doClearPasswordNow,
+      body: (
+        <>
+          清除密码会<b className="text-ink-1">同时关掉访问保护</b>。
+          <br />
+          <br />
+          那之后，同一个局域网里任何人都能打开这个面板、启停你的服务器，改动配置。
+          如果这台机器接的是公共网络，别这么做。
+        </>
+      ),
+    })
   }
 
   const doAddToken = async () => {
@@ -107,8 +121,7 @@ export function AccessPanel({ onToast }: { onToast: (m: string) => void }) {
     }
   }
 
-  const doRemoveToken = async (id: string, name: string) => {
-    if (!window.confirm(`删除令牌「${name}」？\n\n用了它的脚本会立刻失效。`)) return
+  const doRemoveTokenNow = async (id: string) => {
     try {
       await api.removeToken(id)
       await load()
@@ -117,6 +130,22 @@ export function AccessPanel({ onToast }: { onToast: (m: string) => void }) {
       onToast((e as Error).message)
     }
   }
+
+  const doRemoveToken = (id: string, name: string) =>
+    confirm({
+      title: `删除令牌「${name}」`,
+      danger: true,
+      confirmLabel: '删除令牌',
+      run: () => doRemoveTokenNow(id),
+      body: (
+        <>
+          用了这个令牌的脚本、定时任务、第三方工具会<b className="text-ink-1">立刻失效</b>。
+          <br />
+          <br />
+          想恢复只能重新生成一个，新令牌和旧的不是同一个。
+        </>
+      ),
+    })
 
   if (err) {
     return (
@@ -367,6 +396,8 @@ export function AccessPanel({ onToast }: { onToast: (m: string) => void }) {
           </button>
         </div>
       </div>
+
+      {dialog}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type PluginItem } from '../api'
 import { IconPackage, IconSearch, IconTrash, IconUpload } from './Icons'
-import { Empty, ListRow, NotReady, SectionHead, SkeletonList, Toggle, fmtSize, fmtTime } from './ui'
+import { Empty, ListRow, NotReady, SectionHead, SkeletonList, Toggle, fmtSize, fmtTime, useConfirm } from './ui'
 import type { Instance } from '../types'
 
 /** 模组端放 mods，插件端放 plugins —— 告诉用户往哪丢文件，别让他猜 */
@@ -24,6 +24,8 @@ export function PluginsPanel({ instance, onToast }: Props) {
   /* 首屏标记。不区分「还没读到」和「读到了但目录是空的」，
      会在数据回来之前先把「目录是空的」写出来 —— 那是句假话。 */
   const [loading, setLoading] = useState(true)
+
+  const { dialog, confirm } = useConfirm()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(async () => {
@@ -67,8 +69,7 @@ export function PluginsPanel({ instance, onToast }: Props) {
     }
   }
 
-  const remove = async (p: PluginItem) => {
-    if (!window.confirm(`删除「${p.name}」？\n\n文件会从磁盘上删掉，删了就得重新下。`)) return
+  const removeNow = async (p: PluginItem) => {
     try {
       await api.pluginDelete(instance.id, p.file)
       reload()
@@ -76,6 +77,21 @@ export function PluginsPanel({ instance, onToast }: Props) {
       onToast((e as Error).message)
     }
   }
+
+  const remove = (p: PluginItem) =>
+    confirm({
+      title: `删除「${p.name}」`,
+      danger: true,
+      confirmLabel: '删除文件',
+      run: () => removeNow(p),
+      body: (
+        <>
+          文件会<b className="text-ink-1">从磁盘上删掉</b>，不是只从这个列表里藏起来。
+          <span className="mono-value mt-1.5 block break-all">{p.file}</span>
+          想要回来就得重新去下载一份；如果是自己改过的版本，先拷出去再删。
+        </>
+      ),
+    })
 
   const onCount = items.filter((i) => i.enabled).length
   const dirName = contentDirLabel(instance.type)
@@ -248,6 +264,8 @@ export function PluginsPanel({ instance, onToast }: Props) {
           在那之前，你从 Modrinth 或 MCBBS 下好 jar，用上面那块传进来，效果一样。
         </NotReady>
       </div>
+
+      {dialog}
     </div>
   )
 }

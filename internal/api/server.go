@@ -94,8 +94,16 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
-	if err := s.mgr.Delete(r.PathValue("id")); err != nil {
-		writeErr(w, 500, err.Error())
+	// 只有显式带 ?files=1 才连磁盘目录一起删。默认保留 ——
+	// 实例目录里是 world/，用户最不可再生的东西，不该因为少传一个参数就没了。
+	withFiles := r.URL.Query().Get("files") == "1"
+	if err := s.mgr.Delete(r.PathValue("id"), withFiles); err != nil {
+		// 「还在跑」是用户操作顺序问题，不是故障 —— 409 让界面能说人话
+		code := 500
+		if errors.Is(err, daemon.ErrInstanceRunning) {
+			code = 409
+		}
+		writeErr(w, code, err.Error())
 		return
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})

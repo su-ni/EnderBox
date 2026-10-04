@@ -1,10 +1,12 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +23,11 @@ const (
 )
 
 var restartBackoff = []time.Duration{5 * time.Second, 20 * time.Second, 60 * time.Second}
+
+// ErrInstanceRunning 想在实例还在跑的时候做一件必须停着才能做的事。
+// 单独定义是为了让上层能给出 409 而不是 500 —— 「你现在不该这么做」和
+// 「我们这边炸了」是两回事，混成一个状态码，界面就只能显示一句没用的错误。
+var ErrInstanceRunning = errors.New("实例正在运行")
 
 type restartState struct {
 	fails int
@@ -169,12 +176,73 @@ func (m *Manager) Update(inst *Instance) error {
 	return m.st.Put(inst.ID, *inst)
 }
 
-func (m *Manager) Delete(id string) error {
-	if p, ok := m.procs[id]; ok {
-		_ = p.Kill()
-		delete(m.procs, id)
+// Delete 删除实例。removeFiles 为真时，连磁盘上的实例目录一起清掉。
+//
+// 默认保留文件是刻意的：实例目录里躺着 world/ —— 用户最贵、最不可再生的东西。
+// 但「删了世界却留一堆目录在磁盘上」也确实反直觉（用户原话：
+// 「为什么删除不能选择删除世界文件」），所以给显式选项，默认仍站在保守那边。
+//
+// 删文件前有一道硬护栏：目标必须是 <数据目录>/instances/ 之下的子孙。
+// 实例配置是可以被手改的（也可能被一段假 JSON 塞进任意路径），
+// 少这一道，一个写错的 dir 就能把 C:\ 交给 os.RemoveAll。
+func (m *Manager) Delete(id string, removeFiles bool) error {
+	inst, ok := m.st.Get(id)
+	if !ok {
+		return fmt.Errorf("实例不存在: %s", id)
 	}
-	return m.st.Delete(id)
+
+	var abs string
+	if removeFiles {
+		// 先校验、后动手：路径不合法时要在任何副作用之前就退出。
+		if strings.TrimSpace(inst.Dir) == "" {
+			return fmt.Errorf("这个实例没记录目录，不能删文件")
+		}
+		var err error
+		abs, err = filepath.Abs(inst.Dir)
+		if err != nil {
+			return fmt.Errorf("实例目录不合法: %w", err)
+		}
+		root, err := filepath.Abs(filepath.Join(m.baseDir, "instances"))
+		if err != nil {
+			return fmt.Errorf("数据目录不合法: %w", err)
+		}
+		rel, err := filepath.Rel(root, abs)
+		// rel == "." 说明目标就是 instances 根目录本身，rel 以 .. 开头说明在上面。
+		if err != nil || rel == "." || rel == "" || filepath.IsAbs(rel) || strings.HasPrefix(rel, "..") {
+			return fmt.Errorf("实例目录 %s 不在数据目录的 instances 下，拒绝删除", abs)
+		}
+	}
+
+	if p, ok := m.procs[id]; ok {
+		// 跑着的时候不动文件：存档正被 JVM 按自己的节奏写，删到一半剩下的是残档；
+		// 而且删完进程还活着，会继续往一个已不存在的目录里写。
+		if removeFiles && (p.Status() == StatusRunning || p.Status() == StatusStarting) {
+			return fmt.Errorf("%w，先停掉再删文件", ErrInstanceRunning)
+		}
+		_ = p.Kill()
+		m.mu.Lock()
+		delete(m.procs, id)
+		m.mu.Unlock()
+	}
+
+	// 先摘配置、再删文件。反过来一旦删完文件这一步失败，就会留下一个
+	// 指向不存在目录的实例（体检、启动全都会报怪错）；而先摘配置最坏是留个孤儿目录，
+	// 用户自己删掉就行 —— 失败退化的方向要对。
+	if err := m.st.Delete(id); err != nil {
+		return err
+	}
+
+	m.mu.Lock()
+	delete(m.logs, id)
+	delete(m.restarts, id)
+	m.mu.Unlock()
+
+	if removeFiles {
+		if err := os.RemoveAll(abs); err != nil {
+			return fmt.Errorf("配置已删除，但目录没删干净（%s）：%w", abs, err)
+		}
+	}
+	return nil
 }
 
 // Start 手动启动。会先跑一遍启动前检查 —— 任一 blocker 都直接返回带报告的 PreflightError，

@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type BackupItem } from '../api'
 import { IconSave, IconTrash, IconWarn } from './Icons'
-import { DangerZone, Empty, Field, ListRow, NotReady, SectionHead, SkeletonList, fmtSize, fmtTime } from './ui'
+import {
+  DangerZone,
+  Empty,
+  Field,
+  ListRow,
+  NotReady,
+  SectionHead,
+  SkeletonList,
+  fmtSize,
+  fmtTime,
+  useConfirm,
+} from './ui'
 import type { Instance } from '../types'
 
 const PREVIEW_RESTORE = new URLSearchParams(location.search).has('restore')
@@ -20,6 +31,8 @@ export function BackupPanel({ instance, onToast }: Props) {
   /* 首屏标记。没有它的话，数据回来之前界面会先写「还没有备份」—— 那是句假话，
      而且恰好撒在用户最在意的地方（存档）。 */
   const [loading, setLoading] = useState(true)
+
+  const { dialog, confirm } = useConfirm()
 
   const reload = useCallback(async () => {
     try {
@@ -58,8 +71,7 @@ export function BackupPanel({ instance, onToast }: Props) {
     }
   }
 
-  const remove = async (b: BackupItem) => {
-    if (!window.confirm(`删除这份备份？\n\n${b.file}\n删了就找不回来了。`)) return
+  const removeNow = async (b: BackupItem) => {
     try {
       await api.backupDelete(instance.id, b.file)
       reload()
@@ -67,6 +79,21 @@ export function BackupPanel({ instance, onToast }: Props) {
       onToast((e as Error).message)
     }
   }
+
+  const remove = (b: BackupItem) =>
+    confirm({
+      title: '删除这份备份',
+      danger: true,
+      confirmLabel: '删除备份',
+      run: () => removeNow(b),
+      body: (
+        <>
+          删掉的是磁盘上的这个文件：
+          <span className="mono-value mt-1.5 block break-all">{b.file}</span>
+          之后想还原到它代表的那个时间点就没机会了 —— 除非你在别处还留了一份。
+        </>
+      ),
+    })
 
   const restore = async () => {
     if (!pick) return
@@ -218,6 +245,8 @@ export function BackupPanel({ instance, onToast }: Props) {
           </DangerZone>
         </div>
       )}
+
+      {dialog}
     </div>
   )
 }

@@ -9,11 +9,56 @@ const LEVEL_COLOR: Record<string, string> = {
   FATAL: '#ff6b6b',
 }
 
+/**
+ * 剥掉服务端的 ANSI 控制序列。
+ *
+ * 后端摄入时已经剥过一遍（见 internal/daemon/process.go 的 stripANSI），这里是兜底：
+ * 修好之前落盘的日志文件里已经存着真实的 ESC 字节（实测某实例日志含 1180 个），
+ * 老日志翻出来照样得能看。只对含 ESC 的行做正则，正常行零开销。
+ */
+const ANSI_RE = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b[@-_]/g
+function stripANSI(s: string) {
+  return s.includes('\u001b') ? s.replace(ANSI_RE, '') : s
+}
+
+/**
+ * 还原「终端上肉眼看到的那一行」。
+ *
+ * 服务端输出每条日志前会先写提示符 "> "、再用 "\r  \r" 擦掉，而 \r 不换行 ——
+ * 按 \n 切开的一行就带着 "> \r  \r" 前缀（实测 1854 个 CR 字节）。\r 之后的内容
+ * 才是真正显示在那一行上的，所以要取最后一段。后端摄入时已经清过一遍，
+ * 这里兜底是为了修复之前已经落盘的那些脏行。
+ */
+function normalizeLine(raw: string) {
+  const s = stripANSI(raw)
+  const i = s.lastIndexOf('\r')
+  return i >= 0 ? s.slice(i + 1) : s
+}
+
 /** 从服务端原始 stdout 行里剥出时间 / 级别 / 正文。剥不出来就整行当正文，不猜。 */
 function parseLine(raw: string) {
-  const t = raw.match(/^\[(\d{2}:\d{2}:\d{2})/)
-  const lv = raw.match(/\/(INFO|WARN|WARNING|ERROR|FATAL)\]/) ?? raw.match(/\[(INFO|WARN|WARNING|ERROR|FATAL)\]/)
-  let msg = raw.replace(/^\[\d{2}:\d{2}:\d{2}\]\s*/, '')
+  const line = normalizeLine(raw)
+
+  /*
+   * 管道 stdout 的形态和日志文件**不一样**，这是真机对比出来的：
+   *   文件：[17:59:07] [Server thread/INFO]: Unknown or incomplete command
+   *   管道：[15:26:42 WARN]: YOU ARE RUNNING THIS SERVER AS AN ADMINISTRATIVE
+   * 管道那路没有日期、没有线程名，时间和级别挤在同一个方括号里。
+   * 只按文件的形态写的话，控制台上每条日志的级别都认不出来，全显示成 LOG。
+   */
+  const compact = line.match(/^\[(\d{2}:\d{2}:\d{2}) (INFO|WARN|WARNING|ERROR|FATAL)\]:\s*/)
+  if (compact) {
+    return {
+      time: compact[1],
+      level: compact[2] === 'WARNING' ? 'WARN' : compact[2],
+      msg: line.slice(compact[0].length),
+    }
+  }
+
+  const t = line.match(/^\[(\d{2}:\d{2}:\d{2})/)
+  const lv =
+    line.match(/\/(INFO|WARN|WARNING|ERROR|FATAL)\]/) ?? line.match(/\[(INFO|WARN|WARNING|ERROR|FATAL)\]/)
+  let msg = line.replace(/^\[\d{2}:\d{2}:\d{2}\]\s*/, '')
   msg = msg.replace(/^\[[^\]]*?\/(INFO|WARN|WARNING|ERROR|FATAL)\]:\s*/, '')
   msg = msg.replace(/^\[(INFO|WARN|WARNING|ERROR|FATAL)\]:\s*/, '')
   const level = lv ? (lv[1] === 'WARNING' ? 'WARN' : lv[1]) : ''

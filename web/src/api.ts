@@ -230,7 +230,14 @@ export const api = {
   createInstance: (payload: Record<string, unknown>) =>
     req<Instance>('/instances', jsonInit('POST', payload)),
 
-  removeInstance: (id: string) => req<{ ok: boolean }>(`/instances/${id}`, { method: 'DELETE' }),
+  // withFiles 才连磁盘目录一起删。默认只摘配置 —— 存档不该因为少传一个参数就没了。
+  removeInstance: (id: string, withFiles = false) =>
+    req<{ ok: boolean }>(`/instances/${id}${withFiles ? '?files=1' : ''}`, { method: 'DELETE' }),
+
+  // ── 下载任务 ──
+  // instance 传实例 id 时只返回它的任务 —— 切页面回来要接着看进度，得先找得到任务。
+  fetchTasks: (instance?: string) =>
+    req<{ items: DownloadTask[] }>(`/fetch/tasks${instance ? `?instance=${enc(instance)}` : ''}`),
 
   updateInstance: (id: string, payload: Record<string, unknown>) =>
     req<Instance>(`/instances/${id}`, jsonInit('PUT', payload)),

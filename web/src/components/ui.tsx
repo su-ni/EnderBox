@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { IconInfo } from './Icons'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { IconInfo, IconWarn } from './Icons'
 
 /**
  * 区块标题。整页只有它能用 3px 黑线 —— 黑线是「新的一块开始了」的信号，
@@ -154,6 +154,205 @@ export function DangerZone({ title, children }: { title: string; children: React
 /** 空态：列表没数据时用它，别画一堆占位卡片 */
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="px-1 py-5 text-[13px] leading-relaxed text-ink-2">{children}</p>
+}
+
+// 对话框里可能被聚焦的元素。和浏览器内建的那套 tabbable 规则保持一致即可，
+// 不需要把每一种情况都穷举 —— 漏掉的最多是不能用 Tab 到达，不会出错。
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/**
+ * 应用内对话框。
+ *
+ * 为什么不用 window.confirm / alert（用户原话：「为什么弹窗全都是浏览器自带弹窗」）：
+ * 一是它长得跟这个像素面板毫无关系，白底圆角、跟主题完全脱节；
+ * 二是它只能承载「一段纯文本 + 两个按钮」—— 想加「同时删除世界文件」这种选项根本没地方放；
+ * 三是它会把整个 JS 线程卡住，动画和输入全部冻住。
+ *
+ * 键盘可达是硬要求（这个面板用键盘操作的人不少）：
+ *   · 打开时把焦点收进对话框 —— 不收的话 Tab 继续在背后的页面上走，键盘用户直接迷路；
+ *   · Esc 关闭；
+ *   · Tab / Shift+Tab 在框内循环，不会跑到遮罩背后去；
+ *   · 关闭后焦点还给打开它的那个元素。
+ */
+export function Dialog({
+  title,
+  children,
+  actions,
+  onClose,
+  danger = false,
+  width = 440,
+}: {
+  title: string
+  children: ReactNode
+  actions: ReactNode
+  onClose: () => void
+  /** 不可逆操作（删除、强杀）—— 标题条换成红底，让人在按确认前多看一眼 */
+  danger?: boolean
+  width?: number
+}) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null
+    const box = boxRef.current
+    // data-autofocus 让调用方指定「打开时就该按的那个键」——危险操作应该先落在「取消」上
+    const first =
+      box?.querySelector<HTMLElement>('[data-autofocus]') ?? box?.querySelector<HTMLElement>(FOCUSABLE)
+    first?.focus()
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab' || !box) return
+      const items = Array.from(box.querySelectorAll<HTMLElement>(FOCUSABLE))
+      if (items.length === 0) return
+      const firstEl = items[0]
+      const lastEl = items[items.length - 1]
+      const cur = document.activeElement
+      // 只在「到头」和「焦点已经跑到框外」两种情况下接管，其余交给浏览器默认行为
+      if (e.shiftKey && (cur === firstEl || !box.contains(cur))) {
+        e.preventDefault()
+        lastEl.focus()
+      } else if (!e.shiftKey && (cur === lastEl || !box.contains(cur))) {
+        e.preventDefault()
+        firstEl.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('keydown', onKey, true)
+      prev?.focus?.()
+    }
+  }, [onClose])
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto px-4 py-[8vh]">
+      {/* 点遮罩关闭：这是所有人的肌肉记忆，不做反而显得坏掉了 */}
+      <div className="fixed inset-0 bg-black/70" onClick={onClose} aria-hidden="true" />
+      <div
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="pxb relative w-full bg-panel"
+        style={{ maxWidth: width }}
+      >
+        <div
+          className="flex items-center gap-2.5 border-b-[3px] border-black px-4 py-3"
+          style={{ background: danger ? '#1c1314' : 'var(--color-panel-2)' }}
+        >
+          <span className="shrink-0" style={{ color: danger ? 'var(--color-danger)' : 'var(--color-warn)' }}>
+            <IconWarn size={14} />
+          </span>
+          <h2 id={titleId} className="text-[14px] leading-tight font-bold text-ink-1">
+            {title}
+          </h2>
+        </div>
+        <div className="px-4 py-3.5">{children}</div>
+        <div className="flex flex-wrap justify-end gap-2 border-t-[3px] border-black bg-[#0c0f0c] px-4 py-3">
+          {actions}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 确认框的常用形态：一段正文 + 取消/确认。
+ * 需要额外选项（比如「同时删除世界文件」那个勾）时把控件放进 children。
+ */
+export function ConfirmDialog({
+  title,
+  body,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+  danger = false,
+  width,
+  children,
+}: {
+  title: string
+  body: ReactNode
+  confirmLabel: string
+  onConfirm: () => void
+  onCancel: () => void
+  danger?: boolean
+  /** 正文里要塞选项/长路径时给宽一点，默认 440 够放两三行字 */
+  width?: number
+  children?: ReactNode
+}) {
+  return (
+    <Dialog
+      title={title}
+      danger={danger}
+      width={width}
+      onClose={onCancel}
+      actions={
+        <>
+          {/* 焦点默认落在「取消」上：危险操作不该一个回车就执行掉 */}
+          <button type="button" className="btn btn-ghost" data-autofocus onClick={onCancel}>
+            取消
+          </button>
+          <button
+            type="button"
+            className={`btn ${danger ? 'btn-danger' : ''}`}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
+        </>
+      }
+    >
+      <div className="text-[13px] leading-[1.7] text-ink-2">{body}</div>
+      {children}
+    </Dialog>
+  )
+}
+
+type Ask = {
+  title: string
+  body: ReactNode
+  confirmLabel: string
+  danger?: boolean
+  width?: number
+  run: () => void
+}
+
+/**
+ * 命令式确认框：`const { dialog, confirm } = useConfirm()`，
+ * 需要问一句时 `confirm({...})`，然后把 `dialog` 渲染到 JSX 里。
+ *
+ * 为什么做成 hook 而不是让每个调用点自己 setState：
+ * 面板里有五六处「删除/关闭」都要问一句，各写一份 open + payload 的 state
+ * 就是同一段样板抄六遍 —— 而抄六遍的东西，早晚会有两处行为不一样。
+ */
+export function useConfirm() {
+  const [ask, setAsk] = useState<Ask | null>(null)
+
+  const dialog = ask ? (
+    <ConfirmDialog
+      title={ask.title}
+      body={ask.body}
+      confirmLabel={ask.confirmLabel}
+      danger={ask.danger}
+      width={ask.width}
+      onCancel={() => setAsk(null)}
+      onConfirm={() => {
+        // 先关框再执行：动作如果失败会自己 toast，框停在上面反而挡住了那条错误
+        const cur = ask
+        setAsk(null)
+        cur.run()
+      }}
+    />
+  ) : null
+
+  return { dialog, confirm: (a: Ask) => setAsk(a) }
 }
 
 export function fmtSize(bytes: number): string {
