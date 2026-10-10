@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/su-ni/ServerBox/internal/daemon"
-	"github.com/su-ni/ServerBox/internal/fetch"
-	"github.com/su-ni/ServerBox/internal/settings"
+	"github.com/su-ni/EnderBox/internal/daemon"
+	"github.com/su-ni/EnderBox/internal/fetch"
+	"github.com/su-ni/EnderBox/internal/settings"
 )
 
 type Server struct {
@@ -22,6 +22,12 @@ type Server struct {
 	// bindAddr 守护进程真正绑定的地址。和配置里写的那份对照，
 	// 用来告诉用户「改完重启才生效」。
 	bindAddr string
+	// mpOps 整合包升级的作业表。带锁的内存 map，实现见 modpack.go ——
+	// 这里只负责持有与初始化，逻辑别往 Server 上堆。
+	mpOps *modpackOps
+	// mpPacks 市场预览下下来、等着被安装取走的那份包（packToken）。
+	// 见 modpack_market.go：没有它，用户点「安装」时那几十 MB 得重下一遍。
+	mpPacks *packCache
 }
 
 // New 起一个服务。addr 是本次实际监听的地址（用来和配置里的值对照）。
@@ -32,6 +38,8 @@ func New(mgr *daemon.Manager, set *settings.Store, addr string) *Server {
 		set:      set,
 		sess:     newSessions(),
 		bindAddr: addr,
+		mpOps:    newModpackOps(),
+		mpPacks:  newPackCache(),
 	}
 }
 
@@ -46,6 +54,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/instances/{id}", s.remove)
 	mux.HandleFunc("POST /api/instances/{id}/start", s.start)
 	mux.HandleFunc("POST /api/instances/{id}/stop", s.stop)
+	mux.HandleFunc("POST /api/instances/{id}/restart", s.restart)
 	mux.HandleFunc("POST /api/instances/{id}/kill", s.kill)
 	mux.HandleFunc("POST /api/instances/{id}/command", s.command)
 	mux.HandleFunc("GET /api/instances/{id}/metrics", s.metrics)
@@ -55,10 +64,24 @@ func (s *Server) Routes() http.Handler {
 	s.authRoutes(mux)
 	s.settingsRoutes(mux)
 	s.instanceExtraRoutes(mux)
+	// 「普通模组服 → 对应的混合端」：独立一组，因为它做的事比「改个字段」重得多
+	s.instanceConvertRoutes(mux)
+	// 整合包：身份查询 + 升级预览（只读，真升级待接）
+	s.instanceModpackRoutes(mux)
+	// 整合包市场（P1）：搜索 / 选版本 / 看清代价 / 一键装成实例
+	s.modpackMarketRoutes(mux)
 	s.fetchRoutes(mux)
 	s.pluginRoutes(mux)
+	s.fileRoutes(mux)
+	s.marketRoutes(mux)
 	s.backupRoutes(mux)
+	s.taskRoutes(mux)
+	s.playerRoutes(mux)
+	s.gameruleRoutes(mux)
+	s.liveRoutes(mux)
+	s.configRoutes(mux)
 	s.systemRoutes(mux)
+	s.importRoutes(mux)
 	// 整张表都过鉴权：新增路由不会被漏掉，比一个个挑着挂安全
 	return s.withAuth(mux)
 }
@@ -141,6 +164,28 @@ func (s *Server) kill(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
+// restart 重启 = 先停、再起。走的是和计划任务里那条 restart 动作**完全一样**的路径，
+// 免得两处各写一份、日后只改了一边。
+//
+// 同步等完再返回是有意的：停服最长要等 90 秒，但前端 req() 没有设总超时，
+// 而且「停不下来」这种失败必须原样报回去 —— 后台异步跑的话这里就只能吞掉错误，
+// 违反「不静默失败」。界面本来就每 3 秒轮询状态，等待期间会自己显示 停止中→启动中。
+func (s *Server) restart(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := s.mgr.Stop(id, 90*time.Second); err != nil {
+		writeErr(w, 500, "停服失败，已取消这次重启："+err.Error())
+		return
+	}
+	// 停完等两秒让端口彻底释放。不等的话新进程会撞 Address already in use，
+	// 而那条英文报错用户要翻很久才看得懂。
+	time.Sleep(2 * time.Second)
+	if err := s.mgr.Start(id, ""); err != nil {
+		writeErr(w, 500, "重启时启动失败："+err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
 func (s *Server) command(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Cmd string `json:"cmd"`
@@ -185,6 +230,11 @@ func (s *Server) logs(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "data: %s\n\n", mustJSON(line))
 	}
 	flusher.Flush()
+	// 快照发完打个标记：前端靠它区分「打开页面时补的历史行」与「之后实时来的行」。
+	// 源日志里不带时间戳的行（面板自己的 [EnderBox] 行、mod 列表…）要靠「面板收到的时刻」
+	// 兜底，但把「打开页面那一刻」安在一条五分钟前的历史上就是撒谎 —— 历史行一律不给兜底。
+	fmt.Fprint(w, "event: snapshot-end\ndata: 1\n\n")
+	flusher.Flush()
 
 	subID, ch := buf.Subscribe()
 	defer buf.Unsubscribe(subID)
@@ -210,6 +260,29 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 
 func writeErr(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
+}
+
+// writeErrReason 在 writeErr 上多带一个机器可读的 reason 码。同一个状态码可以有
+// 多种语义（比如 409 既可能是「计划变了」也可能是「已有作业在跑」），前端要按
+// 语义分流「下一步该干嘛」—— 靠匹配文案太脆，改个措辞前端就哑了，必须给码。
+func writeErrReason(w http.ResponseWriter, code int, reason, msg string) {
+	writeJSON(w, code, map[string]string{"error": msg, "reason": reason})
+}
+
+// writeDomainErr 把 daemon 层返回的错误分流成 HTTP 状态码。
+// 三种情形必须分开，否则界面没法告诉用户「下一步该干嘛」：
+//   - 404：这东西没了（实例 / 任务不存在）——跟用户填什么无关，刷新一下就好
+//   - 409：现在不该这么做（服务器没跑却要踢人）——要先去启动服务器
+//   - 400：你填的值不合法——去改对应的那个字段
+func writeDomainErr(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, daemon.ErrInstanceNotFound) || errors.Is(err, daemon.ErrTaskNotFound):
+		writeErr(w, 404, err.Error())
+	case errors.Is(err, daemon.ErrInstanceNotRunning) || errors.Is(err, daemon.ErrBanNeedsStop):
+		writeErr(w, 409, err.Error())
+	default:
+		writeErr(w, 400, err.Error())
+	}
 }
 
 func mustJSON(v any) string {

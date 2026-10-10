@@ -1,0 +1,2225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ServerBox · 像素重制稿 v2</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ════ 像素图标精灵（16×16，全部手绘方块，无 emoji）════ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-grass" viewBox="0 0 16 16">
+  <rect x="1" y="2" width="14" height="12" fill="#7a5230"/>
+  <rect x="1" y="6" width="14" height="2" fill="#6b4420"/>
+  <rect x="1" y="2" width="14" height="4" fill="#5da832"/>
+  <rect x="1" y="2" width="14" height="2" fill="#74c23f"/>
+  <rect x="2" y="8" width="3" height="2" fill="#603c1c"/>
+  <rect x="9" y="9" width="4" height="2" fill="#603c1c"/>
+  <rect x="6" y="12" width="3" height="2" fill="#603c1c"/>
+</symbol>
+<symbol id="i-compass" viewBox="0 0 16 16">
+  <rect x="4" y="1" width="8" height="14" fill="#202932"/>
+  <rect x="1" y="4" width="14" height="8" fill="#202932"/>
+  <rect x="4" y="2" width="8" height="12" fill="#93a1ad"/>
+  <rect x="2" y="4" width="12" height="8" fill="#93a1ad"/>
+  <rect x="5" y="5" width="6" height="6" fill="#0f1418"/>
+  <rect x="7" y="2" width="2" height="7" fill="#e8564a"/>
+  <rect x="7" y="9" width="2" height="5" fill="#f2f6f9"/>
+</symbol>
+<symbol id="i-cmd" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="#8a4a13"/>
+  <rect x="2" y="2" width="12" height="12" fill="#e08a3c"/>
+  <rect x="2" y="2" width="12" height="2" fill="#f0a556"/>
+  <rect x="4" y="5" width="2" height="2" fill="#8a4a13"/>
+  <rect x="10" y="5" width="2" height="2" fill="#8a4a13"/>
+  <rect x="7" y="7" width="2" height="3" fill="#8a4a13"/>
+  <rect x="4" y="11" width="2" height="1" fill="#8a4a13"/>
+  <rect x="10" y="11" width="2" height="1" fill="#8a4a13"/>
+</symbol>
+<symbol id="i-head" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="#c8956a"/>
+  <rect x="1" y="1" width="14" height="5" fill="#5b3a1e"/>
+  <rect x="1" y="1" width="2" height="7" fill="#5b3a1e"/>
+  <rect x="13" y="1" width="2" height="7" fill="#5b3a1e"/>
+  <rect x="4" y="7" width="3" height="3" fill="#eef3f7"/>
+  <rect x="9" y="7" width="3" height="3" fill="#eef3f7"/>
+  <rect x="5" y="8" width="2" height="2" fill="#22262c"/>
+  <rect x="9" y="8" width="2" height="2" fill="#22262c"/>
+  <rect x="6" y="12" width="4" height="1" fill="#8a5f42"/>
+</symbol>
+<symbol id="i-book" viewBox="0 0 16 16">
+  <rect x="2" y="1" width="12" height="14" fill="#8a3a2a"/>
+  <rect x="4" y="2" width="9" height="12" fill="#f2eee0"/>
+  <rect x="2" y="1" width="3" height="14" fill="#a8492f"/>
+  <rect x="6" y="4" width="6" height="1" fill="#b9a98a"/>
+  <rect x="6" y="6" width="6" height="1" fill="#b9a98a"/>
+  <rect x="6" y="8" width="5" height="1" fill="#b9a98a"/>
+  <rect x="6" y="10" width="6" height="1" fill="#b9a98a"/>
+</symbol>
+<symbol id="i-chest" viewBox="0 0 16 16">
+  <rect x="1" y="3" width="14" height="10" fill="#7a5230"/>
+  <rect x="1" y="3" width="14" height="3" fill="#8b5f38"/>
+  <rect x="1" y="3" width="14" height="1" fill="#a5764a"/>
+  <rect x="1" y="6" width="14" height="1" fill="#5a3c1f"/>
+  <rect x="6" y="4" width="4" height="5" fill="#4a4f57"/>
+  <rect x="7" y="6" width="2" height="3" fill="#c9a227"/>
+  <rect x="1" y="12" width="14" height="1" fill="#5a3c1f"/>
+</symbol>
+<symbol id="i-table" viewBox="0 0 16 16">
+  <rect x="1" y="1" width="14" height="14" fill="#6b4420"/>
+  <rect x="1" y="1" width="14" height="3" fill="#8b5a2b"/>
+  <rect x="1" y="1" width="14" height="1" fill="#ab713d"/>
+  <rect x="7" y="1" width="1" height="3" fill="#3f2a12"/>
+  <rect x="1" y="6" width="14" height="1" fill="#3f2a12"/>
+  <rect x="7" y="6" width="1" height="9" fill="#3f2a12"/>
+  <rect x="3" y="8" width="2" height="2" fill="#a5764a"/>
+  <rect x="11" y="10" width="2" height="2" fill="#a5764a"/>
+</symbol>
+<symbol id="i-clock" viewBox="0 0 16 16">
+  <rect x="4" y="1" width="8" height="14" fill="#1b2229"/>
+  <rect x="1" y="4" width="14" height="8" fill="#1b2229"/>
+  <rect x="4" y="2" width="8" height="12" fill="#d9d2b8"/>
+  <rect x="2" y="4" width="12" height="8" fill="#d9d2b8"/>
+  <rect x="7" y="4" width="2" height="5" fill="#c05a2a"/>
+  <rect x="8" y="7" width="4" height="2" fill="#c05a2a"/>
+</symbol>
+<symbol id="i-lever" viewBox="0 0 16 16">
+  <rect x="1" y="10" width="14" height="4" fill="#6b6b6b"/>
+  <rect x="1" y="10" width="14" height="1" fill="#9a9a9a"/>
+  <rect x="1" y="13" width="14" height="1" fill="#3f3f3f"/>
+  <rect x="7" y="2" width="3" height="9" fill="#8b5a2b"/>
+  <rect x="7" y="2" width="3" height="2" fill="#c07a3a"/>
+</symbol>
+<symbol id="i-play" viewBox="0 0 16 16">
+  <rect x="4" y="3" width="2" height="10" fill="currentColor"/>
+  <rect x="6" y="5" width="2" height="6" fill="currentColor"/>
+  <rect x="8" y="6" width="2" height="4" fill="currentColor"/>
+  <rect x="10" y="7" width="2" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-stop" viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" fill="currentColor"/></symbol>
+<symbol id="i-restart" viewBox="0 0 16 16">
+  <rect x="6" y="2" width="6" height="2" fill="currentColor"/>
+  <rect x="11" y="4" width="2" height="5" fill="currentColor"/>
+  <rect x="9" y="11" width="4" height="2" fill="currentColor"/>
+  <rect x="4" y="12" width="5" height="2" fill="currentColor"/>
+  <rect x="2" y="5" width="2" height="7" fill="currentColor"/>
+  <rect x="3" y="3" width="3" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-refresh" viewBox="0 0 16 16">
+  <rect x="4" y="3" width="6" height="2" fill="currentColor"/>
+  <rect x="9" y="5" width="2" height="2" fill="currentColor"/>
+  <rect x="8" y="6" width="3" height="2" fill="currentColor"/>
+  <rect x="6" y="11" width="6" height="2" fill="currentColor"/>
+  <rect x="5" y="9" width="2" height="2" fill="currentColor"/>
+  <rect x="5" y="8" width="3" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-trash" viewBox="0 0 16 16">
+  <rect x="6" y="1" width="4" height="2" fill="currentColor"/>
+  <rect x="2" y="3" width="12" height="1" fill="currentColor"/>
+  <rect x="4" y="5" width="1" height="8" fill="currentColor"/>
+  <rect x="11" y="5" width="1" height="8" fill="currentColor"/>
+  <rect x="5" y="12" width="6" height="1" fill="currentColor"/>
+  <rect x="7" y="7" width="1" height="3" fill="currentColor"/>
+</symbol>
+<symbol id="i-search" viewBox="0 0 16 16">
+  <rect x="3" y="2" width="7" height="1" fill="currentColor"/>
+  <rect x="3" y="9" width="7" height="1" fill="currentColor"/>
+  <rect x="2" y="3" width="1" height="6" fill="currentColor"/>
+  <rect x="10" y="3" width="1" height="6" fill="currentColor"/>
+  <rect x="3" y="3" width="1" height="1" fill="currentColor"/>
+  <rect x="9" y="3" width="1" height="1" fill="currentColor"/>
+  <rect x="3" y="8" width="1" height="1" fill="currentColor"/>
+  <rect x="9" y="8" width="1" height="1" fill="currentColor"/>
+  <rect x="11" y="11" width="4" height="2" fill="currentColor"/>
+  <rect x="10" y="10" width="2" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-plus" viewBox="0 0 16 16">
+  <rect x="7" y="2" width="2" height="12" fill="currentColor"/>
+  <rect x="2" y="7" width="12" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-dl" viewBox="0 0 16 16">
+  <rect x="7" y="1" width="2" height="8" fill="currentColor"/>
+  <rect x="5" y="7" width="2" height="2" fill="currentColor"/>
+  <rect x="9" y="7" width="2" height="2" fill="currentColor"/>
+  <rect x="7" y="9" width="2" height="2" fill="currentColor"/>
+  <rect x="2" y="13" width="12" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-ul" viewBox="0 0 16 16">
+  <rect x="7" y="1" width="2" height="8" fill="currentColor"/>
+  <rect x="5" y="3" width="2" height="2" fill="currentColor"/>
+  <rect x="9" y="3" width="2" height="2" fill="currentColor"/>
+  <rect x="7" y="1" width="2" height="2" fill="currentColor"/>
+  <rect x="2" y="13" width="12" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-cpu" viewBox="0 0 16 16">
+  <rect x="4" y="4" width="8" height="1" fill="currentColor"/>
+  <rect x="4" y="11" width="8" height="1" fill="currentColor"/>
+  <rect x="4" y="5" width="1" height="6" fill="currentColor"/>
+  <rect x="11" y="5" width="1" height="6" fill="currentColor"/>
+  <rect x="6" y="6" width="4" height="4" fill="currentColor"/>
+  <rect x="6" y="2" width="1" height="2" fill="currentColor"/>
+  <rect x="9" y="2" width="1" height="2" fill="currentColor"/>
+  <rect x="6" y="12" width="1" height="2" fill="currentColor"/>
+  <rect x="9" y="12" width="1" height="2" fill="currentColor"/>
+  <rect x="2" y="6" width="2" height="1" fill="currentColor"/>
+  <rect x="12" y="6" width="2" height="1" fill="currentColor"/>
+  <rect x="2" y="9" width="2" height="1" fill="currentColor"/>
+  <rect x="12" y="9" width="2" height="1" fill="currentColor"/>
+</symbol>
+<symbol id="i-mem" viewBox="0 0 16 16">
+  <rect x="1" y="5" width="14" height="6" fill="currentColor"/>
+  <rect x="3" y="11" width="1" height="2" fill="currentColor"/>
+  <rect x="6" y="11" width="1" height="2" fill="currentColor"/>
+  <rect x="9" y="11" width="1" height="2" fill="currentColor"/>
+  <rect x="12" y="11" width="1" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-users" viewBox="0 0 16 16">
+  <rect x="5" y="2" width="6" height="6" fill="currentColor"/>
+  <rect x="3" y="9" width="10" height="5" fill="currentColor"/>
+  <rect x="4" y="9" width="8" height="1" fill="currentColor"/>
+</symbol>
+<symbol id="i-time" viewBox="0 0 16 16">
+  <rect x="4" y="2" width="8" height="1" fill="currentColor"/>
+  <rect x="4" y="13" width="8" height="1" fill="currentColor"/>
+  <rect x="2" y="4" width="1" height="8" fill="currentColor"/>
+  <rect x="13" y="4" width="1" height="8" fill="currentColor"/>
+  <rect x="3" y="3" width="1" height="1" fill="currentColor"/>
+  <rect x="12" y="3" width="1" height="1" fill="currentColor"/>
+  <rect x="3" y="12" width="1" height="1" fill="currentColor"/>
+  <rect x="12" y="12" width="1" height="1" fill="currentColor"/>
+  <rect x="7" y="4" width="1" height="5" fill="currentColor"/>
+  <rect x="8" y="8" width="4" height="1" fill="currentColor"/>
+</symbol>
+<symbol id="i-heart" viewBox="0 0 16 16">
+  <rect x="3" y="2" width="4" height="2" fill="currentColor"/>
+  <rect x="9" y="2" width="4" height="2" fill="currentColor"/>
+  <rect x="2" y="4" width="12" height="3" fill="currentColor"/>
+  <rect x="4" y="7" width="8" height="3" fill="currentColor"/>
+  <rect x="6" y="10" width="4" height="2" fill="currentColor"/>
+  <rect x="7" y="12" width="2" height="1" fill="currentColor"/>
+</symbol>
+<symbol id="i-info" viewBox="0 0 16 16">
+  <rect x="2" y="2" width="12" height="1" fill="currentColor"/>
+  <rect x="2" y="13" width="12" height="1" fill="currentColor"/>
+  <rect x="1" y="3" width="1" height="10" fill="currentColor"/>
+  <rect x="14" y="3" width="1" height="10" fill="currentColor"/>
+  <rect x="7" y="4" width="2" height="2" fill="currentColor"/>
+  <rect x="7" y="8" width="2" height="4" fill="currentColor"/>
+</symbol>
+<symbol id="i-check" viewBox="0 0 16 16">
+  <rect x="2" y="7" width="2" height="3" fill="currentColor"/>
+  <rect x="4" y="9" width="2" height="3" fill="currentColor"/>
+  <rect x="6" y="7" width="2" height="3" fill="currentColor"/>
+  <rect x="8" y="5" width="2" height="3" fill="currentColor"/>
+  <rect x="10" y="3" width="2" height="3" fill="currentColor"/>
+  <rect x="12" y="1" width="2" height="3" fill="currentColor"/>
+</symbol>
+<symbol id="i-crown" viewBox="0 0 16 16">
+  <rect x="2" y="9" width="12" height="4" fill="currentColor"/>
+  <rect x="2" y="6" width="2" height="3" fill="currentColor"/>
+  <rect x="6" y="4" width="2" height="5" fill="currentColor"/>
+  <rect x="10" y="4" width="2" height="5" fill="currentColor"/>
+  <rect x="7" y="2" width="2" height="3" fill="currentColor"/>
+  <rect x="4" y="5" width="2" height="4" fill="currentColor"/>
+  <rect x="12" y="6" width="2" height="3" fill="currentColor"/>
+</symbol>
+<symbol id="i-kick" viewBox="0 0 16 16">
+  <rect x="2" y="2" width="2" height="12" fill="currentColor"/>
+  <rect x="4" y="2" width="4" height="2" fill="currentColor"/>
+  <rect x="4" y="12" width="4" height="2" fill="currentColor"/>
+  <rect x="8" y="7" width="6" height="2" fill="currentColor"/>
+  <rect x="11" y="4" width="2" height="2" fill="currentColor"/>
+  <rect x="11" y="10" width="2" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-ban" viewBox="0 0 16 16">
+  <rect x="5" y="1" width="6" height="2" fill="currentColor"/>
+  <rect x="5" y="13" width="6" height="2" fill="currentColor"/>
+  <rect x="3" y="3" width="2" height="2" fill="currentColor"/>
+  <rect x="1" y="5" width="2" height="6" fill="currentColor"/>
+  <rect x="13" y="5" width="2" height="6" fill="currentColor"/>
+  <rect x="11" y="3" width="2" height="2" fill="currentColor"/>
+  <rect x="3" y="11" width="2" height="2" fill="currentColor"/>
+  <rect x="11" y="11" width="2" height="2" fill="currentColor"/>
+  <rect x="5" y="5" width="2" height="2" fill="currentColor"/>
+  <rect x="7" y="7" width="2" height="2" fill="currentColor"/>
+  <rect x="9" y="9" width="2" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-chev-r" viewBox="0 0 16 16">
+  <rect x="5" y="4" width="2" height="8" fill="currentColor"/>
+  <rect x="7" y="5" width="2" height="6" fill="currentColor"/>
+  <rect x="9" y="6" width="2" height="4" fill="currentColor"/>
+  <rect x="11" y="7" width="2" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-chev-l" viewBox="0 0 16 16">
+  <rect x="9" y="4" width="2" height="8" fill="currentColor"/>
+  <rect x="7" y="5" width="2" height="6" fill="currentColor"/>
+  <rect x="5" y="6" width="2" height="4" fill="currentColor"/>
+  <rect x="3" y="7" width="2" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-x" viewBox="0 0 16 16">
+  <rect x="3" y="3" width="2" height="2" fill="currentColor"/>
+  <rect x="5" y="5" width="2" height="2" fill="currentColor"/>
+  <rect x="7" y="7" width="2" height="2" fill="currentColor"/>
+  <rect x="9" y="9" width="2" height="2" fill="currentColor"/>
+  <rect x="11" y="11" width="2" height="2" fill="currentColor"/>
+  <rect x="11" y="3" width="2" height="2" fill="currentColor"/>
+  <rect x="9" y="5" width="2" height="2" fill="currentColor"/>
+  <rect x="5" y="9" width="2" height="2" fill="currentColor"/>
+  <rect x="3" y="11" width="2" height="2" fill="currentColor"/>
+</symbol>
+<symbol id="i-folder" viewBox="0 0 16 16">
+  <rect x="1" y="3" width="6" height="2" fill="#b8862b"/>
+  <rect x="1" y="5" width="14" height="9" fill="#d9a52e"/>
+  <rect x="1" y="5" width="14" height="1" fill="#efc25a"/>
+  <rect x="1" y="13" width="14" height="1" fill="#9c7418"/>
+</symbol>
+<symbol id="i-cube" viewBox="0 0 16 16">
+  <rect x="2" y="3" width="12" height="10" fill="#8b5a2b"/>
+  <rect x="2" y="3" width="12" height="3" fill="#a5764a"/>
+  <rect x="2" y="3" width="12" height="1" fill="#c08a55"/>
+  <rect x="7" y="3" width="2" height="10" fill="#4a4f57"/>
+  <rect x="2" y="12" width="12" height="1" fill="#5a3c1f"/>
+</symbol>
+<symbol id="i-jar" viewBox="0 0 16 16">
+  <rect x="3" y="2" width="10" height="12" fill="#c9742a"/>
+  <rect x="3" y="2" width="10" height="2" fill="#e08a3c"/>
+  <rect x="3" y="2" width="10" height="1" fill="#f0a556"/>
+  <rect x="5" y="6" width="6" height="5" fill="#8a4a13"/>
+  <rect x="3" y="13" width="10" height="1" fill="#7a3f10"/>
+</symbol>
+<symbol id="i-zip" viewBox="0 0 16 16">
+  <rect x="3" y="1" width="10" height="14" fill="#d9b45a"/>
+  <rect x="3" y="1" width="10" height="1" fill="#f0d27a"/>
+  <rect x="7" y="1" width="2" height="14" fill="#8a6a1f"/>
+  <rect x="7" y="3" width="2" height="2" fill="#f0d27a"/>
+  <rect x="7" y="7" width="2" height="2" fill="#f0d27a"/>
+  <rect x="7" y="11" width="2" height="2" fill="#f0d27a"/>
+</symbol>
+<symbol id="i-file" viewBox="0 0 16 16">
+  <rect x="3" y="1" width="10" height="14" fill="#c8d2da"/>
+  <rect x="3" y="1" width="10" height="1" fill="#eef3f7"/>
+  <rect x="3" y="14" width="10" height="1" fill="#93a1ad"/>
+  <rect x="5" y="5" width="6" height="1" fill="#7f8b98"/>
+  <rect x="5" y="7" width="6" height="1" fill="#7f8b98"/>
+  <rect x="5" y="9" width="4" height="1" fill="#7f8b98"/>
+</symbol>
+</defs></svg>
+
+<!-- ════ 背景大气层 ════ -->
+<div class="atmos" aria-hidden="true">
+  <div class="grid"></div>
+  <div class="glow-a"></div>
+  <div class="glow-b"></div>
+  <div class="motes">
+    <i style="left:6%;--d:17s"></i><i style="left:14%;--d:23s"></i><i style="left:23%;--d:14s"></i>
+    <i style="left:31%;--d:29s"></i><i style="left:44%;--d:19s"></i><i style="left:52%;--d:26s"></i>
+    <i style="left:61%;--d:16s"></i><i style="left:70%;--d:31s"></i><i style="left:79%;--d:21s"></i>
+    <i style="left:87%;--d:13s"></i><i style="left:94%;--d:27s"></i>
+  </div>
+  <div class="vignette"></div>
+</div>
+
+<!-- ════ 设计稿工具条 ════ -->
+<div class="draftbar">
+  <b>SERVERBOX · PIXEL REFRESH v2</b>
+  <div class="sw" title="配色">
+    <i style="background:#0d1116"></i><i style="background:#131920"></i><i style="background:#33d5cf"></i>
+    <i style="background:#e08a3c"></i><i style="background:#57d364"></i><i style="background:#8be24a"></i>
+  </div>
+  <span style="font-size:12px;color:var(--ink-3)">深石板底 · 钻石青主色 · 铜橙点缀 · 极致像素</span>
+  <button class="btn btn-ghost xs" id="animToggle" type="button" style="margin-left:auto">暂停动效</button>
+  <a class="btn btn-ghost xs" href="spec.html">设计规范</a>
+  <div class="flownav">
+    <a href="wizard.html">新建向导</a><a href="market.html">整合包市场</a><a href="login.html">登录页</a>
+  </div>
+  <span class="hint">完整稿 · 10 个页签 + 3 条流程页</span>
+</div>
+
+<div class="app">
+  <div class="strata"></div>
+
+  <!-- ════ 顶栏 ════ -->
+  <header class="topbar">
+    <button class="btn btn-ghost icon only-mobile" id="drawerBtn" type="button" aria-label="世界列表">
+      <svg class="pic"><use href="#i-grass"/></svg>
+    </button>
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 16 16"><use href="#i-grass"/></svg></div>
+      <div>
+        <div class="nm">SERVERBOX</div>
+        <div class="sub">MC 服务器管理面板</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="conn"><span class="pulse-dot"></span>守护进程已连接</div>
+    <button class="btn btn-ghost sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>刷新</button>
+    <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-plus"/></svg>新建世界</button>
+  </header>
+
+  <div class="shell">
+    <!-- ════ 侧栏：世界列表 ════ -->
+    <aside class="side">
+      <div class="side-cap">
+        <span class="eyebrow">Worlds</span>
+        <span class="n">6</span>
+      </div>
+      <div class="worlds">
+        <div class="world on reveal" style="--rd:.02s">
+          <svg class="ava" viewBox="0 0 16 16"><use href="#i-grass"/></svg>
+          <div class="txt"><div class="nm">生存服 · 长期档</div><div class="sb">PAPER 1.21.4</div></div>
+          <span class="st run"></span>
+        </div>
+        <div class="world reveal" style="--rd:.06s">
+          <svg class="ava" viewBox="0 0 16 16" style="filter:hue-rotate(150deg)"><use href="#i-grass"/></svg>
+          <div class="txt"><div class="nm">创造服 · 建筑</div><div class="sb">FABRIC 1.21.4</div></div>
+          <span class="st"></span>
+        </div>
+        <div class="world reveal" style="--rd:.1s">
+          <svg class="ava" viewBox="0 0 16 16" style="filter:hue-rotate(45deg)"><use href="#i-grass"/></svg>
+          <div class="txt"><div class="nm">测试服 · 快速</div><div class="sb">PAPER 1.20.4</div></div>
+          <span class="st"></span>
+        </div>
+        <div class="world reveal" style="--rd:.14s">
+          <svg class="ava" viewBox="0 0 16 16" style="filter:hue-rotate(280deg)"><use href="#i-grass"/></svg>
+          <div class="txt"><div class="nm">Forge 整合服</div><div class="sb">MOHIST 1.20.1</div></div>
+          <span class="st crash"></span>
+        </div>
+        <div class="world reveal" style="--rd:.18s">
+          <svg class="ava" viewBox="0 0 16 16" style="filter:hue-rotate(200deg)"><use href="#i-grass"/></svg>
+          <div class="txt"><div class="nm">空岛 · 竞速</div><div class="sb">PAPER 1.21.5</div></div>
+          <span class="st"></span>
+        </div>
+        <div class="world reveal" style="--rd:.22s">
+          <svg class="ava" viewBox="0 0 16 16" style="filter:hue-rotate(320deg)"><use href="#i-grass"/></svg>
+          <div class="txt"><div class="nm">整合包 · 冒险</div><div class="sb">FORGE 1.20.1</div></div>
+          <span class="st"></span>
+        </div>
+      </div>
+      <div class="side-foot">
+        <button class="btn btn-start" type="button" style="justify-content:center"><svg class="pic"><use href="#i-plus"/></svg>新建世界</button>
+        <button class="btn btn-ghost" type="button" style="justify-content:center"><svg class="pic"><use href="#i-ul"/></svg>导入已有服务器</button>
+      </div>
+      <div class="side-sum">共 6 个世界 · 运行中 1 个</div>
+    </aside>
+
+    <!-- ════ 主区 ════ -->
+    <main class="main">
+      <div class="world-head">
+        <div class="world-title">
+          <h1 class="reveal" style="--rd:.04s">生存服 · 长期档</h1>
+          <span class="state-pill reveal" style="--rd:.08s"><i></i>运行中</span>
+          <span class="type-chip reveal" style="--rd:.1s"><svg class="pic" style="width:12px;height:12px"><use href="#i-cmd"/></svg>PAPER 1.21.4</span>
+          <div class="world-actions">
+            <button class="btn btn-stop sm" type="button"><svg class="pic"><use href="#i-stop"/></svg>停止</button>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-restart"/></svg>重启</button>
+            <button class="btn btn-danger sm" type="button"><svg class="pic"><use href="#i-trash"/></svg>删除</button>
+          </div>
+        </div>
+        <div class="world-meta">
+          <span class="kv">端口 <b>25565</b></span>
+          <span class="kv">内存 <b>4096 MB</b></span>
+          <span class="kv">PID <b>98372</b></span>
+          <span class="kv">已运行 <b>6 时 42 分</b></span>
+          <span class="path">F:\tmp\sboxdata\instances\1179165465118968</span>
+        </div>
+      </div>
+
+      <!-- 页签：MC 物品槽。
+           ⚠ 上面这九项必须与 panel/web/src/App.tsx 的 PAGES 完全一致 —— 顺序、文案一字不差：
+              概览 / 玩家 / 配置 / 插件与模组 / 整合包 / 文件 / 备份与还原 / 计划任务 / 设置。
+              「控制台」是「概览」页里的一块（见 data-page="overview" 右侧那颗 panel），不是独立页签，
+              不要在这里加回去 —— 加了就等于给面板凭空多开一个页面，导航就变了。
+              分隔线右侧两屏是设计参考页（给实现时对照异常状态 / 完整控制台版式），不属于面板导航。 -->
+      <nav class="tabbar" id="tabbar">
+        <button class="tab on" data-view="overview" type="button"><svg class="pic"><use href="#i-compass"/></svg>概览</button>
+        <button class="tab" data-view="players" type="button"><svg class="pic"><use href="#i-head"/></svg>玩家</button>
+        <button class="tab" data-view="config" type="button"><svg class="pic"><use href="#i-book"/></svg>配置</button>
+        <button class="tab" data-view="plugins" type="button"><svg class="pic"><use href="#i-table"/></svg>插件与模组</button>
+        <button class="tab" data-view="modpack" type="button"><svg class="pic"><use href="#i-cube"/></svg>整合包</button>
+        <button class="tab" data-view="files" type="button"><svg class="pic"><use href="#i-folder"/></svg>文件</button>
+        <button class="tab" data-view="backup" type="button"><svg class="pic"><use href="#i-chest"/></svg>备份与还原</button>
+        <button class="tab" data-view="tasks" type="button"><svg class="pic"><use href="#i-clock"/></svg>计划任务</button>
+        <button class="tab" data-view="settings" type="button"><svg class="pic"><use href="#i-lever"/></svg>设置</button>
+        <span class="tabbar-sep" aria-hidden="true"></span>
+        <span class="tabbar-ref">设计参考</span>
+        <button class="tab tab-ref" data-view="console" type="button"><svg class="pic"><use href="#i-cmd"/></svg>控制台整页</button>
+        <button class="tab tab-ref" data-view="states" type="button"><svg class="pic"><use href="#i-info"/></svg>异常状态</button>
+      </nav>
+
+      <div class="content">
+
+        <!-- ════════ 屏 1 · 概览 ════════ -->
+        <section class="page on" data-page="overview">
+          <div class="panel reveal" style="--rd:.12s">
+            <i class="corner"></i>
+            <div class="preflight">
+              <div class="hearts">
+                <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+                <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+                <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+                <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+                <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+                <svg class="heart" style="color:#2a333d"><use href="#i-heart"/></svg>
+              </div>
+              <div class="big"><b>5</b><span class="of">/ 6 项通过</span></div>
+              <div class="txt">
+                <h3>启动前体检</h3>
+                <p>Java 21 已就绪、端口 25565 空闲、eula.txt 已同意、server.jar 存在、磁盘余量充足。<span style="color:var(--warn)">未通过：max-players 仍为默认 20</span></p>
+              </div>
+              <button class="btn sm" type="button"><svg class="pic"><use href="#i-restart"/></svg>重新体检</button>
+              <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-check"/></svg>一键修复</button>
+            </div>
+          </div>
+
+          <!-- 指标带 v2：大数 + 方块刻度条 + 60 点历史曲线 -->
+          <div class="metrics">
+            <div class="metric tex-diamond reveal" style="--rd:.16s" data-jitter="42">
+              <div class="top"><svg class="pic" style="color:var(--cyan)"><use href="#i-cpu"/></svg><span class="lb">CPU</span><span class="tag">峰值 78%</span></div>
+              <div class="val"><b data-count="42">42</b><span class="u">%</span></div>
+              <div class="meter" data-pct="42" data-tone="cy"></div>
+              <svg class="spark" data-seed="42" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <div class="sparkcap"><span>近 60 采样</span><span class="pk">峰值 78%</span></div>
+              <div class="note"><span class="pulse-dot" style="width:6px;height:6px"></span>进程 98372 · 8 核占用</div>
+            </div>
+            <div class="metric tex-diamond reveal" style="--rd:.2s" data-jitter="2380">
+              <div class="top"><svg class="pic" style="color:var(--copper)"><use href="#i-mem"/></svg><span class="lb">MEMORY</span><span class="tag">峰值 3.1 GB</span></div>
+              <div class="val"><b data-count="2380">2380</b><span class="u">MB</span><span class="of">/ 4096</span></div>
+              <div class="meter" data-pct="58" data-tone="on"></div>
+              <svg class="spark g" data-seed="58" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <div class="sparkcap"><span>近 60 采样</span><span class="pk">峰值 3.1 GB</span></div>
+              <div class="note">堆内已提交 2.4 GB · G1GC</div>
+            </div>
+            <div class="metric tex-diamond reveal" style="--rd:.24s" data-jitter="3">
+              <div class="top"><svg class="pic" style="color:var(--ok)"><use href="#i-users"/></svg><span class="lb">PLAYERS</span><span class="tag">上限 20</span></div>
+              <div class="val"><b data-count="3">3</b><span class="u">人</span><span class="of">/ 20</span></div>
+              <div class="meter" data-pct="15" data-tone="on"></div>
+              <svg class="spark y" data-seed="15" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <div class="sparkcap"><span>近 60 采样</span><span class="pk">峰值 6 人</span></div>
+              <div class="note"><span class="pulse-dot" style="width:6px;height:6px"></span>小小米 · Su_Ni · 红石大师</div>
+            </div>
+            <div class="metric tex-diamond reveal" style="--rd:.28s" data-jitter="0">
+              <div class="top"><svg class="pic" style="color:var(--gold)"><use href="#i-time"/></svg><span class="lb">UPTIME</span><span class="tag">TPS 20.0</span></div>
+              <div class="val"><b style="font-size:24px">6:42:11</b></div>
+              <div class="meter" data-pct="100" data-tone="xp"></div>
+              <svg class="spark o" data-seed="80" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <div class="sparkcap"><span>近 60 采样 · TPS</span><span class="pk">最低 19.2</span></div>
+              <div class="note">最近重启 4 小时前 · 无崩溃</div>
+            </div>
+          </div>
+
+          <!-- 控制台预览 + 右侧档案 -->
+          <div class="grid-2 reveal" style="--rd:.32s">
+            <div class="panel" style="margin-bottom:0">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-cmd"/></svg>
+                <h2>控制台</h2>
+                <span class="con-live"><span class="pulse-dot"></span>LIVE</span>
+                <div class="spacer"></div>
+                <button class="btn xs" type="button">跟随</button>
+                <button class="btn btn-ghost xs" type="button">清空</button>
+              </div>
+              <div class="con-body" style="min-height:236px;max-height:270px">
+                <div class="log-line" data-lv="INFO"><span class="t">03:11:40</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Tick 50 | uptime 300s | heap 42MB | players 3</span></div>
+                <div class="log-line" data-lv="WARN"><span class="t">03:11:56</span><span class="lv" style="color:#f2c14e">WARN</span><span class="m">Can't keep up! Is the server overloaded? Running 2140ms behind</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:12:17</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Tick 100 | uptime 605s | heap 88MB | players 3</span></div>
+                <div class="log-line joined" data-lv="INFO"><span class="t">03:12:42</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m"><em>小小米</em> joined the game</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:13:07</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Tick 150 | uptime 903s | heap 96MB | players 4</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:14:23</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Saving chunks for level 'world'/minecraft:overworld</span></div>
+              </div>
+              <div class="con-input">
+                <span class="ps1">生存服 · 长期档 &gt;</span>
+                <input placeholder="输入指令后回车，例如 list / op Steve / whitelist on" aria-label="服务器指令">
+                <span class="caret"></span>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div class="panel" style="margin-bottom:0">
+                <i class="corner"></i>
+                <div class="con-head tex-stone"><svg class="pic" style="color:var(--cyan)"><use href="#i-book"/></svg><h2>服务器档案</h2></div>
+                <div style="padding:4px 14px 12px">
+                  <div class="field" style="grid-template-columns:110px 1fr;padding:9px 0"><div class="lb" style="font-weight:400;color:var(--ink-3);font-size:12.5px">服务端文件</div><div style="font-family:var(--f-term);font-size:15px">server.jar</div></div>
+                  <div class="field" style="grid-template-columns:110px 1fr;padding:9px 0"><div class="lb" style="font-weight:400;color:var(--ink-3);font-size:12.5px">内存上限</div><div style="font-family:var(--f-term);font-size:15px">4096 MB</div></div>
+                  <div class="field" style="grid-template-columns:110px 1fr;padding:9px 0"><div class="lb" style="font-weight:400;color:var(--ink-3);font-size:12.5px">开机自启</div><div><span class="badge wl">已开启</span></div></div>
+                  <div class="field" style="grid-template-columns:110px 1fr;padding:9px 0"><div class="lb" style="font-weight:400;color:var(--ink-3);font-size:12.5px">崩溃重启</div><div><span class="badge wl">5s 重试 3 次</span></div></div>
+                  <div class="field" style="grid-template-columns:110px 1fr;padding:9px 0;border-bottom:0"><div class="lb" style="font-weight:400;color:var(--ink-3);font-size:12.5px">Java 路径</div><div style="font-family:var(--f-term);font-size:15px">自动 · JDK 21.0.9</div></div>
+                </div>
+              </div>
+              <div class="panel" style="margin-bottom:0">
+                <i class="corner"></i>
+                <div class="con-head tex-stone"><svg class="pic" style="color:var(--copper)"><use href="#i-lever"/></svg><h2>快捷操作</h2></div>
+                <div class="quick-grid" style="padding:12px 14px">
+                  <button class="btn sm" type="button"><svg class="pic"><use href="#i-check"/></svg>保存世界</button>
+                  <button class="btn sm" type="button"><svg class="pic"><use href="#i-chest"/></svg>立即备份</button>
+                  <button class="btn sm" type="button"><svg class="pic"><use href="#i-users"/></svg>玩家列表</button>
+                  <button class="btn sm" type="button"><svg class="pic"><use href="#i-cmd"/></svg>发送指令</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 R · 控制台整页（设计参考，非面板页签）════════ -->
+        <section class="page" data-page="console">
+          <div class="grid-console">
+            <div class="panel reveal" style="--rd:.12s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-cmd"/></svg>
+                <h2>控制台</h2>
+                <span class="con-live"><span class="pulse-dot"></span>LIVE · 实时</span>
+                <div class="spacer"></div>
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">缓冲 512 行</span>
+                <button class="btn xs" type="button">跟随</button>
+                <button class="btn btn-ghost xs" type="button">清空</button>
+                <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-dl"/></svg>导出</button>
+              </div>
+              <!-- 级别筛选 -->
+              <div class="toolbar" style="gap:8px">
+                <div class="con-filter" id="logFilter">
+                  <button class="chipf on" data-f="all" type="button">全部<span class="n">14</span></button>
+                  <button class="chipf" data-f="warn" type="button">只看警示<span class="n">1</span></button>
+                  <button class="chipf" data-f="err" type="button">只看报错<span class="n">1</span></button>
+                </div>
+                <div class="spacer" style="margin-left:auto"></div>
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">同类报错自动折叠 · 点「展开」看全部</span>
+              </div>
+              <div class="con-body" id="conBody" style="min-height:470px;max-height:calc(100vh - 330px)">
+                <div class="log-line art" data-lv="LOG"><span class="m">  ____                        _   ____            </span></div>
+                <div class="log-line art" data-lv="LOG"><span class="m"> / ___|  ___ _ ____   _____ _ __| __ )  _____  __ </span></div>
+                <div class="log-line art" data-lv="LOG"><span class="m"> \___ \ / _ \ '__\ \ / / _ \ '__|  _ \ / _ \ \/ / </span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:10:02</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Starting minecraft server version 1.21.4</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:10:03</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Loading properties</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:10:05</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Preparing level "world"</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:10:09</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Done (12.483s)! For help, type "help"</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:11:40</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Tick 50 | uptime 300s | heap 42MB | players 3</span></div>
+                <div class="log-line" data-lv="WARN"><span class="t">03:11:56</span><span class="lv" style="color:#f2c14e">WARN</span><span class="m">Can't keep up! Is the server overloaded? Running 2140ms or 42 ticks behind</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:12:17</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Tick 100 | uptime 605s | heap 88MB | players 3</span></div>
+                <div class="log-line joined" data-lv="INFO"><span class="t">03:12:42</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m"><em>小小米</em> joined the game</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:13:07</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Tick 150 | uptime 903s | heap 96MB | players 4</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:14:23</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Saving chunks for level 'world'/minecraft:overworld</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:15:01</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Tick 200 | uptime 1201s | heap 118MB | players 3</span></div>
+                <div class="log-line" data-lv="ERROR"><span class="t">03:16:12</span><span class="lv" style="color:#ff6b6b">ERROR</span><span class="m">Failed to load plugin 'LegacyGuard': Unsupported API version 1.13</span></div>
+                <div class="log-line left" data-lv="INFO"><span class="t">03:16:40</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m"><em>稳稳的鱼</em> lost connection: Disconnected</span></div>
+                <!-- 报错聚合演示 -->
+                <div class="log-line fold" data-lv="ERROR">
+                  <span class="foldh">
+                    <svg class="pic" style="width:12px;height:12px"><use href="#i-ban"/></svg>
+                    <span>Failed to load plugin 'LegacyGuard'：Unsupported API version 1.13</span>
+                    <span class="cnt">同类 × 12</span>
+                    <span class="exp">展开 ▾</span>
+                  </span>
+                </div>
+                <div class="log-line fresh" data-lv="INFO"><span class="t">03:17:19</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Tick 400 | uptime 4803s | heap 158MB | players 2</span></div>
+              </div>
+              <div class="con-input">
+                <span class="ps1">生存服 · 长期档 &gt;</span>
+                <input placeholder="输入指令后回车，例如 list / op Steve / whitelist on" aria-label="服务器指令">
+                <span class="caret"></span>
+                <button class="btn btn-primary sm" type="button">发送</button>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div class="panel reveal" style="--rd:.16s;margin-bottom:0">
+                <i class="corner"></i>
+                <div class="con-head tex-stone"><svg class="pic" style="color:var(--cyan)"><use href="#i-cmd"/></svg><h2>常用指令</h2></div>
+                <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+                  <button class="btn btn-ghost sm" type="button" style="justify-content:flex-start"><svg class="pic"><use href="#i-users"/></svg>list</button>
+                  <button class="btn btn-ghost sm" type="button" style="justify-content:flex-start"><svg class="pic"><use href="#i-check"/></svg>save-all</button>
+                  <button class="btn btn-ghost sm" type="button" style="justify-content:flex-start"><svg class="pic"><use href="#i-crown"/></svg>op Steve</button>
+                  <button class="btn btn-ghost sm" type="button" style="justify-content:flex-start"><svg class="pic"><use href="#i-ban"/></svg>ban Herobrine</button>
+                  <button class="btn btn-ghost sm" type="button" style="justify-content:flex-start"><svg class="pic"><use href="#i-clock"/></svg>time set day</button>
+                  <button class="btn btn-ghost sm" type="button" style="justify-content:flex-start"><svg class="pic"><use href="#i-lever"/></svg>whitelist on</button>
+                </div>
+              </div>
+              <div class="panel reveal" style="--rd:.2s;margin-bottom:0">
+                <i class="corner"></i>
+                <div class="con-head tex-stone"><svg class="pic" style="color:var(--ok)"><use href="#i-time"/></svg><h2>最近指令</h2></div>
+                <div style="padding:8px 12px 12px;font-family:var(--f-term);font-size:15px;color:var(--ink-2)">
+                  <div style="padding:4px 0;border-bottom:1px solid var(--line-1)">list → 3/20 在线</div>
+                  <div style="padding:4px 0;border-bottom:1px solid var(--line-1)">save-all → 完成</div>
+                  <div style="padding:4px 0;border-bottom:1px solid var(--line-1)">whitelist add 老玩家 → 已添加</div>
+                  <div style="padding:4px 0">time set day → 时间已设为白天</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 2 · 玩家 ════════ -->
+        <section class="page" data-page="players">
+          <div class="sec-head reveal" style="--rd:.1s">
+            <span class="idx">02</span>
+            <h2>玩家</h2>
+            <span class="sub">共 6 人 · 3 人在线 · 勾选后可批量操作</span>
+            <div class="spacer"></div>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-ul"/></svg>导入名单</button>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-dl"/></svg>导出</button>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>刷新</button>
+            <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-plus"/></svg>添加玩家</button>
+          </div>
+
+          <div class="panel reveal" style="--rd:.14s">
+            <i class="corner"></i>
+
+            <!-- 批量操作条：勾选后出现 -->
+            <div class="batchbar" id="batchbar">
+              <span>已选 <b id="batchN">0</b> 项</span>
+              <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-check"/></svg>批量加白名单</button>
+              <button class="btn sm" type="button"><svg class="pic"><use href="#i-kick"/></svg>批量踢出</button>
+              <button class="btn btn-danger sm" type="button"><svg class="pic"><use href="#i-ban"/></svg>批量封禁</button>
+              <div class="spacer" style="margin-left:auto"></div>
+              <button class="btn btn-ghost xs" id="batchClear" type="button">取消选择</button>
+            </div>
+
+            <div class="toolbar">
+              <div class="filters">
+                <button class="chipf on" type="button">全部<span class="n">6</span></button>
+                <button class="chipf" type="button">在线<span class="n">3</span></button>
+                <button class="chipf" type="button">白名单<span class="n">4</span></button>
+                <button class="chipf" type="button">管理员<span class="n">2</span></button>
+                <button class="chipf" type="button">封禁<span class="n">1</span></button>
+              </div>
+              <div class="spacer" style="margin-left:auto"></div>
+              <div style="display:flex;align-items:center;gap:8px;min-width:200px">
+                <svg class="pic" style="color:var(--ink-3)"><use href="#i-search"/></svg>
+                <input class="inp" style="padding:6px 9px" placeholder="搜名字或 UUID">
+              </div>
+            </div>
+
+            <!-- 可排序表头 -->
+            <div class="phead">
+              <span class="chk" id="chkAll" title="全选"></span>
+              <span></span>
+              <button type="button" data-sort="name" class="desc">玩家 <i class="ar"></i></button>
+              <button type="button" data-sort="status">状态 <i class="ar"></i></button>
+              <button type="button" data-sort="time">游戏时长 <i class="ar"></i></button>
+              <span></span>
+            </div>
+
+            <div class="plist" id="plist">
+              <div class="prow" data-name="红石大师" data-status="1" data-time="64">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(30deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">红石大师</span><span class="badge op"><svg class="pic" style="width:10px;height:10px;display:inline-block;vertical-align:-1px"><use href="#i-crown"/></svg> OP 4</span><span class="badge wl">白名单</span><span class="sub">world · 160, 65, 325</span></div>
+                <div class="pstat"><span class="dot on"></span>在线 · 27 ms</div>
+                <div class="pcoords">游戏 64 分</div>
+                <div class="pact">
+                  <button class="btn xs" title="白名单"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs" title="设为 OP"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs" title="踢出"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs" title="封禁"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">位置</div><div class="v">world 160, 65, 325</div></div>
+                <div class="cell"><div class="k">首次加入</div><div class="v">2026-03-14</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">128 小时 40 分</div></div>
+                <div class="cell"><div class="k">最后在线</div><div class="v">刚刚</div></div>
+              </div>
+
+              <div class="prow" data-name="小小米" data-status="1" data-time="32">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(200deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">小小米</span><span class="badge op"><svg class="pic" style="width:10px;height:10px;display:inline-block;vertical-align:-1px"><use href="#i-crown"/></svg> OP 4</span><span class="badge wl">白名单</span><span class="sub">world · 108, 66, -325</span></div>
+                <div class="pstat"><span class="dot on"></span>在线 · 64 ms</div>
+                <div class="pcoords">游戏 32 分</div>
+                <div class="pact">
+                  <button class="btn xs"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">位置</div><div class="v">world 108, 66, -325</div></div>
+                <div class="cell"><div class="k">首次加入</div><div class="v">2026-05-02</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">42 小时 12 分</div></div>
+                <div class="cell"><div class="k">最后在线</div><div class="v">刚刚</div></div>
+              </div>
+
+              <div class="prow" data-name="Su_Ni" data-status="1" data-time="18">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(300deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">Su_Ni</span><span class="badge wl">白名单</span><span class="sub">world · 203, 66, -338</span></div>
+                <div class="pstat"><span class="dot on"></span>在线 · 105 ms</div>
+                <div class="pcoords">游戏 18 分</div>
+                <div class="pact">
+                  <button class="btn xs"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">位置</div><div class="v">world 203, 66, -338</div></div>
+                <div class="cell"><div class="k">首次加入</div><div class="v">2026-07-19</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">9 小时 05 分</div></div>
+                <div class="cell"><div class="k">最后在线</div><div class="v">刚刚</div></div>
+              </div>
+
+              <div class="prow" data-name="稳稳的鱼" data-status="0" data-time="0">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(120deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">稳稳的鱼</span><span class="badge ban">已封禁</span><span class="sub">2026-09-20 起 · 永久封禁</span></div>
+                <div class="pstat"><span class="dot"></span>离线 · 上次 world</div>
+                <div class="pcoords">—</div>
+                <div class="pact">
+                  <button class="btn xs"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">封禁原因</div><div class="v">破坏他人建筑（已举报）</div></div>
+                <div class="cell"><div class="k">封禁时间</div><div class="v">2026-09-20 18:02</div></div>
+                <div class="cell"><div class="k">操作人</div><div class="v">控制台</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">6 小时 20 分</div></div>
+              </div>
+
+              <div class="prow" data-name="老玩家" data-status="0" data-time="0">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(60deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">老玩家</span><span class="badge wl">白名单</span><span class="sub">离线模式 · UUID 手工生成</span></div>
+                <div class="pstat"><span class="dot"></span>离线 · 上次 world</div>
+                <div class="pcoords">—</div>
+                <div class="pact">
+                  <button class="btn xs"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">位置</div><div class="v">world 278, 68, -363</div></div>
+                <div class="cell"><div class="k">首次加入</div><div class="v">2025-11-30</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">310 小时</div></div>
+                <div class="cell"><div class="k">最后在线</div><div class="v">3 天前</div></div>
+              </div>
+
+              <div class="prow" data-name="新来的" data-status="0" data-time="0">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(250deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">新来的</span><span class="sub">尚未加入白名单</span></div>
+                <div class="pstat"><span class="dot"></span>离线</div>
+                <div class="pcoords">—</div>
+                <div class="pact">
+                  <button class="btn xs"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">UUID</div><div class="v">待服务端首次记录</div></div>
+                <div class="cell"><div class="k">首次加入</div><div class="v">—</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">—</div></div>
+                <div class="cell"><div class="k">最后在线</div><div class="v">—</div></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 3 · 配置 ════════ -->
+        <section class="page" data-page="config">
+          <div class="sec-head reveal" style="--rd:.1s">
+            <span class="idx">03</span>
+            <h2>配置</h2>
+            <span class="sub">改完立即生效的分组在前，服务端自己的 server.properties 改完要重启才读</span>
+            <div class="spacer"></div>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-search"/></svg>搜索设置</button>
+          </div>
+
+          <div class="cfg-wrap">
+            <div class="panel reveal" style="--rd:.12s">
+              <i class="corner"></i>
+              <div class="cfg-nav" id="cfgNav">
+                <button class="on" data-pane="inst" type="button"><svg class="pic"><use href="#i-book"/></svg>实例设置<span class="n">6</span></button>
+                <button data-pane="net" type="button"><svg class="pic"><use href="#i-compass"/></svg>网络与身份<span class="n">5</span></button>
+                <button data-pane="play" type="button"><svg class="pic"><use href="#i-table"/></svg>玩法<span class="n">7</span></button>
+                <button data-pane="world" type="button"><svg class="pic"><use href="#i-grass"/></svg>世界生成<span class="n">5</span></button>
+                <button data-pane="pm" type="button"><svg class="pic"><use href="#i-users"/></svg>玩家管理<span class="n">3</span></button>
+                <button data-pane="remote" type="button"><svg class="pic"><use href="#i-lever"/></svg>远程控制<span class="n">3</span></button>
+              </div>
+            </div>
+
+            <div class="panel reveal" style="--rd:.16s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-book"/></svg>
+                <h2 id="cfgTitle">实例设置</h2>
+                <span style="font-size:12.5px;color:var(--ink-3)" id="cfgSub">6 项 · 我们自己管的配置，改完立刻生效</span>
+                <div class="spacer"></div>
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">第 <b id="cfgIdx">1</b> / 6 组</span>
+              </div>
+
+              <!-- 实例设置 -->
+              <div class="cfg-pane on" data-pane="inst">
+                <div style="padding:6px 16px 16px">
+                  <div class="field">
+                    <div><div class="lb">名称</div><div class="hint">左侧列表里显示的名字</div></div>
+                    <input class="inp" value="生存服 · 长期档">
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">端口</div><div class="hint">朋友连进来的地址就是 IP:端口</div></div>
+                    <div class="stepper"><button type="button">−</button><input class="inp" value="25565"><button type="button">+</button></div>
+                  </div>
+                  <!-- 校验错误态演示 -->
+                  <div class="field invalid">
+                    <div><div class="lb">内存上限 (MB)</div><div class="hint">原版 2 GB 够 5 个玩家</div></div>
+                    <div>
+                      <div class="stepper"><button type="button">−</button><input class="inp" value="256"><button type="button">+</button></div>
+                      <div class="err"><svg class="pic" style="width:12px;height:12px"><use href="#i-ban"/></svg>至少要 1024 MB，否则 Paper 起不来（当前 256）</div>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">开机自动启动</div><div class="hint">守护进程起来时自动把它拉起来</div></div>
+                    <div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div>
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">崩溃自动重启</div><div class="hint">5 秒重试 1 次，连续 3 次不起来就停下</div></div>
+                    <div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div>
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">Java 路径</div><div class="hint">留空 = 按 MC 版本自动挑</div></div>
+                    <input class="inp" placeholder="留空 = 自动挑最合适的">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 网络与身份 -->
+              <div class="cfg-pane" data-pane="net">
+                <div style="padding:6px 16px 16px">
+                  <div class="field"><div><div class="lb">服务器 IP</div><div class="hint">留空 = 监听所有网卡</div></div><input class="inp" placeholder="留空 = 0.0.0.0"></div>
+                  <div class="field"><div><div class="lb">server-port</div><div class="hint">server.properties 里的同名键</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="25565"><button type="button">+</button></div></div>
+                  <div class="field"><div><div class="lb">正版验证</div><div class="hint">关掉才能让离线客户端连进来</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">MOTD</div><div class="hint">服务器列表里显示的一句话</div></div><input class="inp" value="§a生存服 §7· §f长期档 1.21.4"></div>
+                  <div class="field"><div><div class="lb">最大玩家数</div><div class="hint">当前是默认值，体检里就是这条没过</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="20"><button type="button">+</button></div></div>
+                </div>
+              </div>
+
+              <!-- 玩法 -->
+              <div class="cfg-pane" data-pane="play">
+                <div style="padding:6px 16px 16px">
+                  <div class="field"><div><div class="lb">游戏模式</div><div class="hint">新玩家进入时的默认模式</div></div><input class="inp" value="survival"></div>
+                  <div class="field"><div><div class="lb">难度</div><div class="hint">easy / normal / hard / peaceful</div></div><input class="inp" value="normal"></div>
+                  <div class="field"><div><div class="lb">强制游戏模式</div><div class="hint">每次进服都重置为上面的模式</div></div><div class="tog" role="switch" aria-checked="false"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">允许飞行</div><div class="hint">生存模式下也允许飞</div></div><div class="tog" role="switch" aria-checked="false"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">PvP</div><div class="hint">玩家之间能否互相伤害</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">死亡不掉落</div><div class="hint">keepInventory，多数长期档会开</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">命令方块</div><div class="hint">关掉可减少被滥用的风险</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                </div>
+              </div>
+
+              <!-- 世界生成 -->
+              <div class="cfg-pane" data-pane="world">
+                <div style="padding:6px 16px 16px">
+                  <div class="field"><div><div class="lb">世界种子</div><div class="hint">留空 = 每次随机</div></div><input class="inp" placeholder="留空 = 随机"></div>
+                  <div class="field"><div><div class="lb">世界类型</div><div class="hint">default / flat / large_biomes / amplified</div></div><input class="inp" value="default"></div>
+                  <div class="field"><div><div class="lb">生成结构</div><div class="hint">村庄、要塞、遗迹等</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">允许下界</div><div class="hint">关掉后下界传送门失效</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">视距 (chunks)</div><div class="hint">越大越吃内存，8~12 是家用机甜点</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="10"><button type="button">+</button></div></div>
+                </div>
+              </div>
+
+              <!-- 玩家管理 -->
+              <div class="cfg-pane" data-pane="pm">
+                <div style="padding:6px 16px 16px">
+                  <div class="field"><div><div class="lb">白名单</div><div class="hint">开启后只有名单里的人能进</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">自动踢出挂机</div><div class="hint">超过设定分钟没输入就踢</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="30"><button type="button">+</button></div></div>
+                  <div class="field"><div><div class="lb">出生点保护半径</div><div class="hint">spawn-protection，0 为关闭</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="16"><button type="button">+</button></div></div>
+                </div>
+              </div>
+
+              <!-- 远程控制 -->
+              <div class="cfg-pane" data-pane="remote">
+                <div style="padding:6px 16px 16px">
+                  <div class="field"><div><div class="lb">启用 RCON</div><div class="hint">给远程工具发指令用，日常不用开</div></div><div class="tog" role="switch" aria-checked="false"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">RCON 端口</div><div class="hint">默认 25575</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="25575"><button type="button">+</button></div></div>
+                  <div class="field"><div><div class="lb">RCON 密码</div><div class="hint">开了 RCON 就该换成强密码</div></div><input class="inp" type="password" value="••••••••••"></div>
+                </div>
+              </div>
+
+              <!-- 未保存强提醒 -->
+              <div class="unsaved">
+                <span class="dotw"></span>
+                <span style="font-size:12.5px;color:var(--ink-1)">有 <b style="font-family:var(--f-pix);color:var(--copper)">2</b> 处改动尚未保存 —— 其中 1 处校验未通过</span>
+                <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-check"/></svg>保存这一组</button>
+                <button class="btn btn-ghost sm" type="button">放弃改动</button>
+                <div class="spacer" style="margin-left:auto"></div>
+                <button class="btn sm" id="cfgPrev" type="button"><svg class="pic"><use href="#i-chev-l"/></svg>上一组</button>
+                <button class="btn sm" id="cfgNext" type="button">下一组<svg class="pic"><use href="#i-chev-r"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 4 · 插件与模组 ════════ -->
+        <section class="page" data-page="plugins">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">04</span>
+            <h2>插件与模组</h2>
+            <span class="sub">Paper 这类读 plugins/，Forge / Fabric 这类读 mods/ —— 目录按服务端类型自动切换，不让你自己挑</span>
+            <div class="spacer"></div>
+            <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-dl"/></svg>获取模组</button>
+            <button class="btn btn-ghost sm" type="button" aria-label="刷新列表"><svg class="pic"><use href="#i-refresh"/></svg></button>
+          </div>
+
+          <!-- 依赖问题：只报「必需」的（可选前置是建议，不是「会起不来」）。 -->
+          <div class="banner-danger reveal" style="--rd:.1s">
+            <svg class="pic" style="color:var(--warn);width:20px;height:20px"><use href="#i-info"/></svg>
+            <div class="t">
+              <h3>有 2 个模组缺少必需前置</h3>
+              <p>缺必需前置的模组在服务端加载阶段就会被丢掉，压根不会进游戏。点「装前置」会先按你的 MC 版本挑好对应版本 —— 不会替你默认装最新版；如果那个前置其实已经在目录里、只是被禁用了，它会告诉你去把它启用。</p>
+            </div>
+            <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-dl"/></svg>装前置（2）</button>
+          </div>
+
+          <div class="panel reveal" style="--rd:.14s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--cyan)"><use href="#i-table"/></svg>
+              <h2>已安装</h2>
+              <span style="font-size:12.5px;color:var(--ink-3)">12 个 · 启用 9 个</span>
+              <input class="inp" style="max-width:240px;margin-left:8px" placeholder="名字 / 文件名 / modId">
+              <div class="spacer"></div>
+              <div class="filters">
+                <button class="chipf on" type="button">全部<span class="n">12</span></button>
+                <button class="chipf" type="button">已启用<span class="n">9</span></button>
+                <button class="chipf" type="button">已禁用<span class="n">1</span></button>
+                <button class="chipf" type="button">缺前置<span class="n">2</span></button>
+              </div>
+            </div>
+
+            <div class="rlist">
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">Sodium <span class="badge">FABRIC</span><span class="badge">1.21.4</span></div>
+                  <div class="rsub">大幅优化渲染，几乎不掉画质 · jellysquid3</div>
+                </div>
+                <div class="rmeta">sodium-fabric-1.21.4.jar · 1.2 MB</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow dep">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">Create <span class="badge">FORGE</span><span class="badge">1.20.1</span><span class="badge ban">缺前置</span></div>
+                  <div class="rsub">需要 <b style="color:var(--warn)">flywheel</b> 才能加载 —— 现在它在服务端启动阶段就被丢掉了</div>
+                </div>
+                <div class="rmeta">create-1.20.1-6.0.4.jar · 14.8 MB</div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button"><svg class="pic"><use href="#i-dl"/></svg>装前置</button>
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow dep">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">Jade <span class="badge">FORGE</span><span class="badge">1.20.1</span><span class="badge ban">缺前置</span></div>
+                  <div class="rsub">需要 <b style="color:var(--warn)">iceberg</b></div>
+                </div>
+                <div class="rmeta">jade-1.20.1-11.9.2.jar · 402 KB</div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button"><svg class="pic"><use href="#i-dl"/></svg>装前置</button>
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--emerald)"><use href="#i-cmd"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">ServerBoxCompanion <span class="badge">BUKKIT</span><span class="badge op">v0.2.0</span></div>
+                  <div class="rsub">面板的实时数据由它提供 · 我们自己写的插件</div>
+                </div>
+                <div class="rmeta">plugins/ServerBoxCompanion.jar · 46 KB</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow off">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">LegacyGuard <span class="badge">BUKKIT</span><span class="badge">已禁用</span></div>
+                  <div class="rsub">上次启动时它报了 Unsupported API version 1.13 —— 先禁用，别让它拖住整台服</div>
+                </div>
+                <div class="rmeta">LegacyGuard-1.13.jar · 88 KB</div>
+                <div class="ract">
+                  <span class="tog" role="switch" aria-checked="false"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--ink-3)"><use href="#i-ban"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">mystery-mod-7 <span class="badge">读不出信息</span></div>
+                  <div class="rsub">jar 里没有认识的元数据文件 —— 名字就是文件名，其余留空，不瞎猜</div>
+                </div>
+                <div class="rmeta">mystery-mod-7.jar · 2.1 MB</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="con-foot">
+              <svg class="pic" style="color:var(--ink-3)"><use href="#i-info"/></svg>
+              开关改的是文件后缀（<code>.jar</code> ↔ <code>.jar.disabled</code>），下次启动才生效；删除是不可逆的，唯一的后悔药在备份页。
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 7 · 备份与还原 ════════
+             对应 web/src/components/BackupPanel.tsx。单列三段往下排：
+               01 现在就来一份（输入备注 + 立刻备份）
+               02 备份文件（列表：每行 还原 / 删除）
+               03 自动备份（开启开关 + 每天的时刻 + 每隔几小时 + 保留最近几份 + 备份范围 + 保存）
+             自动备份**没有**「触发方式」多选开关 —— 每天的时刻与每隔几小时一直都能用，
+             留空 / 填 0 就是不启用。列表也**没有**排序按钮和「下载」按钮。别加回来。 -->
+        <section class="page" data-page="backup">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">07</span>
+            <h2>备份与还原</h2>
+            <span class="sub">正在管「生存服 · 长期档」的存档。服务器开着的时候备份，会先让服务端把地图刷盘再打包，不会拿到半个区块。当前范围：<b style="color:var(--ink-1)">只存存档</b>（在下面「自动备份」里改）</span>
+          </div>
+
+          <!-- 01 现在就来一份 -->
+          <div class="panel reveal" style="--rd:.12s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">01</span>
+              <h2>现在就来一份</h2>
+              <span style="font-size:12.5px;color:var(--ink-3)">备注可留空</span>
+            </div>
+            <div style="padding:14px 16px 16px;display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+              <div style="width:320px;max-width:100%">
+                <div style="font-size:12.5px;font-weight:600">这一份叫什么</div>
+                <input class="inp" style="width:100%;margin-top:7px" placeholder="例如：装完插件前" maxlength="24">
+              </div>
+              <button class="btn btn-primary" type="button"><svg class="pic"><use href="#i-chest"/></svg>立刻备份</button>
+            </div>
+          </div>
+
+          <!-- 02 备份文件 -->
+          <div class="panel reveal" style="--rd:.16s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">02</span>
+              <h2>备份文件</h2>
+              <span style="font-size:12.5px;color:var(--ink-3)">4 份 · 共 1.5 GB</span>
+              <div class="spacer"></div>
+              <button class="btn btn-ghost sm" type="button">刷新</button>
+            </div>
+
+            <div class="rlist">
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-chest"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">backup-auto-20261007-0300.zip <span class="chip s">自动</span></div>
+                  <div class="rsub">642.3 MB · 2026-10-07 03:00</div>
+                </div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button">还原</button>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除备份 backup-auto-20261007-0300.zip"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--ok)"><use href="#i-chest"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">装 Create 之前 <span class="chip s">手动</span></div>
+                  <div class="rsub">118.6 MB · 2026-10-06 21:14</div>
+                </div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button">还原</button>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除备份 装 Create 之前"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--warn)"><use href="#i-chest"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">backup-pre-restore-20261006-2040.zip <span class="chip s w">还原前自动存</span></div>
+                  <div class="rsub">638.9 MB · 2026-10-06 20:40</div>
+                </div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button">还原</button>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除备份 backup-pre-restore-20261006-2040.zip"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="con-foot">
+              <svg class="pic" style="color:var(--ink-3)"><use href="#i-info"/></svg>
+              还没有备份时：「世界越大越舍不得丢。先手动点一次上面那颗按钮试试。」
+            </div>
+          </div>
+
+          <!-- 03 自动备份 -->
+          <div class="panel reveal" style="--rd:.2s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">03</span>
+              <h2>自动备份</h2>
+              <span style="font-size:12.5px;color:var(--ink-3)">已开启</span>
+            </div>
+
+            <div style="padding:14px 16px 18px">
+              <div style="display:flex;align-items:flex-start;gap:16px">
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:600">开启自动备份</div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:4px">到点自动打包一份。服务器开着时会先让服务端刷盘再打包，不会拿到半个区块。</p>
+                </div>
+                <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+              </div>
+
+              <div class="fgrid" style="margin-top:18px;border-top:3px solid #000;padding-top:18px">
+                <div>
+                  <div style="font-size:12.5px;font-weight:600">每天的时刻</div>
+                  <div style="display:flex;gap:8px;margin-top:8px">
+                    <input class="inp" style="flex:1;min-width:0" placeholder="例如 04:00" maxlength="5">
+                    <button class="btn sm" type="button"><svg class="pic"><use href="#i-plus"/></svg>添加</button>
+                  </div>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+                    <button class="chip s g" type="button" title="点一下删掉">03:00 ×</button>
+                    <button class="chip s g" type="button" title="点一下删掉">12:00 ×</button>
+                  </div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:8px">留空 = 不用固定时刻。最多 6 个，点标签就能删。</p>
+                </div>
+
+                <div>
+                  <div style="font-size:12.5px;font-weight:600">每隔几小时</div>
+                  <div class="stepper" style="margin-top:8px;max-width:170px"><button type="button">−</button><input class="inp" value="0"><button type="button">+</button></div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:8px">0 = 不用间隔式。两种方式可以一起用，谁先到点按谁跑。</p>
+                </div>
+
+                <div>
+                  <div style="font-size:12.5px;font-weight:600">保留最近几份</div>
+                  <div class="stepper" style="margin-top:8px;max-width:170px"><button type="button">−</button><input class="inp" value="7"><button type="button">+</button></div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:8px">0 = 不限。超出的自动删最旧的 —— <b style="color:var(--ink-2)">手动备份也算在内</b>，重要的一份请额外留个副本。</p>
+                </div>
+
+                <div>
+                  <div style="font-size:12.5px;font-weight:600">备份范围</div>
+                  <div class="filters" style="margin-top:8px">
+                    <button class="chipf on" type="button">整个实例目录</button>
+                    <button class="chipf" type="button">只存存档</button>
+                  </div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:8px">连插件、模组、配置一起打包，还原后整个环境回到同一时刻的一致状态。体积最大。手动备份同样用这个范围。</p>
+                </div>
+              </div>
+
+              <div class="pol-foot" style="margin-top:18px">
+                <div class="row"><span class="k">上次自动备份</span><span class="v">2026-10-07 03:00</span></div>
+                <div class="row"><span class="k">下次预计</span><span class="v">2026-10-07 12:00</span></div>
+              </div>
+
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px">
+                <button class="btn btn-primary" type="button"><svg class="pic"><use href="#i-check"/></svg>保存自动备份设置</button>
+                <span style="font-size:12px;color:var(--ink-3)">改了要保存才生效。刚打开的策略不会立刻补跑一次。</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 还原确认：点列表里的「还原」才出现，是整页风险最高的交互 -->
+          <div class="danger-zone reveal" style="--rd:.24s">
+            <h3>还原会把当前世界换成备份里的样子</h3>
+            <p>
+              目标：<span style="font-family:var(--f-term);font-size:14px;color:#ffd9d9">backup-20261006-2114.zip</span><br>
+              流程是：停服 → 先把现在这份状态自动存成「还原前」备份 → 清空世界目录 → 解压覆盖 → 之前开着就重新拉起来。所以就算选错了也还有一份后悔药，但玩家会掉线一次。
+            </p>
+            <p style="display:flex;align-items:center;gap:8px;color:var(--warn)">
+              <svg class="pic"><use href="#i-ban"/></svg>服务器正在运行，还原会先停服。
+            </p>
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+              <button class="btn btn-ghost" type="button">取消</button>
+              <button class="btn btn-danger" type="button">停服并还原到这一份</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 8 · 计划任务 ════════
+             对应 web/src/components/TasksPanel.tsx。
+             真实交互：列表上只有 开关 / 铅笔（编辑）/ 垃圾桶（删除）三件事，
+             新建与编辑都走**弹窗**（Dialog 620px）。没有「试跑」，也没有常驻的流水线侧栏 ——
+             别把这两样加回来，那是我们自己发明的操作。 -->
+        <section class="page" data-page="tasks">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">08</span>
+            <h2>计划任务</h2>
+            <span class="sub">任务是<b style="color:var(--ink-1)">有顺序的动作流水线</b> —— 前一步做完才做下一步，最多 10 步。和自动备份共用同一个调度循环</span>
+            <div class="spacer"></div>
+            <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-plus"/></svg>新建任务</button>
+          </div>
+
+          <div class="panel reveal" style="--rd:.12s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--cyan)"><use href="#i-clock"/></svg>
+              <h2>计划任务</h2>
+              <span style="font-size:12.5px;color:var(--ink-3)">4 条</span>
+            </div>
+
+            <div style="padding:12px 16px 0">
+              <p style="font-size:12.5px;line-height:1.7;color:var(--ink-3);max-width:70ch">
+                到点自动做事：定时备份、到点重启、整点广播。动作按顺序执行，<b style="color:var(--ink-2)">前一步失败就停下来</b>，不会继续往下做 —— 尤其是「重启」失败之后。
+              </p>
+
+              <!-- 失败的任务必须单独拎出来说。只说「到点了」不说「没做成」，等于让用户以为一切正常。 -->
+              <div class="nbox d" style="margin-top:12px">
+                <div class="hd"><svg class="pic"><use href="#i-ban"/></svg>有 1 条任务上次没做成</div>
+                <div class="li">「周五大扫除」步骤 2（备份）失败：磁盘剩余空间不足，写不进新的备份包</div>
+              </div>
+            </div>
+
+            <div class="rlist" style="margin-top:12px">
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-clock"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">每晚备份 <span class="chip s">下次 明天 04:00</span></div>
+                  <div class="rrow-sub"><span>上次 3 小时前</span></div>
+                </div>
+                <div class="rmeta">每天 04:00 → 备份</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" title="编辑「每晚备份」" aria-label="编辑"><svg class="pic"><use href="#i-lever"/></svg></button>
+                  <button class="btn btn-ghost xs" type="button" title="删除「每晚备份」" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-clock"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">凌晨自动重启 <span class="chip s">下次 明天 03:55</span></div>
+                  <div class="rrow-sub"><span>上次 21 小时前</span></div>
+                </div>
+                <div class="rmeta">每天 03:55 → 发指令：say 5 分钟后重启 → 等待 300 秒 → 重启</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" title="编辑" aria-label="编辑"><svg class="pic"><use href="#i-lever"/></svg></button>
+                  <button class="btn btn-ghost xs" type="button" title="删除" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--ok)"><use href="#i-clock"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">每小时清一次地面 <span class="chip s g">执行中</span></div>
+                  <div class="rrow-sub"><span>上次 40 分钟前</span></div>
+                </div>
+                <div class="rmeta">每隔 60 分钟 → 发指令：kill @e[type=item]</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" title="编辑" aria-label="编辑"><svg class="pic"><use href="#i-lever"/></svg></button>
+                  <button class="btn btn-ghost xs" type="button" title="删除" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow off">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px"><use href="#i-clock"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">周五大扫除 <span class="chip s">已停用</span><span class="chip s d">上次失败</span></div>
+                  <div class="rrow-sub"><span>上次 10-02 22:00</span></div>
+                </div>
+                <div class="rmeta">每周五 22:00 → 发指令 → 备份 → 等待 300 秒 → 重启</div>
+                <div class="ract">
+                  <span class="tog" role="switch" aria-checked="false"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" title="编辑" aria-label="编辑"><svg class="pic"><use href="#i-lever"/></svg></button>
+                  <button class="btn btn-ghost xs" type="button" title="删除" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="con-foot">
+              <svg class="pic" style="color:var(--ink-3)"><use href="#i-info"/></svg>
+              一条都没有时：「还没有计划任务。想「每天凌晨四点自动备份」或者「每周一早上重启一次清理内存」，点右上角建一条，30 秒一轮的调度器会按时叫它。」
+            </div>
+          </div>
+
+          <!-- 新建 / 编辑弹窗：列表上的「新建任务」「铅笔」都弹它。不是侧栏、不是常驻面板。 -->
+          <div class="panel reveal" style="--rd:.16s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--copper)"><use href="#i-lever"/></svg>
+              <h2>新建 / 编辑任务</h2>
+              <div class="spacer"></div>
+              <span style="font-size:12.5px;color:var(--ink-3)">弹窗 · 620px</span>
+            </div>
+            <div style="padding:16px;display:flex;justify-content:center">
+              <div class="dlg" style="max-width:620px">
+                <div class="dlg-head">
+                  <svg class="pic" style="color:var(--copper)"><use href="#i-clock"/></svg>
+                  <h2>新建计划任务</h2>
+                  <button class="btn btn-ghost xs x" type="button" aria-label="关闭"><svg class="pic"><use href="#i-x"/></svg></button>
+                </div>
+                <div class="dlg-body" style="max-height:none">
+                  <label style="display:block">
+                    <span style="font-size:12.5px;font-weight:600">任务名</span>
+                    <input class="inp" style="width:100%;margin-top:6px" placeholder="例如 每晚备份">
+                    <span style="display:block;font-size:12px;color:var(--ink-3);margin-top:5px">只给你自己看，会出现在控制台日志里。</span>
+                  </label>
+
+                  <div style="border-top:1px solid var(--line-1);margin-top:16px;padding-top:14px;display:flex;align-items:flex-start;gap:16px">
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:13px;font-weight:600">启用这条任务</div>
+                      <p style="font-size:12px;color:var(--ink-3);margin-top:4px;line-height:1.7">关掉之后不再按时执行，但配置留着。下次打开时会从打开那一刻重新起算，不补跑关着的时候错过的点。</p>
+                    </div>
+                    <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  </div>
+
+                  <div style="border-top:1px solid var(--line-1);margin-top:16px;padding-top:14px">
+                    <div style="font-size:12.5px;font-weight:600">什么时候跑</div>
+                    <div class="filters" style="margin-top:8px">
+                      <button class="chipf" type="button">按间隔</button>
+                      <button class="chipf on" type="button">每天</button>
+                      <button class="chipf" type="button">每周</button>
+                      <button class="chipf" type="button">CRON</button>
+                    </div>
+                    <div style="display:flex;gap:12px;align-items:center;margin-top:12px;flex-wrap:wrap">
+                      <span style="font-size:12.5px;color:var(--ink-2)">每天</span>
+                      <input class="inp" style="width:92px;font-family:var(--f-term);font-size:14px" value="04:00">
+                      <span style="font-size:12px;color:var(--ink-3)">按这台机器的本地时间</span>
+                    </div>
+                    <p style="font-size:12px;color:var(--ink-3);margin-top:10px;line-height:1.7">
+                      四种触发方式：<b style="color:var(--ink-2)">按间隔</b>（每隔 N 分钟，60 = 每小时、1440 = 每天）、<b style="color:var(--ink-2)">每天</b>（填一个时刻）、<b style="color:var(--ink-2)">每周</b>（选星期几 + 时刻）、<b style="color:var(--ink-2)">CRON</b>（五段式「分 时 日 月 周」；日和星期同时写时取「同时满足」）。
+                    </p>
+                  </div>
+
+                  <div style="border-top:1px solid var(--line-1);margin-top:16px;padding-top:14px;max-width:520px">
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                      <span style="font-size:12.5px;font-weight:600">按顺序做这些事</span>
+                      <button class="btn btn-ghost sm" style="margin-left:auto" type="button"><svg class="pic"><use href="#i-plus"/></svg>添加动作</button>
+                    </div>
+
+                    <div class="actions-list" style="margin-top:10px;border-top:1px solid var(--line-1)">
+                      <div class="arow" style="border-bottom:1px solid var(--line-1);padding:10px 0">
+                        <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">1</span>
+                        <span class="sel">发指令 <svg class="pic" style="width:10px;height:10px"><use href="#i-chev-r"/></svg></span>
+                        <input class="inp" value="say 服务器 5 分钟后重启">
+                        <button class="btn btn-ghost sm" type="button" aria-label="删除第 1 个动作" disabled><svg class="pic"><use href="#i-trash"/></svg></button>
+                      </div>
+                      <div class="arow" style="border-bottom:1px solid var(--line-1);padding:10px 0">
+                        <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">2</span>
+                        <span class="sel">等待 <svg class="pic" style="width:10px;height:10px"><use href="#i-chev-r"/></svg></span>
+                        <div class="stepper" style="max-width:150px"><button type="button">−</button><input class="inp" value="300"><button type="button">+</button></div>
+                        <button class="btn btn-ghost sm" type="button" aria-label="删除第 2 个动作"><svg class="pic"><use href="#i-trash"/></svg></button>
+                      </div>
+                      <div class="arow" style="border-bottom:1px solid var(--line-1);padding:10px 0">
+                        <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">3</span>
+                        <span class="sel">重启 <svg class="pic" style="width:10px;height:10px"><use href="#i-chev-r"/></svg></span>
+                        <span style="font-size:12px;color:var(--ink-3)">按面板自己的停机流程走：先 stop，等进程真退出再 start</span>
+                        <button class="btn btn-ghost sm" type="button" aria-label="删除第 3 个动作"><svg class="pic"><use href="#i-trash"/></svg></button>
+                      </div>
+                    </div>
+
+                    <p style="font-size:12px;color:var(--ink-3);margin-top:12px;line-height:1.7">
+                      动作类型一共 7 种：发指令 · 启动 · 停止 · 重启 · 强制结束 · 备份 · 等待。最多 10 步。<br>
+                      常用组合：<span style="font-family:var(--f-term);font-size:14px">发指令 say …</span> → <span style="font-family:var(--f-term);font-size:14px">等待 300 秒</span> → <span style="font-family:var(--f-term);font-size:14px">重启</span>，就是「先广播再重启」。
+                    </p>
+                  </div>
+                </div>
+                <div class="dlg-foot">
+                  <span style="flex:1"></span>
+                  <button class="btn btn-ghost" type="button">取消</button>
+                  <button class="btn btn-primary" type="button"><svg class="pic"><use href="#i-check"/></svg>保存</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 9 · 设置 ════════ -->
+        <section class="page" data-page="settings">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">09</span>
+            <h2>设置</h2>
+            <span class="sub">这里改的是面板自己，不是某一个世界 —— 针对单个世界的往左上角的「配置」去</span>
+          </div>
+
+          <div class="cfg-wrap">
+            <div class="panel reveal" style="--rd:.1s">
+              <i class="corner"></i>
+              <!-- ⚠ 这五组必须与 SettingsPanel.tsx 的 TABS 完全一致（顺序、文案都一样）：
+                   访问安全 / Java 运行时 / 下载源 / 守护与启动 / 关于。
+                   真实面板打开时默认停在「Java 运行时」（TABS 里 TABS[1]）；设计稿为了让
+                   五组内容都能被翻到，默认停在第一组「访问安全」。 -->
+              <div class="cfg-nav" id="setNav">
+                <button class="on" data-pane="access" type="button"><svg class="pic"><use href="#i-crown"/></svg>访问安全</button>
+                <button data-pane="java" type="button"><svg class="pic"><use href="#i-cpu"/></svg>Java 运行时</button>
+                <button data-pane="source" type="button"><svg class="pic"><use href="#i-dl"/></svg>下载源</button>
+                <button data-pane="daemon" type="button"><svg class="pic"><use href="#i-lever"/></svg>守护与启动</button>
+                <button data-pane="about" type="button"><svg class="pic"><use href="#i-info"/></svg>关于</button>
+              </div>
+            </div>
+
+            <div class="panel reveal" style="--rd:.14s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-crown"/></svg>
+                <h2 id="setTitle">访问安全</h2>
+                <span style="font-size:12.5px;color:var(--ink-3)" id="setSub">谁可以打开这个面板</span>
+              </div>
+
+              <!-- ═══ 01 访问安全（AccessPanel.tsx）═══ -->
+              <div class="cfg-pane on" data-pane="access">
+                <div style="padding:14px 16px 18px">
+                  <!-- 只有「暴露在局域网 且 没开保护」才算危险 -->
+                  <div class="nbox d">
+                    <div class="hd"><svg class="pic"><use href="#i-ban"/></svg>现在局域网里任何人都能打开这个面板</div>
+                    守护进程监听在 <span class="mono">:23333</span>（所有网卡），而访问保护没开。同一个 Wi-Fi 下的任何设备都能启停你的服务器、删你的存档。下面设一个密码并开启保护就行。
+                  </div>
+
+                  <div style="margin-top:18px">
+                    <div style="display:flex;align-items:flex-start;gap:16px">
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:13px;font-weight:600">开启访问保护</div>
+                        <p style="font-size:12px;color:var(--ink-3);margin-top:4px">开启后，非本机访问需要密码或 API 令牌。</p>
+                      </div>
+                      <span class="tog" role="switch" aria-checked="false"><span class="knob"></span></span>
+                    </div>
+                    <p style="font-size:12px;color:var(--warn);margin-top:8px">还没有密码也没有令牌，开不了保护 —— 先把下面密码设上。</p>
+                    <div style="display:flex;align-items:flex-start;gap:16px;margin-top:14px">
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:13px;font-weight:600">本机访问免登录</div>
+                        <p style="font-size:12px;color:var(--ink-3);margin-top:4px">在这台机器上打开面板不用输密码。关掉的话自己每次也要登。</p>
+                      </div>
+                      <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                    </div>
+                  </div>
+
+                  <div class="fgrid" style="margin-top:18px">
+                    <div class="field col">
+                      <div><div class="lb">登录有效期（小时）</div><div class="hint">过期后需要重新登录</div></div>
+                      <input class="inp" style="font-family:var(--f-term);font-size:14px" value="12">
+                    </div>
+                    <div class="field col">
+                      <div><div class="lb">监听地址</div><div class="hint">:23333 表示所有网卡都监听（手机能连）；127.0.0.1:23333 表示只本机能连</div></div>
+                      <input class="inp" style="font-family:var(--f-term);font-size:14px" value=":23333">
+                    </div>
+                  </div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:10px">
+                    当前实际绑定 <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-2)">0.0.0.0:23333</span>
+                    <span style="color:var(--warn)"> · 改过了，重启守护进程才生效</span>
+                  </p>
+
+                  <!-- 02 面板密码 -->
+                  <div style="margin-top:24px;border-top:1px solid var(--line-1);padding-top:18px">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                      <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">02</span>
+                      <h3 style="font-size:14px;font-weight:600">面板密码</h3>
+                      <span style="font-size:12.5px;color:var(--ink-3)">已设置 · 2026-09-20 10:12</span>
+                      <div class="spacer"></div>
+                      <span class="chip s g">已保护</span>
+                    </div>
+                    <div class="fgrid" style="margin-top:14px">
+                      <div class="field col">
+                        <div><div class="lb">当前密码</div><div class="hint">改密码必须先给旧的</div></div>
+                        <input class="inp" type="password" value="password">
+                      </div>
+                      <div class="field col">
+                        <div><div class="lb">新密码</div><div class="hint">至少 6 位</div></div>
+                        <input class="inp" type="password" value="password">
+                      </div>
+                      <div class="field col">
+                        <div><div class="lb">再输一遍</div></div>
+                        <input class="inp" type="password" value="password">
+                      </div>
+                    </div>
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px">
+                      <button class="btn btn-primary" type="button">改密码</button>
+                      <button class="btn btn-danger" type="button">清除密码</button>
+                      <span style="font-size:12px;color:var(--ink-3)">改完密码所有已登录的设备都会被踢下线</span>
+                    </div>
+                  </div>
+
+                  <!-- 03 API 令牌 -->
+                  <div style="margin-top:24px;border-top:1px solid var(--line-1);padding-top:18px">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                      <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">03</span>
+                      <h3 style="font-size:14px;font-weight:600">API 令牌</h3>
+                      <span style="font-size:12.5px;color:var(--ink-3)">给脚本 / 外部工具用，不用把密码写进脚本里</span>
+                      <div class="spacer"></div>
+                      <button class="btn btn-ghost sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>刷新</button>
+                    </div>
+
+                    <!-- 明文只在刚生成后出现一次；关掉就再也看不到 -->
+                    <div class="nbox" style="margin-top:14px;border-left-color:var(--ok);background:rgba(87,211,100,.06)">
+                      <div class="hd" style="color:var(--ink-1)"><svg class="pic" style="color:var(--ok)"><use href="#i-check"/></svg>令牌已生成 —— 关掉这一页就再也看不到了</div>
+                      <div class="mono" style="color:var(--ok);font-size:13px">sbx_9f4c1a27d0e83b56a1c47f209e5d8b31</div>
+                      <p style="font-size:12px;color:var(--ink-2);margin-top:8px">用法：请求头带 <span class="mono" style="color:var(--cyan)">Authorization: Bearer &lt;令牌&gt;</span>，或者给 EventSource 这类设不了头的场景走 <span class="mono" style="color:var(--cyan)">?token=&lt;令牌&gt;</span>。我们只存它的哈希，明文拿不回来。</p>
+                      <button class="btn sm" style="margin-top:12px" type="button">我知道了，收起来</button>
+                    </div>
+
+                    <div class="rlist" style="margin-top:14px">
+                      <div class="rrow" style="grid-template-columns:32px minmax(0,1fr) auto">
+                        <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-crown"/></svg></div>
+                        <div class="rmain">
+                          <div class="rtitle">手机上的脚本</div>
+                          <div class="rsub mono" style="font-size:13px">sbx_9f4c1a… · 建于 2026-09-22 08:40 · 最后用 2 小时前</div>
+                        </div>
+                        <div class="ract"><button class="btn btn-ghost xs" type="button" aria-label="删除令牌 手机上的脚本"><svg class="pic"><use href="#i-trash"/></svg></button></div>
+                      </div>
+                      <div class="rrow" style="grid-template-columns:32px minmax(0,1fr) auto">
+                        <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-crown"/></svg></div>
+                        <div class="rmain">
+                          <div class="rtitle">群里的机器人</div>
+                          <div class="rsub mono" style="font-size:13px">sbx_1b7e04… · 建于 2026-10-01 19:12 · 还没用过</div>
+                        </div>
+                        <div class="ract"><button class="btn btn-ghost xs" type="button" aria-label="删除令牌 群里的机器人"><svg class="pic"><use href="#i-trash"/></svg></button></div>
+                      </div>
+                    </div>
+
+                    <div class="field" style="margin-top:16px">
+                      <div><div class="lb">新建令牌</div><div class="hint">取个好认的名字，比如「手机上的脚本」</div></div>
+                      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                        <input class="inp" style="flex:1;min-width:200px" placeholder="用途备注">
+                        <button class="btn" type="button">生成令牌</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ 02 Java 运行时（JavaTab）═══ -->
+              <div class="cfg-pane" data-pane="java">
+                <div style="padding:14px 16px 18px">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">02</span>
+                    <h3 style="font-size:14px;font-weight:600">Java 运行时</h3>
+                    <span style="font-size:12.5px;color:var(--ink-3)">检测到 2 个</span>
+                    <div class="spacer"></div>
+                    <button class="btn btn-ghost sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>重新扫描</button>
+                  </div>
+
+                  <div class="rlist" style="margin-top:14px">
+                    <div class="rrow" style="grid-template-columns:32px minmax(0,1fr) auto">
+                      <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-cpu"/></svg></div>
+                      <div class="rmain">
+                        <div class="rtitle">Java 21 <span class="mono" style="font-size:13px;color:var(--ink-3)">21.0.9</span> <span class="chip s g">默认</span></div>
+                        <div class="rsub mono" style="font-size:13px">Eclipse Temurin · 本程序托管 · 64 位 · C:\Users\Administrator\.serverbox\java\temurin-21\bin\java.exe</div>
+                      </div>
+                      <div class="ract"></div>
+                    </div>
+                    <div class="rrow" style="grid-template-columns:32px minmax(0,1fr) auto">
+                      <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-cpu"/></svg></div>
+                      <div class="rmain">
+                        <div class="rtitle">Java 17 <span class="mono" style="font-size:13px;color:var(--ink-3)">17.0.12</span></div>
+                        <div class="rsub mono" style="font-size:13px">Eclipse Adoptium · 系统扫描 · 64 位 · C:\Program Files\Eclipse Adoptium\jdk-17.0.12\bin\java.exe</div>
+                      </div>
+                      <div class="ract"></div>
+                    </div>
+                  </div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:12px">一个 Java 都没找到时：「ServerBox 自己不 bundled Java —— 先去装一个（推荐 Eclipse Temurin），装完点「重新扫描」。」</p>
+
+                  <div style="margin-top:24px;border-top:1px solid var(--line-1);padding-top:18px">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                      <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">02·B</span>
+                      <h3 style="font-size:14px;font-weight:600">各世界需要哪个 Java</h3>
+                      <span style="font-size:12.5px;color:var(--ink-3)">按 MC 版本推算</span>
+                    </div>
+                    <div class="rlist" style="margin-top:14px">
+                      <div class="rrow" style="grid-template-columns:minmax(0,1fr) auto auto">
+                        <div class="rmain">
+                          <div class="rtitle">生存服 · 长期档</div>
+                          <div class="rsub mono" style="font-size:13px">PAPER 1.21.1</div>
+                        </div>
+                        <div class="rmeta">Java 21</div>
+                        <div class="ract"><span class="chip s g">已满足</span></div>
+                      </div>
+                      <div class="rrow" style="grid-template-columns:minmax(0,1fr) auto auto">
+                        <div class="rmain">
+                          <div class="rtitle">模组服</div>
+                          <div class="rsub mono" style="font-size:13px">FORGE 1.16.5</div>
+                        </div>
+                        <div class="rmeta">Java 8</div>
+                        <div class="ract"><span class="chip s d">缺</span></div>
+                      </div>
+                    </div>
+                    <p style="font-size:12.5px;line-height:1.8;color:var(--ink-2);margin-top:12px">
+                      1.16 及更早要 Java 8 · 1.17～1.20.4 要 Java 17 · 1.20.5 及更新要 Java 21。高阶 Java 一般能跑低版本服务端，反过来不行。
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ 03 下载源（SourcePanel）═══ -->
+              <div class="cfg-pane" data-pane="source">
+                <div style="padding:14px 16px 18px">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">03</span>
+                    <h3 style="font-size:14px;font-weight:600">下载源与市场</h3>
+                    <span style="font-size:12.5px;color:var(--ink-3)">默认走哪个源、从哪搜模组</span>
+                  </div>
+
+                  <div style="max-width:480px;margin-top:16px">
+                    <div class="field col">
+                      <div><div class="lb">默认下载源</div><div class="hint">服务端 jar 从哪下。列表来自后端实测能用的那些</div></div>
+                      <span class="sel" style="width:100%">官方源（Mojang） <svg class="pic" style="width:10px;height:10px"><use href="#i-chev-r"/></svg></span>
+                    </div>
+                    <div class="field col" style="margin-top:16px">
+                      <div><div class="lb">模组市场地址</div><div class="hint">「插件与模组」页的在线搜索走这个地址</div></div>
+                      <input class="inp" style="font-family:var(--f-term);font-size:14px" value="https://api.modrinth.com/v2">
+                    </div>
+                  </div>
+                  <p style="font-size:12.5px;line-height:1.7;color:var(--ink-2);margin-top:12px;max-width:70ch">
+                    默认是 Modrinth 官方 API —— 国内直连经常超时，换成能访问的镜像 / 反代就行（要填到 <span class="mono" style="color:var(--ink-1)">/v2</span> 这一层）。留空表示用官方地址。
+                  </p>
+
+                  <div class="rlist" style="margin-top:16px">
+                    <div class="rrow" style="grid-template-columns:minmax(0,1fr) auto">
+                      <div class="rmain">
+                        <div class="rtitle">官方源（Mojang）</div>
+                        <div class="rsub">适用：原版 / Paper / Fabric / Forge</div>
+                      </div>
+                      <div class="ract"></div>
+                    </div>
+                    <div class="rrow" style="grid-template-columns:minmax(0,1fr) auto">
+                      <div class="rmain">
+                        <div class="rtitle">BMCLAPI</div>
+                        <div class="rsub">适用：原版</div>
+                      </div>
+                      <div class="ract"><span class="chip s w">部分类型不可用</span></div>
+                    </div>
+                  </div>
+
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:12px">条目与「适用」范围都来自后端（/api/mirrors），上面只是版式示例。</p>
+
+                  <div class="nbox" style="margin-top:16px">
+                    <div class="hd"><span class="badge ban">还没接</span>换镜像不是挂上就有用</div>
+                    没被镜像的路径会直接 404，选了反而更糟。所以只列出实测能用的，并且标明它覆盖哪些服务端类型。Paper 目前没有可用的国内镜像，走官方直连反而更快。
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ 04 守护与启动 ═══ -->
+              <div class="cfg-pane" data-pane="daemon">
+                <div style="padding:14px 16px 18px">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">04</span>
+                    <h3 style="font-size:14px;font-weight:600">守护与启动</h3>
+                    <span style="font-size:12.5px;color:var(--ink-3)">这一页只管全局行为</span>
+                  </div>
+
+                  <div class="nbox" style="margin-top:16px;border-left-color:var(--cyan);background:rgba(51,213,207,.06)">
+                    <div class="hd" style="color:var(--ink-1)">单个世界的开关在「配置」页</div>
+                    某个世界要不要开机自启、崩了要不要自动重启，是每个世界各自的事，放在那个世界的「配置」页里 —— 一页管一个世界的全部设置，比在这里列一堆世界更容易看懂。
+                  </div>
+
+                  <div class="nbox" style="margin-top:12px">
+                    <div class="hd"><span class="badge ban">还没接</span>真正的全局行为还没收进来</div>
+                    守护进程自己要不要注册成系统服务、崩溃重启的间隔与次数上限、退出时是否连带关掉所有服务器。这些要等 Windows 服务那层做完再统一收进来。
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ 05 关于（AboutTab）═══ -->
+              <div class="cfg-pane" data-pane="about">
+                <div style="padding:14px 16px 18px">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">05</span>
+                    <h3 style="font-size:14px;font-weight:600">关于</h3>
+                    <span style="font-size:12.5px;color:var(--ink-3)">运行时信息直接来自守护进程</span>
+                  </div>
+
+                  <div class="fgrid" style="margin-top:16px">
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">ServerBox 版本</div><div class="v">v0.1.0+dev</div></div>
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">Go 版本</div><div class="v">go1.27.1</div></div>
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">运行平台</div><div class="v">windows / amd64</div></div>
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">进程号</div><div class="v">98372</div></div>
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">已运行</div><div class="v">6 时 42 分（自 2026-10-07 11:00:00）</div></div>
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">数据目录</div><div class="v">F:\tmp\sboxdata</div></div>
+                  </div>
+
+                  <div class="nbox" style="margin-top:18px;border-left-color:var(--cyan);background:rgba(51,213,207,.06)">
+                    <div class="hd" style="color:var(--ink-1)">ServerBox 是什么</div>
+                    一个给「家里有台闲置电脑」的人用的 Minecraft 开服器。不是客户端启动器（那是 PCL / HMCL 的活），也不是给运维用的面板 —— 目标就一个：30 秒把服开起来，然后忘了它。
+                  </div>
+                </div>
+              </div>
+
+              <div class="unsaved">
+                <span class="dotw"></span>
+                <span style="font-size:12.5px;color:var(--ink-1)">大部分项<b style="font-family:var(--f-pix);color:var(--copper)">失焦即存</b>；密码、令牌这类要按按钮的除外</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 · 文件 ════════ -->
+        <section class="page" data-page="files">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">06</span>
+            <h2>文件</h2>
+            <span class="sub">正在管 <b style="color:var(--ink-1)">生存服 · 长期档</b> 的整个实例目录。配置文件可以在这里直接改；zip 能直接解开。</span>
+            <div class="spacer"></div>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>刷新</button>
+          </div>
+
+          <div class="panel reveal" style="--rd:.12s">
+            <i class="corner"></i>
+
+            <!-- 第一行：上一级 + 面包屑（每一段都能点回去，root 用实例目录名） -->
+            <div class="pathbar">
+              <button class="btn btn-ghost sm" type="button"><svg class="pic"><use href="#i-chev-l"/></svg>上一级</button>
+              <div class="crumbs">
+                <button type="button">实例根目录</button>
+                <span class="sep">/</span>
+                <button type="button">plugins</button>
+                <span class="sep">/</span>
+                <span class="cur">EssentialsX</span>
+              </div>
+            </div>
+
+            <!-- 第二行：过滤 + 上传文件 / 上传并解压（两个独立动作，各带自己的选文件框） -->
+            <div class="toolbar">
+              <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:180px;max-width:300px">
+                <svg class="pic" style="color:var(--ink-3)"><use href="#i-search"/></svg>
+                <input class="inp" style="padding:6px 9px" placeholder="按文件名过滤">
+              </div>
+              <div class="spacer" style="margin-left:auto"></div>
+              <button class="btn sm" type="button"><svg class="pic"><use href="#i-ul"/></svg>上传文件</button>
+              <button class="btn sm" type="button"><svg class="pic"><use href="#i-chest"/></svg>上传并解压</button>
+            </div>
+
+            <div class="rlist">
+              <div class="frow" style="grid-template-columns:30px 1fr auto">
+                <svg class="fic" viewBox="0 0 16 16"><use href="#i-folder"/></svg>
+                <div style="min-width:0">
+                  <button style="background:none;border:0;padding:0;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink-1);font-family:inherit">config/</button>
+                  <div class="fmeta" style="margin-top:3px">目录</div>
+                </div>
+                <div class="fact">
+                  <button class="btn btn-danger xs" title="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+              <div class="frow" style="grid-template-columns:30px 1fr auto">
+                <svg class="fic" viewBox="0 0 16 16"><use href="#i-jar"/></svg>
+                <div style="min-width:0">
+                  <span style="font-size:13.5px;font-weight:600;color:var(--ink-1)">EssentialsX-2.20.1.jar</span>
+                  <div class="fmeta" style="margin-top:3px">4.1 MB · 2026-10-04 09:13</div>
+                </div>
+                <div class="fact">
+                  <button class="btn btn-danger xs" title="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+              <div class="frow" style="grid-template-columns:30px 1fr auto">
+                <svg class="fic" viewBox="0 0 16 16"><use href="#i-file"/></svg>
+                <div style="min-width:0">
+                  <button style="background:none;border:0;padding:0;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink-1);font-family:inherit">config.yml</button>
+                  <div class="fmeta" style="margin-top:3px">38 KB · 2026-10-04 09:13</div>
+                </div>
+                <div class="fact">
+                  <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-book"/></svg>编辑</button>
+                  <button class="btn btn-danger xs" title="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+              <div class="frow" style="grid-template-columns:30px 1fr auto">
+                <svg class="fic" viewBox="0 0 16 16"><use href="#i-file"/></svg>
+                <div style="min-width:0">
+                  <button style="background:none;border:0;padding:0;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink-1);font-family:inherit">messages_zh.properties</button>
+                  <div class="fmeta" style="margin-top:3px">92 KB · 2026-10-04 09:13</div>
+                </div>
+                <div class="fact">
+                  <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-book"/></svg>编辑</button>
+                  <button class="btn btn-danger xs" title="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+              <div class="frow" style="grid-template-columns:30px 1fr auto">
+                <svg class="fic" viewBox="0 0 16 16"><use href="#i-folder"/></svg>
+                <div style="min-width:0">
+                  <button style="background:none;border:0;padding:0;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink-1);font-family:inherit">userdata/</button>
+                  <div class="fmeta" style="margin-top:3px">目录</div>
+                </div>
+                <div class="fact">
+                  <button class="btn btn-danger xs" title="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+              <div class="frow" style="grid-template-columns:30px 1fr auto">
+                <svg class="fic" viewBox="0 0 16 16"><use href="#i-zip"/></svg>
+                <div style="min-width:0">
+                  <span style="font-size:13.5px;font-weight:600;color:var(--ink-1)">EssentialsX-2.20.1-backup.zip</span>
+                  <div class="fmeta" style="margin-top:3px">5.3 MB · 2026-10-06 21:41</div>
+                </div>
+                <div class="fact">
+                  <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-chest"/></svg>解压</button>
+                  <button class="btn btn-danger xs" title="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="con-foot">
+              <svg class="pic" style="color:var(--ink-3)"><use href="#i-info"/></svg>
+              6 项 —— 目录名与文本文件名都能点：目录点进去、文本文件点开编辑；jar 只有删除；zip 多一个「解压」；删除一律先弹确认框
+            </div>
+          </div>
+
+          <div class="grid-2 reveal" style="--rd:.16s">
+            <!-- 编辑文本文件（真实是 760 宽的弹窗；未改动时按钮写「没有改动」） -->
+            <div class="panel" style="margin-bottom:0">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-book"/></svg>
+                <h2>编辑 config.yml</h2>
+                <div class="spacer"></div>
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">plugins/EssentialsX/config.yml · 38 KB</span>
+              </div>
+              <div style="padding:14px 16px">
+                <div class="codebox" contenteditable="false"><span class="c"># EssentialsX 主配置</span>
+<span class="k">teleport:</span>
+  <span class="k">invulnerable:</span> <span class="v">true</span>
+  <span class="k">cooldown:</span> <span class="v">0</span>
+<span class="k">economy:</span>
+  <span class="k">starting-balance:</span> <span class="v">500</span>
+  <span class="k">currency-symbol:</span> <span class="v">'$'</span>
+<span class="k">chat:</span>
+  <span class="k">format:</span> <span class="v">'{DISPLAYNAME} {MESSAGE}'</span>
+  <span class="k">radius:</span> <span class="v">0</span>   <span class="c"># 0 = 全服可见</span></div>
+                <div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">
+                  <span style="font-size:12px;color:var(--ink-3);flex:1;min-width:220px;line-height:1.7">
+                    改完记得保存，然后重启服务器才会生效。改错了没法撤销 —— 重要文件建议先备份。
+                  </span>
+                  <button class="btn sm" type="button">取消</button>
+                  <button class="btn btn-start sm" type="button"><svg class="pic"><use href="#i-check"/></svg>保存</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel" style="margin-bottom:0">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--copper)"><use href="#i-info"/></svg>
+                <h2>两种空态</h2>
+                <span style="font-size:12.5px;color:var(--ink-3)">文案照真实实现，一个字没改</span>
+              </div>
+              <div style="padding:14px 16px">
+                <p style="font-size:12.5px;color:var(--ink-3);margin-bottom:6px">① 有过滤词、但没匹配到：</p>
+                <p style="font-size:13px;color:var(--ink-2);line-height:1.7">这个目录里没有匹配「<span style="font-family:var(--f-term);font-size:14px">ess</span>」的东西。</p>
+                <p style="font-size:12.5px;color:var(--ink-3);margin:14px 0 6px">② 目录本身是空的：</p>
+                <p style="font-size:13px;color:var(--ink-2);line-height:1.7">这个目录是空的。可以用上面的按钮传文件，或者解开一个 zip。</p>
+                <div class="pol-foot">
+                  <div class="row"><span class="k">上传到</span><span class="v">实例根目录 / plugins / EssentialsX</span></div>
+                  <div class="row"><span class="k">换页面</span><span class="v">上传中按钮禁用，避免重复点</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 5 · 整合包 ════════
+             对应 web/src/components/ModpackPanel.tsx（+ ModpackOpView.tsx）。
+             这一页只有一条路：选输入 → 预览（只算不装）→ 看过代价清单 → 开始。
+             别在这里加「从市场挑一个」「装到哪个实例」这类入口 —— 真实面板没有，
+             市场是另一处（mod.html 设计稿），实例就是当前这个。 -->
+        <section class="page" data-page="modpack">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">05</span>
+            <h2>整合包</h2>
+            <span class="sub">升级会删文件，所以先把<b style="color:var(--ink-1)">代价清单</b>列出来，你点了确认才动</span>
+            <div class="spacer"></div>
+            <button class="btn sm" type="button" title="重新读取这个实例的整合包信息"><svg class="pic"><use href="#i-refresh"/></svg>刷新</button>
+          </div>
+
+          <!-- ① 装的是哪个包。字段全部来自后端，缺的显示 —，不编值 -->
+          <div class="panel reveal" style="--rd:.12s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--cyan)"><use href="#i-cube"/></svg>
+              <h2>整合包升级</h2>
+              <span class="badge wl">机械动力 · Create Above and Beyond</span>
+            </div>
+            <div style="padding:2px 16px 12px">
+              <div class="srow"><span class="k">当前版本</span><span class="v">1.3.2</span></div>
+              <div class="srow"><span class="k">Minecraft</span><span class="v">1.18.2</span></div>
+              <div class="srow"><span class="k">加载器</span><span class="v">Forge 40.2.4</span></div>
+              <div class="srow"><span class="k">模组数</span><span class="v">214 个</span></div>
+              <div class="srow"><span class="k">覆盖文件数</span><span class="v">36 个</span></div>
+              <div class="srow"><span class="k">安装时间</span><span class="v">2026-09-28 21:04</span></div>
+              <div class="srow"><span class="k">上次升级</span><span class="v">从没升过</span></div>
+            </div>
+          </div>
+
+          <!-- ② 升级到什么版本：版本列表接口还没做，只能手填版本号 / id；本地 .mrpack 是二选一 -->
+          <div class="panel reveal" style="--rd:.16s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--copper)"><use href="#i-refresh"/></svg>
+              <h2>升级到新版本</h2>
+            </div>
+            <div style="padding:4px 16px 16px">
+              <div class="field">
+                <div><div class="lb">要升级到的版本（Modrinth 版本号或版本 id）</div><div class="hint">版本列表接口还没做，先手填 Modrinth 上的版本号或版本 id。点了「预览升级」只会算、不会真的改任何文件。</div></div>
+                <input class="inp" placeholder="例如 2.4 或 6OMYdNAO">
+              </div>
+              <div class="field">
+                <div><div class="lb">或用本地 .mrpack 文件</div><div class="hint">和上面的版本二选一。两个都填会被拦下并提示（服务端同一条规则）</div></div>
+                <input class="inp" placeholder="填 .mrpack 文件的完整路径">
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
+                <button class="btn btn-primary" type="button"><svg class="pic"><use href="#i-search"/></svg>预览升级</button>
+                <span class="badge wl">只算不装 · 清单先摊开给你看</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ③ 预览结果 + 进度。顺序就是用户做决定的顺序：拦死 → 版本跳跃 → 要删的文件 →
+                 你改过没动的 → 新增/变更 → 计数 → 按钮。破坏性的一律排在按钮之前。 -->
+          <div class="panel reveal" style="--rd:.2s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--cyan)"><use href="#i-file"/></svg>
+              <h2>计划清单</h2>
+              <span class="badge wl">升级到 2.0.0</span>
+              <div class="spacer"></div>
+              <button class="btn xs" type="button">换个版本</button>
+            </div>
+            <div style="padding:14px 16px">
+              <p style="font-size:12.5px;color:var(--ink-3);margin-bottom:12px">将升级到 <b style="font-family:var(--f-term);font-size:14px;color:var(--ink-1)">2.0.0</b>（MC 1.20.1 · Forge 47.4.10）</p>
+
+              <div class="nbox w">
+                <div class="hd"><svg class="pic"><use href="#i-ban"/></svg>版本跳跃：MC 从 1.18.2 跳到 1.20.1</div>
+                存档、世界生成、模组都要跟着换一轮，等于换了一台服。<b>先做一次完整备份</b>再开始；升完也别急着删旧存档。
+              </div>
+
+              <div class="nbox d">
+                <div class="hd"><svg class="pic"><use href="#i-ban"/></svg>升级会删除这些文件（6）</div>
+                <div class="li"><span class="mono">mods/create-1.18.2.jar</span> —— 新版本换了文件名，旧的那份要拿走</div>
+                <div class="li"><span class="mono">config/create-server.toml</span> —— 旧版才有这个键，新版挪到别处了</div>
+                <div class="li" style="color:var(--ink-3)">其余 4 个也是同一类（<span class="mono">mods/flywheel-0.6.8.jar</span> 等）。只删整合包原本装进去的那些 —— 你自己在 mods/ 里加的东西不会被碰。</div>
+              </div>
+
+              <div class="nbox">
+                <div class="hd" style="color:var(--ink-2)">你改过、我们没动的文件（1）</div>
+                <div class="li"><span class="mono">config/jei/jei-client.toml</span> —— 你自己改过，保留你的那份，不覆盖</div>
+              </div>
+
+              <div class="plan" style="margin-top:14px">
+                <div class="prow2"><span class="k add">新增</span><span class="v">create-2.0.0.jar · flywheel-0.6.10.jar · 等 42 个</span><span class="n">42 个</span></div>
+                <div class="prow2"><span class="k upd">变更</span><span class="v">jei-1.20.1.jar · quark-4.0.jar · 等 18 个</span><span class="n">18 个</span></div>
+                <div class="prow2"><span class="k del">删除</span><span class="v">create-1.18.2.jar · 旧的 config/create 目录 · 等 6 个</span><span class="n">6 个</span></div>
+              </div>
+
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px">
+                <span class="chip s g">新增 42</span>
+                <span class="chip s w">变更 18</span>
+                <span class="chip s d">删除 6</span>
+                <span class="chip s">保留 148</span>
+                <span class="chip s">跳过 1</span>
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">预计下载 312 MB</span>
+              </div>
+
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line-1)">
+                <button class="btn btn-primary" type="button"><svg class="pic"><use href="#i-ul"/></svg>我已备份，开始升级</button>
+                <span style="font-size:12px;color:var(--ink-3)">会先下载再落文件，预计 312 MB。</span>
+              </div>
+
+              <!-- 点下去之后：动词换成「升级中」，并点名阶段 —— 服务端文件那一段文件数一直是 0，
+                   不点名阶段用户只会对着一个不动的进度条等十几分钟。 -->
+              <div class="nbox" style="margin-top:14px;border-left-color:var(--cyan);background:#131b1a">
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline">
+                  <span style="font-size:13px;font-weight:600;color:var(--ink-1)">升级中</span>
+                  <span class="chip s">正在升级模组</span>
+                  <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">41 / 66 个文件</span>
+                  <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3);margin-left:auto">正在处理 mods/flywheel-0.6.10.jar</span>
+                </div>
+                <div class="prog" style="margin-top:10px"><div class="fill" style="width:62%"></div><div class="lb2">62%</div></div>
+                <p style="font-size:12px;color:var(--ink-2);margin-top:8px">已下载 312 MB / 480 MB。升级在后台进行，切到别的页面回来还能看到进度。</p>
+                <div style="margin-top:10px"><button class="btn sm" type="button"><svg class="pic"><use href="#i-ban"/></svg>取消升级</button></div>
+              </div>
+            </div>
+            <div class="con-foot">
+              <svg class="pic" style="color:var(--warn)"><use href="#i-ban"/></svg>
+              删除项在你点「开始升级」之前一个都不会动 —— 想反悔就关掉这个面板，什么都没发生
+            </div>
+          </div>
+
+          <!-- ④ 另一种情形（大多数实例的默认所见）：这个实例不是整合包装的 -->
+          <div class="panel reveal" style="--rd:.24s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--ink-3)"><use href="#i-cube"/></svg>
+              <h2>没装过整合包时</h2>
+              <div class="spacer"></div>
+              <span style="font-size:12.5px;color:var(--ink-3)">另一种状态</span>
+            </div>
+            <div style="padding:12px 16px 16px">
+              <p style="font-size:12.5px;color:var(--ink-3)">这个实例不是由整合包安装的</p>
+              <div class="field" style="margin-top:8px">
+                <div><div class="lb">从本地 .mrpack 安装</div><div class="hint">预览只算不装，会先列出要新增哪些文件，确认了再开始</div></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                  <input class="inp" placeholder="例如 F:\packs\我的整合包.mrpack" style="flex:1;min-width:220px">
+                  <button class="btn" type="button"><svg class="pic"><use href="#i-ul"/></svg>预览安装</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 R · 状态速览（设计参考，非面板页签）════════ -->
+        <section class="page" data-page="states">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">R</span>
+            <h2>状态速览</h2>
+            <span class="sub">四种「非正常」状态的样子 —— 实现时照这个来，别各写各的</span>
+          </div>
+
+          <!-- 断连横幅 -->
+          <div class="banner-danger reveal" style="--rd:.1s">
+            <svg class="pic" style="color:var(--bad);width:20px;height:20px"><use href="#i-ban"/></svg>
+            <div class="t">
+              <h3>和守护进程断开了</h3>
+              <p>页面里显示的读数停在断连前一刻，别再照着它下判断。确认 serverbox.exe 还在跑，或者它是不是换了端口。</p>
+            </div>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>重连</button>
+          </div>
+
+          <div class="grid-2" style="margin-top:0">
+            <!-- 加载骨架 -->
+            <div class="panel reveal" style="--rd:.14s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone"><svg class="pic" style="color:var(--cyan)"><use href="#i-info"/></svg><h2>正在连接守护进程…</h2></div>
+              <div class="statecard">
+                <div class="sk" style="width:56%"></div>
+                <div class="sk" style="width:82%;margin-top:12px"></div>
+                <div class="sk" style="width:64%;margin-top:12px"></div>
+                <div style="display:flex;gap:10px;margin-top:20px">
+                  <div class="sk" style="width:110px;height:32px"></div>
+                  <div class="sk" style="width:80px;height:32px"></div>
+                </div>
+                <p style="margin-top:16px;font-size:12.5px;color:var(--ink-3)">还没问过第一遍时用它 —— 既不是「没有世界」也不是「连不上」，别谎报故障。</p>
+              </div>
+            </div>
+
+            <!-- 空态：还没有世界 -->
+            <div class="panel reveal" style="--rd:.18s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone"><svg class="pic" style="color:var(--ok)"><use href="#i-grass"/></svg><h2>还没有世界</h2></div>
+              <div class="statecard">
+                <svg class="empty-ic" viewBox="0 0 16 16" style="color:var(--ink-3)"><use href="#i-grass"/></svg>
+                <h3>先在左边建一个</h3>
+                <p>5 步就有了一台自己的服务器：挑服务端 → 挑版本 → 选内存 → 装 Java → 点启动。剩下的交给我们。</p>
+                <div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
+                  <button class="btn btn-start" type="button"><svg class="pic"><use href="#i-plus"/></svg>新建世界</button>
+                  <button class="btn" type="button"><svg class="pic"><use href="#i-ul"/></svg>导入已有服务器</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <!-- 崩溃诊断 -->
+            <div class="panel reveal" style="--rd:.22s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone"><svg class="pic" style="color:var(--bad)"><use href="#i-ban"/></svg><h2>崩溃诊断</h2><span class="badge ban" style="margin-left:4px">已崩溃</span><div class="spacer"></div><span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">退出码 1</span></div>
+              <div class="statecard" style="padding:14px 18px 18px">
+                <div class="crash-step">
+                  <span class="no">01</span>
+                  <div class="b"><h4>现象</h4><p>启动后 3 秒退出，日志停在 <code>UnsupportedClassVersionError</code>。</p></div>
+                </div>
+                <div class="crash-step">
+                  <span class="no">02</span>
+                  <div class="b"><h4>原因</h4><p>MC 1.21.4 需要 Java 21，但当前用的是 Java 17。类是 65.0 版本编的，17 读不了。</p></div>
+                </div>
+                <div class="crash-step">
+                  <span class="no">03</span>
+                  <div class="b"><h4>怎么办</h4><p>把该实例的 Java 换到 21 —— 已经检测到本机装了 <code>JDK 21.0.9</code>，一键就能换。</p></div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+                  <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-check"/></svg>一键换成 Java 21</button>
+                  <button class="btn sm" type="button"><svg class="pic"><use href="#i-dl"/></svg>看完整日志</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 组件状态一览 -->
+            <div class="panel reveal" style="--rd:.26s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone"><svg class="pic" style="color:var(--copper)"><use href="#i-lever"/></svg><h2>组件状态一览</h2></div>
+              <div style="padding:14px 16px">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                  <div>
+                    <div class="eyebrow" style="margin-bottom:8px">按钮</div>
+                    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+                      <button class="btn btn-primary sm" type="button">主操作 / 悬停有附魔闪光</button>
+                      <button class="btn sm" type="button">次要</button>
+                      <button class="btn sm" type="button" disabled style="opacity:.45;cursor:not-allowed">禁用</button>
+                      <button class="btn btn-danger sm" type="button">危险</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="eyebrow" style="margin-bottom:8px">徽记 / 输入 / 开关</div>
+                    <div style="display:flex;flex-direction:column;gap:9px;align-items:flex-start">
+                      <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <span class="badge op">OP 4</span><span class="badge wl">白名单</span><span class="badge ban">已封禁</span><span class="badge">普通</span>
+                      </div>
+                      <input class="inp" style="max-width:190px" placeholder="输入框 · 聚焦时右下发青光">
+                      <div style="display:flex;gap:12px;align-items:center">
+                        <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                        <span class="tog" role="switch" aria-checked="false"><span class="knob"></span></span>
+                        <span class="chk on"></span>
+                        <span class="chk"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line-1)">
+                  <div class="eyebrow" style="margin-bottom:8px">方块刻度条 / 火花线</div>
+                  <div class="meter" data-pct="72" data-tone="cy"></div>
+                  <div class="meter row" data-pct="45" data-tone="on" style="margin-top:8px"></div>
+                  <svg class="spark" data-seed="72" viewBox="0 0 120 30" preserveAspectRatio="none" style="height:34px;margin-top:10px"></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ════ 底部 HUD：生命 + 经验条 + F3 信息 ════ -->
+  <div class="hud tex-dirt">
+    <div class="hp">
+      <span class="lb">健康</span>
+      <div class="hearts">
+        <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+        <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+        <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+        <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+        <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+        <svg class="heart" style="color:#2a333d"><use href="#i-heart"/></svg>
+      </div>
+      <span style="font-family:var(--f-term);font-size:15px;color:var(--ink-2)">5/6</span>
+    </div>
+    <div class="xpzone">
+      <div class="lvbox"><span class="lv" id="hudLv">20</span></div>
+      <div class="xpbar"><div class="fill" id="hudXp"></div></div>
+      <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.08em;color:var(--ink-3)">活跃度 · TPS</span>
+    </div>
+    <div class="f3">
+      <span>世界 <b>生存服 · 长期档</b></span>
+      <span>端口 <b>25565</b></span>
+      <span>运行 <b>6:42:11</b></span>
+      <span class="blink">● LIVE</span>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

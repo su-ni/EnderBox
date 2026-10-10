@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ServerBox UI 重设计 · 设计稿 v2（只动视觉，不动操作逻辑）</title>
+<style>
+/* ════════════════════════════════════════════════════════════
+   ServerBox UI 重设计 · 设计稿 v2
+   ⚠ 本稿的承诺：只动「皮肤」，不动「骨架」。
+     每一屏都对着现版真实页面的区块顺序 / 按钮位置 / 操作流程逐块重绘。
+     字阶、颜色、图标、面板层次、行长、控制台与指标带的渲染 —— 全是视觉层。
+   ════════════════════════════════════════════════════════════ */
+:root {
+  --base: #111311;
+  --deep: #0a0c0a;
+  --panel: #1c201d;
+  --panel2: #242b25;
+  --raised: #2c342d;
+  --line: #39413a;
+  --line-2: #4a544b;
+
+  /* 文字整体提亮一档：ink-3 8b978a → 99a49b（对比 6.1 → 7.0:1） */
+  --ink1: #eef1ec;
+  --ink2: #bcc7ba;
+  --ink3: #99a49b;
+
+  --green: #7cc24f;
+  --green-deep: #5d9c3a;
+  --green-tint: rgba(124, 194, 79, .10);
+  --amber: #f2c14e;
+  --amber-tint: rgba(242, 193, 78, .10);
+  --red: #e0574c;
+  --red-tint: rgba(224, 87, 76, .12);
+  --cyan: #4aedd9;
+  --cyan-tint: rgba(74, 237, 217, .08);
+
+  --sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  /* 字阶 6 档（原 7 档砍掉 11px）：22 页题 / 15 区题 / 13.5 正文 / 12.5 次要 / 12 眉标 / mono 数字 */
+  --f-page: 22px;
+  --f-sec: 15px;
+  --f-body: 13.5px;
+  --f-sub: 12.5px;
+  --f-meta: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { color-scheme: dark; }
+body {
+  background: var(--deep);
+  color: var(--ink1);
+  font-family: var(--sans);
+  font-size: var(--f-body);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+svg { display: block; }
+.ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square; }
+
+/* ── 设计稿工具条（非产品 UI）────────────────────────── */
+.draftbar {
+  position: sticky; top: 0; z-index: 99;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 10px 20px;
+  background: #000;
+  border-bottom: 2px solid var(--green);
+}
+.draftbar b { font-size: 13.5px; color: var(--green); letter-spacing: .04em; }
+.dbar-tab {
+  background: none; border: 1px solid var(--line-2); color: var(--ink2);
+  font: 500 12.5px var(--sans); padding: 5px 14px; cursor: pointer;
+}
+.dbar-tab.on { background: var(--green); border-color: var(--green); color: #0c130a; font-weight: 700; }
+.dbar-hint { font-size: 11.5px; color: var(--ink3); margin-left: auto; }
+
+.screen { display: none; }
+.screen.on { display: block; }
+.canvas { max-width: 1440px; margin: 26px auto 80px; padding: 0 22px; }
+.canvas-narrow { max-width: 560px; }
+.canvas-label { display: flex; align-items: baseline; gap: 12px; margin: 0 0 12px 2px; color: var(--ink3); font-size: 12.5px; }
+.canvas-label b { color: var(--ink1); font-size: 15px; }
+
+/* ── 面板层次（视觉层改动：黑硬边收敛，内部细线）────── */
+.frame {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 2px solid #000;
+  border-bottom: 3px solid #000;
+}
+.fhead {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  background: var(--panel2);
+  border-bottom: 1px solid var(--line);
+}
+.fhead h3 { font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.fhead h3 .ic { width: 15px; height: 15px; color: var(--green); }
+.fhead .sub { font-size: 12px; color: var(--ink3); }
+.fhead .sp { margin-left: auto; }
+.rows > * + * { border-top: 1px solid var(--line); }
+
+/* ── 应用骨架：与现版同构（侧栏品牌 + 顶栏 tab 右置）── */
+.app { border: 1px solid #000; background: var(--base); }
+.shell { display: flex; min-height: 820px; }
+.side {
+  width: 236px; flex: none; display: flex; flex-direction: column;
+  background: var(--panel); border-right: 1px solid var(--line);
+}
+.side-brand { display: flex; align-items: center; gap: 10px; padding: 15px 16px 12px; border-bottom: 1px solid var(--line); }
+.side-brand .logo { width: 26px; height: 26px; image-rendering: pixelated; }
+.side-brand .nm { font-weight: 700; font-size: 15px; }
+.side-brand small { display: block; font-size: 11.5px; color: var(--ink3); letter-spacing: .08em; line-height: 1.3; }
+.side-cap { padding: 14px 16px 8px; font-size: 12px; color: var(--ink3); display: flex; align-items: baseline; gap: 8px; }
+.side-cap b { color: var(--ink1); font-size: 13px; }
+.side-cap .n { margin-left: auto; font-family: var(--mono); font-size: 11.5px; }
+.inst-list { flex: 1; }
+.inst { display: flex; align-items: center; gap: 11px; padding: 10px 14px; border-left: 3px solid transparent; }
+.inst:hover { background: var(--panel2); }
+.inst.on { background: var(--panel2); border-left-color: var(--green); }
+.inst .ava { width: 32px; height: 32px; flex: none; image-rendering: pixelated; }
+.inst .nm { font-size: 13.5px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inst .sb { font-family: var(--mono); font-size: 11.5px; color: var(--ink3); margin-top: 1px; }
+.inst .st { margin-left: auto; width: 8px; height: 8px; flex: none; background: var(--ink3); }
+.inst .st.run { background: var(--green); }
+.side-foot { padding: 12px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+
+.main { flex: 1; min-width: 0; padding: 16px 22px 40px; }
+.main .topbar {
+  display: flex; align-items: center; justify-content: flex-end; gap: 2px;
+  margin: -16px -22px 16px; padding: 0 18px; height: 54px;
+  background: var(--panel); border-bottom: 2px solid #000;
+}
+.tabs { display: flex; gap: 2px; }
+.tabs a {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 13px; color: var(--ink2); font-size: 13px; text-decoration: none;
+  border: 1px solid transparent;
+}
+.tabs a .ic { width: 14px; height: 14px; opacity: .8; }
+.tabs a:hover { color: var(--ink1); background: var(--panel2); }
+.tabs a.on { color: #0d140b; background: var(--green); border-color: var(--green); font-weight: 700; }
+.tabs a.on .ic { opacity: 1; }
+
+/* ── 实例标题块（与现版同构：名/状态 → 类型·端口 → 路径）*/
+.instop { padding: 2px 2px 14px; }
+.instop h1 { font-size: var(--f-page); font-weight: 700; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.instop .meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 5px; font-size: 12.5px; color: var(--ink3); }
+.instop .meta .mono { font-family: var(--mono); font-size: 12px; color: var(--ink2); }
+.instop .path { margin-top: 3px; font-family: var(--mono); font-size: 12px; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 状态 pill / chip */
+.pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 2px 10px 2px 8px; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--line-2); color: var(--ink2); background: var(--panel);
+}
+.pill i { width: 7px; height: 7px; background: var(--ink3); }
+.pill.run { color: #dff5d2; border-color: rgba(124,194,79,.5); background: var(--green-tint); }
+.pill.run i { background: var(--green); animation: pulse 2s infinite; }
+.pill.warn { color: #f6e3b0; border-color: rgba(242,193,78,.5); background: var(--amber-tint); }
+.pill.warn i { background: var(--amber); }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 1px 8px; font-size: 12px; font-weight: 600;
+  color: var(--ink2); background: var(--raised); border: 1px solid var(--line-2);
+}
+.chip.g { color: #d6efc6; background: var(--green-tint); border-color: rgba(124,194,79,.45); }
+.chip.w { color: #f6e3b0; background: var(--amber-tint); border-color: rgba(242,193,78,.45); }
+.chip.r { color: #ffd6d1; background: var(--red-tint); border-color: rgba(224,87,76,.5); }
+.chip.c { color: #cdf7f0; background: var(--cyan-tint); border-color: rgba(74,237,217,.4); }
+.chip .mono { font-family: var(--mono); font-weight: 500; }
+.dot { width: 7px; height: 7px; background: var(--green); display: inline-block; }
+
+/* ── 按钮（与现版同一套动作，只修观感）──────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 8px 18px; font: 700 13.5px var(--sans);
+  cursor: pointer; user-select: none;
+  background: var(--raised); color: var(--ink1);
+  border: 1px solid var(--line-2); border-bottom: 3px solid #000;
+}
+.btn:hover { background: var(--line); }
+.btn:active { transform: translateY(1px); border-bottom-width: 2px; }
+.btn .ic { width: 14px; height: 14px; }
+.btn.primary {
+  background: var(--green); color: #0c130a; border-color: #4c7a2e;
+  box-shadow: -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 3px 0 #000;
+}
+.btn.primary:hover { background: #8bd15e; }
+.btn.danger-ghost {
+  background: var(--panel); color: var(--red);
+  border: 1px solid rgba(224,87,76,.55); border-bottom: 3px solid #000;
+}
+.btn.ghost {
+  background: transparent; border: 1px solid var(--line-2); border-bottom-width: 1px;
+  font-weight: 600; color: var(--ink2);
+}
+.btn.ghost:hover { color: var(--ink1); background: var(--panel2); }
+.btn.sm { padding: 5px 12px; font-size: 12.5px; }
+.ibtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex: none; cursor: pointer;
+  background: transparent; color: var(--ink3); border: 1px solid transparent;
+}
+.ibtn:hover { color: var(--ink1); background: var(--raised); border-color: var(--line-2); }
+.ibtn .ic { width: 14px; height: 14px; }
+.tgl { width: 30px; height: 16px; flex: none; background: var(--deep); border: 1px solid var(--line-2); position: relative; }
+.tgl i { position: absolute; top: 1px; left: 1px; width: 12px; height: 12px; background: var(--ink3); }
+.tgl.on { border-color: rgba(124,194,79,.6); }
+.tgl.on i { left: auto; right: 1px; background: var(--green); }
+
+/* ── 指标带（现版同位同数据：4 列一条读数带，渲染重做）*/
+.mband { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); }
+.mband > * + * { border-left: 1px solid var(--line); }
+.metric { padding: 13px 16px 12px; min-width: 0; }
+.metric .lab { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--ink2); }
+.metric .lab .ic { width: 13px; height: 13px; color: var(--ink3); }
+.metric .val { display: flex; align-items: baseline; gap: 5px; margin-top: 6px; }
+.metric .val b { font-family: var(--mono); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+.metric .val .u { font-size: 12px; color: var(--ink3); font-family: var(--mono); }
+.metric .bar { margin-top: 10px; height: 8px; background: var(--deep); border: 1px solid var(--line); position: relative; }
+.metric .bar i { position: absolute; inset: 1px auto 1px 1px; background: var(--green); }
+.metric .bar i.w { background: var(--amber); }
+.metric .bar i.d { background: var(--red); }
+.metric .note { margin-top: 7px; font-size: 12px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.mband.b { display: block; }
+.mband.b > * + * { border-top: 1px solid var(--line); }
+.rrow { display: flex; align-items: center; gap: 12px; padding: 11px 16px; }
+.rrow .tile {
+  width: 30px; height: 30px; flex: none; display: flex; align-items: center; justify-content: center;
+  background: var(--raised); border: 1px solid var(--line-2); color: var(--ink2);
+}
+.rrow .nm { width: 76px; flex: none; font-size: 13px; font-weight: 600; }
+.rrow .bar { flex: 1; height: 10px; background: var(--deep); border: 1px solid var(--line); position: relative; }
+.rrow .bar i { position: absolute; inset: 1px auto 1px 1px; background: var(--green); }
+.rrow .bar i.w { background: var(--amber); }
+.rrow .num { width: 128px; flex: none; text-align: right; font-family: var(--mono); font-size: 12.5px; color: var(--ink2); font-variant-numeric: tabular-nums; }
+
+/* ── 控制台（现版同构：头部 + 日志 + 命令行）────────── */
+.live { display: inline-flex; align-items: center; gap: 6px; font: 700 11.5px var(--mono); letter-spacing: .08em; color: var(--green); }
+.live i { width: 7px; height: 7px; background: var(--green); animation: pulse 1.6s infinite; }
+.term { background: #0c0e0c; font-family: var(--mono); font-size: 12.5px; line-height: 1.75; padding: 10px 0; }
+.ln { display: flex; gap: 10px; padding: 0 14px; }
+.ln .t { flex: none; color: #5f6b60; font-size: 12px; padding-top: 1px; }
+.ln .lv { flex: none; width: 44px; font-size: 11px; font-weight: 700; padding-top: 2px; text-align: center; height: 15px; }
+.ln .lv.info { color: #7fa66f; background: var(--green-tint); }
+.ln .lv.warn { color: var(--amber); background: var(--amber-tint); }
+.ln .lv.err { color: var(--red); background: var(--red-tint); }
+.ln .msg { color: #cdd7cb; min-width: 0; overflow-wrap: anywhere; }
+.ln .msg.warn { color: #f2dfa8; }
+.cmdbuf {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: var(--panel2); border-top: 1px solid var(--line);
+}
+.cmdbuf .pr { font-family: var(--mono); font-size: 13.5px; color: var(--green); font-weight: 700; }
+.cmdbuf input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--ink1); font: 400 13.5px var(--mono); }
+.cmdbuf input::placeholder { color: var(--ink3); }
+
+/* ── 表单 ───────────────────────────────────────────── */
+.input { display: flex; align-items: center; gap: 8px; background: var(--deep); border: 1px solid var(--line-2); padding: 0 12px; height: 36px; }
+.input:focus-within { border-color: var(--green); box-shadow: 0 0 0 1px var(--green); }
+.input input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--ink1); font: 400 13.5px var(--sans); }
+.input input::placeholder { color: var(--ink3); }
+.input .ic { width: 14px; height: 14px; color: var(--ink3); }
+.fhint { font-size: 12px; color: var(--ink3); line-height: 1.6; max-width: 62ch; }
+
+/* ── 体检卡（现版同构：挡住项 / 提醒项 / 修复按钮）──── */
+.notebox { display: flex; gap: 11px; padding: 12px 14px; border-left: 3px solid var(--line-2); background: var(--panel2); }
+.notebox .ic { width: 15px; height: 15px; flex: none; margin-top: 2px; color: var(--ink3); }
+.notebox p { font-size: 12.5px; line-height: 1.7; color: var(--ink2); max-width: 62ch; }
+.notebox p b { color: var(--ink1); }
+.notebox.warn { border-left-color: var(--amber); background: var(--amber-tint); }
+.notebox.warn .ic, .notebox.warn p b { color: var(--amber); }
+.notebox.warn p { color: #ead9ac; }
+.notebox .acts { margin-top: 8px; display: flex; gap: 8px; }
+
+/* ── 列表行（modrow 同构：图标+名+副行 | 右侧元信息+开关+操作）*/
+.lrow { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+.lrow:hover { background: var(--panel2); }
+.lrow .ic-ava { width: 26px; height: 26px; flex: none; background: var(--raised); border: 1px solid var(--line-2); display: flex; align-items: center; justify-content: center; color: var(--ink2); }
+.lrow .ic-ava .ic { width: 14px; height: 14px; }
+.lrow .nm { min-width: 0; flex: 1; }
+.lrow .nm b { display: block; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow .nm span { display: block; font-size: 12px; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow .nm span b { display: inline; font-size: 12px; color: var(--amber); }
+.lrow .meta { flex: none; text-align: right; font-family: var(--mono); font-size: 11.5px; color: var(--ink3); line-height: 1.5; }
+.lrow .ops { display: flex; gap: 4px; flex: none; margin-left: 4px; align-items: center; }
+
+/* ── 配置页：fnav（现版同构）────────────────────────── */
+.cfg { display: grid; grid-template-columns: 218px minmax(0,1fr); gap: 16px; align-items: start; }
+.fnav { background: var(--panel); border: 1px solid var(--line); }
+.fitem { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 14px; font-size: 13px; color: var(--ink2); border-left: 3px solid transparent; }
+.fitem:hover { background: var(--panel2); color: var(--ink1); }
+.fitem.on { background: var(--panel2); border-left-color: var(--green); color: var(--ink1); font-weight: 600; }
+.fitem .n { font-family: var(--mono); font-size: 11.5px; color: var(--ink3); }
+.cfgpane { min-width: 0; }
+.cfg-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 12px 16px; }
+.cfg-head b { font-size: 15px; }
+.cfg-head .sub { font-size: 12px; color: var(--ink3); }
+.cfg-head .pg { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--ink3); }
+.vpick { display: grid; grid-template-columns: 150px minmax(0,1fr); border-top: 1px solid var(--line); }
+.vcol { border-right: 1px solid var(--line); }
+.vcol .vitem { padding: 9px 14px; font-family: var(--mono); font-size: 12.5px; color: var(--ink2); }
+.vcol .vitem.on { background: var(--green); color: #0d140b; font-weight: 700; }
+.vcol .vfoot { padding: 9px 14px; font-size: 12px; color: var(--ink3); border-top: 1px solid var(--line); }
+.bcol .brow { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+.bcol .brow:hover { background: var(--panel2); }
+.bcol .brow code { font-family: var(--mono); font-size: 12.5px; color: var(--ink1); }
+.bcol .brow .bm { font-family: var(--mono); font-size: 11.5px; color: var(--ink3); }
+.bcol .brow .bt { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--ink3); }
+.cfg-acts { padding: 12px 16px 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cfg-foot { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-top: 1px solid var(--line); }
+.cfg-foot .hint { font-size: 12px; color: var(--ink3); }
+
+/* ── 设计系统展示 ───────────────────────────────────── */
+.ds-wrap { max-width: 1440px; margin: 26px auto 80px; padding: 0 22px; }
+.ds-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.swatches { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 12px 14px; }
+.sw { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ink2); }
+.sw i { width: 34px; height: 22px; flex: none; border: 1px solid #000; }
+.sw code { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--ink3); }
+.type-spec { padding: 8px 14px 14px; }
+.type-spec > div { display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.type-spec > div:last-child { border-bottom: 0; }
+.type-spec code { flex: none; width: 118px; font-family: var(--mono); font-size: 11px; color: var(--ink3); }
+.icon-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; padding: 12px 14px 16px; }
+.icon-grid .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 9px 2px 7px; font-size: 10.5px; color: var(--ink3); }
+.icon-grid .cell:hover { background: var(--panel2); color: var(--ink1); }
+.icon-grid .cell .ic { width: 18px; height: 18px; }
+.icon-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 14px 16px; }
+.icon-compare .col b { display: block; font-size: 12px; color: var(--ink3); margin-bottom: 8px; }
+.icon-compare .rowi { display: flex; align-items: center; gap: 9px; padding: 4px 0; font-size: 12px; color: var(--ink2); }
+.bad-old { width: 12px; height: 12px; flex: none; image-rendering: pixelated; shape-rendering: crispEdges; }
+.diag { padding: 12px 16px 16px; list-style: none; }
+.diag li { margin: 0 0 9px 0; font-size: 12.5px; line-height: 1.7; color: var(--ink2); }
+.diag li b { color: var(--ink1); }
+.diag .tag { display: inline-block; font: 700 10.5px var(--mono); padding: 1px 6px; margin-right: 6px; vertical-align: 1px; }
+.diag .tag.bad { color: #ffb3aa; background: var(--red-tint); }
+.diag .tag.good { color: #d6efc6; background: var(--green-tint); }
+.diag .tag.learn { color: #cdf7f0; background: var(--cyan-tint); }
+.ds-note { padding: 10px 14px 14px; font-size: 12px; color: var(--ink3); line-height: 1.7; }
+.ds-note b { color: var(--ink2); }
+
+/* 手机档（现版同构：抽屉顶栏 + 横滚页签 + 内容）*/
+.m-app { max-width: 520px; margin: 0 auto; border: 1px solid #000; background: var(--base); min-height: 880px; }
+.m-top { display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 14px; background: var(--panel); border-bottom: 2px solid #000; }
+.m-top .burger { display: flex; flex-direction: column; gap: 4px; padding: 6px; }
+.m-top .burger i { width: 16px; height: 2px; background: var(--ink1); display: block; }
+.m-top .bt { font-weight: 700; font-size: 14px; }
+.m-top .pill { margin-left: auto; }
+.m-tabs { display: flex; gap: 2px; overflow-x: auto; padding: 8px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.m-tabs a { flex: none; padding: 6px 12px; font-size: 12.5px; color: var(--ink2); text-decoration: none; border: 1px solid transparent; }
+.m-tabs a.on { background: var(--green); color: #0d140b; font-weight: 700; }
+.m-main { padding: 14px; display: grid; gap: 14px; }
+.grid-overlay .app, .grid-overlay .m-app { outline: 1px dashed rgba(74,237,217,.4); }
+@media (max-width: 1100px) {
+  .mband { grid-template-columns: repeat(2, 1fr); }
+  .mband > *:nth-child(3) { border-left: 0; }
+  .mband > *:nth-child(n+3) { border-top: 1px solid var(--line); }
+}
+</style>
+</head>
+<body>
+
+<!-- 新图标集：16 网格 · 1.5 线宽 · square 端点 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-dash" viewBox="0 0 16 16"><path d="M2.5 12.5a6 6 0 0 1 11 0"/><path d="M8 12.5 11.2 7.4"/><path d="M2 14.5h12"/></symbol>
+    <symbol id="i-term" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10"/><path d="M4.5 6.2 7 8l-2.5 1.8"/><path d="M8.5 10.2H12"/></symbol>
+    <symbol id="i-players" viewBox="0 0 16 16"><circle cx="6" cy="5.5" r="2.6"/><path d="M1.8 13.6c.3-2.7 2-4.1 4.2-4.1s3.9 1.4 4.2 4.1"/><path d="M10.6 3.3a2.6 2.6 0 0 1 0 4.4"/><path d="M11.8 9.9c1.6.5 2.6 1.8 2.8 3.7"/></symbol>
+    <symbol id="i-config" viewBox="0 0 16 16"><path d="M2.5 5h11M2.5 11h11"/><circle cx="6" cy="5" r="1.9" fill="#111311"/><circle cx="10.5" cy="11" r="1.9" fill="#111311"/></symbol>
+    <symbol id="i-plugin" viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="4.6" height="4.6"/><rect x="9" y="2.5" width="4.6" height="4.6"/><rect x="2.5" y="9" width="4.6" height="4.6"/><path d="M11.3 9v2.3h2.3"/></symbol>
+    <symbol id="i-box" viewBox="0 0 16 16"><path d="M2.5 5.2 8 2.3l5.5 2.9v5.6L8 13.7 2.5 10.8z"/><path d="M2.5 5.2 8 8.1l5.5-2.9"/><path d="M8 8.1v5.6"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 12.8V3.6h4.1l1.5 1.9H14v7.3z"/></symbol>
+    <symbol id="i-backup" viewBox="0 0 16 16"><path d="M8 1.8 13.2 3.8v4.6c0 3-2.3 4.9-5.2 5.8-2.9-.9-5.2-2.8-5.2-5.8V3.8z"/><path d="M5.6 7.9l1.7 1.7 3.4-3.4"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.7"/><path d="M8 4.8v3.4l2.4 1.5"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.1"/><path d="M8 1.6v2.1M8 12.3v2.1M1.6 8h2.1M12.3 8h2.1M3.5 3.5l1.5 1.5M11 11l1.5 1.5M12.5 3.5 11 5M5 11l-1.5 1.5"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 16 16"><rect x="4.5" y="4.5" width="7" height="7"/><rect x="6.7" y="6.7" width="2.6" height="2.6"/><path d="M6 2.5v2M10 2.5v2M6 11.5v2M10 11.5v2M2.5 6h2M2.5 10h2M11.5 6h2M11.5 10h2"/></symbol>
+    <symbol id="i-mem" viewBox="0 0 16 16"><rect x="2" y="4.5" width="12" height="7"/><rect x="4.8" y="6.8" width="2.2" height="2.4" fill="currentColor" stroke="none"/><rect x="8.4" y="6.8" width="2.2" height="2.4" fill="currentColor" stroke="none"/><path d="M4 11.5v1.6M8 11.5v1.6M12 11.5v1.6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 16 16"><path d="M8 2.5v7.2"/><path d="M4.8 7 8 10.2 11.2 7"/><path d="M2.8 13.2h10.4"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 2.2 14.4 13.4H1.6z"/><path d="M8 6.4v3.2"/><path d="M8 11.4v.4" stroke-width="2"/></symbol>
+    <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.8 3.2v9.6L12.6 8z"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 16 16"><rect x="4.2" y="4.2" width="7.6" height="7.6"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 16 16"><path d="M3 4.5h10M6.5 4.5V2.8h3v1.7M4.5 4.5l.7 9h5.6l.7-9"/><path d="M6.8 7v3.6M9.2 7v3.6" stroke-width="1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.2 8.6l3.2 3.2 6.4-7"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+    <symbol id="i-x" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4 4 12"/></symbol>
+    <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.4"/><path d="M10.4 10.4 14 14"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 16 16"><path d="M13.2 8A5.2 5.2 0 1 1 11.6 4.2"/><path d="M13.4 1.9v2.9h-2.9"/></symbol>
+    <symbol id="i-dl-box" viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11"/><path d="M8 4.8v4.4M5.9 7.6 8 9.7l2.1-2.1"/><path d="M5.2 11.6h5.6" stroke-width="1"/></symbol>
+    <symbol id="i-arrow-l" viewBox="0 0 16 16"><path d="M13 8H3.4"/><path d="M7 3.8 3 8l4 4.2"/></symbol>
+    <symbol id="i-arrow-r" viewBox="0 0 16 16"><path d="M3 8h9.6"/><path d="M9 3.8 13 8l-4 4.2"/></symbol>
+  </defs>
+</svg>
+
+<!-- ═══ 设计稿工具条 ═══ -->
+<div class="draftbar">
+  <b>ServerBox · 重设计稿 v2（只动视觉）</b>
+  <button class="dbar-tab on" data-go="ds">诊断与设计系统</button>
+  <button class="dbar-tab" data-go="home">概览</button>
+  <button class="dbar-tab" data-go="plugins">插件与模组</button>
+  <button class="dbar-tab" data-go="config">配置</button>
+  <button class="dbar-tab" data-go="mobile">手机档 520</button>
+  <button class="dbar-tab" id="mband-toggle">指标带：A 读数 ⇄ B 资源条</button>
+  <button class="dbar-tab" id="grid-toggle">网格</button>
+  <span class="dbar-hint">结构与现版逐块同构 · 只换视觉层</span>
+</div>
+
+<!-- ══════════ 诊断 + 设计系统 ══════════ -->
+<section class="screen on" id="scr-ds">
+<div class="ds-wrap">
+
+  <div class="canvas-label"><b>一、边界承诺</b><span>本稿<b style="color:var(--ink1)">不改操作逻辑</b>：页面的区块顺序、按钮位置、操作流程与现版完全一致；动的只有字阶、颜色、图标、面板层次、组件渲染与行长。设计系统区往下，四屏都是现版页面的「换皮对照」。</span></div>
+  <div class="ds-grid">
+    <div class="frame">
+      <div class="fhead"><h3><svg class="ic"><use href="#i-warn"/></svg>要改的（全部是视觉层）</h3></div>
+      <ul class="diag">
+        <li><span class="tag bad">眉标</span><b>中文眉标 11px mono + 0.16em 字距</b>（.eyebrow）——中文加字距会散架。改：12px、正文字体、无字距。</li>
+        <li><span class="tag bad">小字</span><b>11.5px 灰字满天飞</b>（.mono-meta：路径/时间/峰值）。改：最小 12px，且只给机器数据。</li>
+        <li><span class="tag bad">指标带</span><b>10 格分段条读不出数</b>，数值被上下两层 11px 灰字夹住。改：同位同数据的 26px tabular 大数 + 细进度条（A），或资源条式（B）——工具条可切。</li>
+        <li><span class="tag bad">图标</span><b>36 个像素拼贴不可辨认</b>（IconCpu=两个矩形）。改：16 网格 1.5px 线稿，保留 square 端点的像素感。</li>
+        <li><span class="tag bad">层次</span><b>满屏 3px 黑边框同权重</b>。改：面板改 1px 细线 + 头部条提亮分层；黑硬边只留主按钮。</li>
+        <li><span class="tag bad">行长</span><b>警告/说明段全宽 ~1100px</b>。改：正文上限 62ch——位置不动，只收宽度。</li>
+      </ul>
+    </div>
+    <div class="frame">
+      <div class="fhead"><h3><svg class="ic"><use href="#i-dash"/></svg>保留与借鉴</h3></div>
+      <ul class="diag">
+        <li><span class="tag good">保留</span><b>暗色草绿身份与全部信息架构</b>——顶栏 tab、左侧实例列表、fnav 分组、单列列表行，动都不动。</li>
+        <li><span class="tag good">保留</span><b>体检带修复、崩溃判读、诚实文案</b>——竞品没有的能力，只是把皮做体面。</li>
+        <li><span class="tag learn">借鉴</span><b>Pterodactyl</b>：统计读数的「标签+大值+单位」排法、状态色语言；<b>MCSManager</b>：终端的行内分级配色。只学渲染，不学布局。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="canvas-label" style="margin-top:34px"><b>二、设计令牌</b><span>底色身份不动；文字提亮一档；字阶 7 档 → 6 档；新增语义 tint。</span></div>
+  <div class="ds-grid">
+    <div class="frame">
+      <div class="fhead"><h3><svg class="ic"><use href="#i-config"/></svg>色板</h3></div>
+      <div class="swatches">
+        <div class="sw"><i style="background:#111311"></i>base<code>#111311</code></div>
+        <div class="sw"><i style="background:#1c201d"></i>panel<code>#1c201d</code></div>
+        <div class="sw"><i style="background:#242b25"></i>panel-2<code>#242b25</code></div>
+        <div class="sw"><i style="background:#2c342d"></i>raised<code>#2c342d</code></div>
+        <div class="sw"><i style="background:#eef1ec"></i>ink-1<code>16.2:1</code></div>
+        <div class="sw"><i style="background:#bcc7ba"></i>ink-2<code>10.1:1</code></div>
+        <div class="sw"><i style="background:#99a49b"></i>ink-3<code>7.0:1</code></div>
+        <div class="sw"><i style="background:#7cc24f"></i>accent<code>#7cc24f</code></div>
+        <div class="sw"><i style="background:rgba(124,194,79,.12)"></i>绿 tint<code>10%</code></div>
+        <div class="sw"><i style="background:rgba(242,193,78,.12)"></i>琥珀 tint<code>10%</code></div>
+        <div class="sw"><i style="background:rgba(224,87,76,.14)"></i>红 tint<code>12%</code></div>
+        <div class="sw"><i style="background:rgba(74,237,217,.10)"></i>青 tint<code>8%</code></div>
+      </div>
+    </div>
+    <div class="frame">
+      <div class="fhead"><h3><svg class="ic"><use href="#i-config"/></svg>字阶（6 档）</h3></div>
+      <div class="type-spec">
+        <div><code>22 / 700 页题</code><span style="font-size:22px;font-weight:700">混合forge测试</span></div>
+        <div><code>15 / 600 区题</code><span style="font-size:15px;font-weight:600">服务端文件</span></div>
+        <div><code>13.5 正文</code><span style="font-size:13.5px">正文与控件文字，中文最小止步于此。</span></div>
+        <div><code>12.5 次要</code><span style="font-size:12.5px;color:var(--ink2)">表单说明、列表第二行。</span></div>
+        <div><code>12 眉标</code><span style="font-size:12px;font-weight:600;color:var(--ink2)">CPU 占用（不再用 mono、不加字距）</span></div>
+        <div><code>mono 数字</code><span style="font-family:var(--mono);font-size:13px">25565 · 1.20.1 · 2026-10-06 21:56</span></div>
+      </div>
+      <div class="ds-note">mono 只给机器数据（数字/路径/命令/key）。<b>中文一律正文字体</b>。行长：正文 ≤62ch，警告框 ≤52ch。</div>
+    </div>
+  </div>
+
+  <div class="canvas-label" style="margin-top:34px"><b>三、图标重制</b><span>左：旧像素拼贴（12px 实际渲染，不可辨认）；右：新集。导航/页签/列表/表单全部换装，位置不变。</span></div>
+  <div class="ds-grid">
+    <div class="frame">
+      <div class="fhead"><h3><svg class="ic"><use href="#i-x"/></svg>旧（Icons.tsx 摘样）</h3></div>
+      <div class="icon-compare">
+        <div class="col">
+          <b>CPU / 内存 / 玩家（12px 实际渲染）</b>
+          <div class="rowi"><svg class="bad-old" viewBox="0 0 16 16"><rect x="2" y="9" width="12" height="4" fill="#b7c2b4"/><rect x="5" y="2" width="6" height="7" fill="#b7c2b4"/></svg>CPU 占用——认不出是 CPU</div>
+          <div class="rowi"><svg class="bad-old" viewBox="0 0 16 16"><rect x="2" y="4" width="12" height="8" fill="#b7c2b4"/><rect x="4" y="6" width="2" height="4" fill="#111311"/><rect x="7" y="6" width="2" height="4" fill="#111311"/><rect x="10" y="6" width="2" height="4" fill="#111311"/></svg>内存——像一块面包</div>
+          <div class="rowi"><svg class="bad-old" viewBox="0 0 16 16"><rect x="3" y="2" width="4" height="4" fill="#b7c2b4"/><rect x="9" y="2" width="4" height="4" fill="#b7c2b4"/><rect x="3" y="9" width="4" height="4" fill="#b7c2b4"/><rect x="9" y="9" width="4" height="4" fill="#b7c2b4"/></svg>玩家——像表格</div>
+        </div>
+        <div class="col" style="font-size:12.5px;color:var(--ink2);line-height:1.8">
+          纯色块没有轮廓语义，缩到 12px 只剩「一个灰东西」。新集用<b style="color:var(--ink1)">轮廓 + 局部实心</b>表达语义，square 端点保住「方」的性格，任意尺寸可辨认。
+        </div>
+      </div>
+    </div>
+    <div class="frame">
+      <div class="fhead"><h3><svg class="ic"><use href="#i-plugin"/></svg>新图标集</h3></div>
+      <div class="icon-grid">
+        <div class="cell"><svg class="ic"><use href="#i-dash"/></svg>概览</div>
+        <div class="cell"><svg class="ic"><use href="#i-term"/></svg>控制台</div>
+        <div class="cell"><svg class="ic"><use href="#i-players"/></svg>玩家</div>
+        <div class="cell"><svg class="ic"><use href="#i-config"/></svg>配置</div>
+        <div class="cell"><svg class="ic"><use href="#i-plugin"/></svg>插件</div>
+        <div class="cell"><svg class="ic"><use href="#i-box"/></svg>整合包</div>
+        <div class="cell"><svg class="ic"><use href="#i-folder"/></svg>文件</div>
+        <div class="cell"><svg class="ic"><use href="#i-backup"/></svg>备份</div>
+        <div class="cell"><svg class="ic"><use href="#i-clock"/></svg>任务</div>
+        <div class="cell"><svg class="ic"><use href="#i-gear"/></svg>设置</div>
+        <div class="cell"><svg class="ic"><use href="#i-cpu"/></svg>CPU</div>
+        <div class="cell"><svg class="ic"><use href="#i-mem"/></svg>内存</div>
+        <div class="cell"><svg class="ic"><use href="#i-down"/></svg>下载</div>
+        <div class="cell"><svg class="ic"><use href="#i-dl-box"/></svg>安装</div>
+        <div class="cell"><svg class="ic"><use href="#i-warn"/></svg>警告</div>
+        <div class="cell"><svg class="ic"><use href="#i-play"/></svg>启动</div>
+        <div class="cell"><svg class="ic"><use href="#i-stop"/></svg>停止</div>
+        <div class="cell"><svg class="ic"><use href="#i-trash"/></svg>删除</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-label" style="margin-top:34px"><b>四、指标带</b><span>与现版同位同数据（CPU / 内存 / 在线玩家 / 运行时长，同一条读数带），只重做渲染。工具条可切 A/B。</span></div>
+  <div class="frame" id="mband-demo">
+    <div class="mband">
+      <div class="metric">
+        <div class="lab"><svg class="ic"><use href="#i-cpu"/></svg>CPU 占用</div>
+        <div class="val"><b>34</b><span class="u">%</span></div>
+        <div class="bar"><i style="width:34%"></i></div>
+        <div class="note">峰值 41%</div>
+      </div>
+      <div class="metric">
+        <div class="lab"><svg class="ic"><use href="#i-mem"/></svg>内存</div>
+        <div class="val"><b>1.8</b><span class="u">/ 4.0 GB</span></div>
+        <div class="bar"><i class="w" style="width:45%"></i></div>
+        <div class="note">峰值 2.1 GB</div>
+      </div>
+      <div class="metric">
+        <div class="lab"><svg class="ic"><use href="#i-players"/></svg>在线玩家</div>
+        <div class="val"><b>3</b><span class="u">/ 20</span></div>
+        <div class="bar"><i style="width:15%"></i></div>
+        <div class="note">依据日志实时统计</div>
+      </div>
+      <div class="metric">
+        <div class="lab"><svg class="ic"><use href="#i-clock"/></svg>运行时长</div>
+        <div class="val"><b>3:42</b><span class="u">时:分</span></div>
+        <div class="bar"><i style="width:100%"></i></div>
+        <div class="note">PID 8216</div>
+      </div>
+    </div>
+  </div>
+  <div class="frame" style="margin-top:16px" id="mband-demo-b">
+    <div class="mband b">
+      <div class="rrow"><span class="tile"><svg class="ic"><use href="#i-cpu"/></svg></span><span class="nm">CPU</span><span class="bar"><i style="width:34%"></i></span><span class="num">34% · 峰值 41%</span></div>
+      <div class="rrow"><span class="tile"><svg class="ic"><use href="#i-mem"/></svg></span><span class="nm">内存</span><span class="bar"><i class="w" style="width:45%"></i></span><span class="num">1.8 / 4.0 GB</span></div>
+      <div class="rrow"><span class="tile"><svg class="ic"><use href="#i-players"/></svg></span><span class="nm">玩家</span><span class="bar"><i style="width:15%"></i></span><span class="num">3 / 20</span></div>
+      <div class="rrow"><span class="tile"><svg class="ic"><use href="#i-clock"/></svg></span><span class="nm">时长</span><span class="bar"><i style="width:100%"></i></span><span class="num">3:42 · PID 8216</span></div>
+    </div>
+  </div>
+  <div class="canvas-label" style="margin-top:10px"><span>A：延续现版「一条读数带」，只把分段条换细条、字换对。B：同数据的资源条式。同一位置、同一指标，实现二选一。</span></div>
+</div>
+</section>
+
+<!-- ══════════ 概览（现版同构换皮）══════════ -->
+<section class="screen" id="scr-home">
+<div class="canvas">
+  <div class="canvas-label"><b>概览</b><span>与现版逐块同构：标题块 → 体检报告 → 指标带 → 控制台 → 服务端文件/内存上限/守护策略 + 启动/删除。顺序、位置、按钮全部未动。</span></div>
+  <div class="app">
+    <div class="shell">
+      <aside class="side">
+        <div class="side-brand">
+          <svg class="logo" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="3" fill="#6fbf44"/><rect y="3" width="8" height="1" fill="#5d9c3a"/><rect y="4" width="8" height="4" fill="#8b5a2b"/><rect x="1" y="5" width="1" height="1" fill="#6f4220"/><rect x="4" y="6" width="2" height="1" fill="#6f4220"/></svg>
+          <div><div class="nm">ServerBox</div><small>M1 · WIN</small></div>
+        </div>
+        <div class="side-cap"><b>世界</b><span>WORLDS</span><span class="n">2</span></div>
+        <div class="inst-list rows">
+          <div class="inst on">
+            <svg class="ava" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="3" fill="#6fbf44"/><rect y="3" width="8" height="1" fill="#5d9c3a"/><rect y="4" width="8" height="4" fill="#8b5a2b"/><rect x="1" y="5" width="1" height="1" fill="#6f4220"/></svg>
+            <div style="min-width:0"><div class="nm">混合forge测试</div><div class="sb">MOHIST · 1.20.1</div></div>
+            <span class="st run"></span>
+          </div>
+          <div class="inst">
+            <svg class="ava" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="8" fill="#7d7d7d"/><rect x="1" y="1" width="2" height="2" fill="#8f8f8f"/><rect x="5" y="4" width="2" height="2" fill="#6b6b6b"/></svg>
+            <div style="min-width:0"><div class="nm">测试转换</div><div class="sb">FORGE · 1.20.1</div></div>
+            <span class="st"></span>
+          </div>
+        </div>
+        <div class="side-foot">
+          <button class="btn primary" style="width:100%"><svg class="ic"><use href="#i-plus"/></svg>新建世界</button>
+          <button class="btn ghost" style="width:100%"><svg class="ic"><use href="#i-down"/></svg>导入已有服务器</button>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <nav class="tabs">
+            <a class="on"><svg class="ic"><use href="#i-dash"/></svg>概览</a>
+            <a><svg class="ic"><use href="#i-players"/></svg>玩家</a>
+            <a><svg class="ic"><use href="#i-config"/></svg>配置</a>
+            <a><svg class="ic"><use href="#i-plugin"/></svg>插件与模组</a>
+            <a><svg class="ic"><use href="#i-box"/></svg>整合包</a>
+            <a><svg class="ic"><use href="#i-folder"/></svg>文件</a>
+            <a><svg class="ic"><use href="#i-backup"/></svg>备份与还原</a>
+            <a><svg class="ic"><use href="#i-clock"/></svg>计划任务</a>
+            <a><svg class="ic"><use href="#i-gear"/></svg>设置</a>
+          </nav>
+        </div>
+
+        <!-- ① 标题块（现版同位） -->
+        <div class="instop">
+          <h1>混合forge测试 <span class="pill run"><i></i>运行中</span></h1>
+          <div class="meta"><span class="chip g"><span class="mono">MOHIST</span></span><span><span class="mono">1.20.1</span> · 端口 <span class="mono">25565</span></span></div>
+          <div class="path">F:\tmp\sbxdata\data\instances\i1791275690766</div>
+        </div>
+
+        <!-- ② 体检报告（现版同位：非运行时出现在指标带之前；此处演示运行中态的最近一次结果） -->
+        <div class="frame" style="margin-bottom:16px">
+          <div class="fhead">
+            <h3><svg class="ic"><use href="#i-check"/></svg>启动体检 · 6 项全过</h3>
+            <span class="sp"></span>
+            <button class="btn ghost sm"><svg class="ic"><use href="#i-refresh"/></svg>重新检查</button>
+          </div>
+          <div class="rows">
+            <div class="lrow"><span class="ic-ava" style="color:var(--green)"><svg class="ic"><use href="#i-check"/></svg></span><div class="nm"><b>服务端文件</b><span>mohist-1.20.1-921-server.jar · Java 21 自动挑选</span></div></div>
+            <div class="lrow"><span class="ic-ava" style="color:var(--green)"><svg class="ic"><use href="#i-check"/></svg></span><div class="nm"><b>EULA 已同意</b><span>2026-10-06 21:50</span></div></div>
+            <div class="lrow"><span class="ic-ava" style="color:var(--green)"><svg class="ic"><use href="#i-check"/></svg></span><div class="nm"><b>端口 25565 空闲</b><span>server.properties 与实例配置一致</span></div></div>
+          </div>
+        </div>
+
+        <!-- ③ 指标带（现版同位） -->
+        <div class="frame mband">
+          <div class="metric">
+            <div class="lab"><svg class="ic"><use href="#i-cpu"/></svg>CPU 占用</div>
+            <div class="val"><b>34</b><span class="u">%</span></div>
+            <div class="bar"><i style="width:34%"></i></div>
+            <div class="note">峰值 41%</div>
+          </div>
+          <div class="metric">
+            <div class="lab"><svg class="ic"><use href="#i-mem"/></svg>内存</div>
+            <div class="val"><b>1.8</b><span class="u">/ 4.0 GB</span></div>
+            <div class="bar"><i class="w" style="width:45%"></i></div>
+            <div class="note">峰值 2.1 GB</div>
+          </div>
+          <div class="metric">
+            <div class="lab"><svg class="ic"><use href="#i-players"/></svg>在线玩家</div>
+            <div class="val"><b>3</b><span class="u">/ 20</span></div>
+            <div class="bar"><i style="width:15%"></i></div>
+            <div class="note">依据日志实时统计</div>
+          </div>
+          <div class="metric">
+            <div class="lab"><svg class="ic"><use href="#i-clock"/></svg>运行时长</div>
+            <div class="val"><b>3:42</b><span class="u">时:分</span></div>
+            <div class="bar"><i style="width:100%"></i></div>
+            <div class="note">PID 8216</div>
+          </div>
+        </div>
+
+        <!-- ④ 控制台（现版同位） -->
+        <div class="frame" style="margin-top:16px">
+          <div class="fhead">
+            <h3><svg class="ic"><use href="#i-term"/></svg>控制台</h3>
+            <span class="live"><i></i>LIVE</span>
+            <span class="sp"></span>
+            <button class="btn ghost sm">跟随</button>
+            <button class="btn ghost sm">清空</button>
+          </div>
+          <div class="term">
+            <div class="ln"><span class="t">21:56:41</span><span class="lv info">INFO</span><span class="msg">Starting minecraft server version 1.20.1</span></div>
+            <div class="ln"><span class="t">21:56:42</span><span class="lv info">INFO</span><span class="msg">Loading properties</span></div>
+            <div class="ln"><span class="t">21:56:47</span><span class="lv warn">WARN</span><span class="msg warn">Running in offline/insecure mode</span></div>
+            <div class="ln"><span class="t">21:57:03</span><span class="lv info">INFO</span><span class="msg">[ServerBoxCompanion] ServerBoxCompanion 0.2.0 已启用（MC 1.20.1-R0.1-SNAPSHOT）</span></div>
+            <div class="ln"><span class="t">21:57:09</span><span class="lv info">INFO</span><span class="msg">Done (27.314s)! For help, type "help"</span></div>
+            <div class="ln"><span class="t">22:01:15</span><span class="lv info">INFO</span><span class="msg">Steve joined the game</span></div>
+            <div class="ln"><span class="t">22:03:28</span><span class="lv info">INFO</span><span class="msg">小小墨 joined the game</span></div>
+            <div class="ln"><span class="t">22:04:02</span><span class="lv info">INFO</span><span class="msg">&lt;Steve&gt; 谁把我家门拆了</span></div>
+            <div class="ln"><span class="t">22:04:41</span><span class="lv warn">WARN</span><span class="msg warn">Can't keep up! Is the server overloaded? Running 2043ms behind</span></div>
+            <div class="ln"><span class="t">22:05:10</span><span class="lv info">INFO</span><span class="msg">Alex joined the game</span></div>
+            <div class="ln"><span class="t">22:08:19</span><span class="lv info">INFO</span><span class="msg">Saving chunks for level 'ServerLevel[world]'/minecraft:overworld</span></div>
+          </div>
+          <div class="cmdbuf">
+            <span class="pr">&gt;</span>
+            <input placeholder="输入命令，回车发送">
+          </div>
+        </div>
+
+        <!-- ⑤ 底排（现版同位：三项 dl + 启动/删除在右侧） -->
+        <div style="display:flex;align-items:flex-end;gap:28px;flex-wrap:wrap;margin-top:22px">
+          <dl style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;flex:1;min-width:0">
+            <div><dt style="font-size:12px;font-weight:600;color:var(--ink2)">服务端文件</dt><dd style="font-family:var(--mono);font-size:12px;color:var(--ink2);margin-top:5px;overflow-wrap:anywhere">mohist-1.20.1-921-server.jar</dd></div>
+            <div><dt style="font-size:12px;font-weight:600;color:var(--ink2)">内存上限</dt><dd style="font-size:13.5px;margin-top:5px">4.0 GB</dd></div>
+            <div><dt style="font-size:12px;font-weight:600;color:var(--ink2)">守护策略</dt><dd style="font-size:13.5px;margin-top:5px">不自动启动 · 崩溃重启</dd></div>
+          </dl>
+          <div style="display:flex;gap:10px">
+            <button class="btn primary"><svg class="ic"><use href="#i-play"/></svg>启动</button>
+            <button class="btn danger-ghost"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════ 插件与模组（现版同构换皮：已安装视图 + 获取模组视图）══════════ -->
+<section class="screen" id="scr-plugins">
+<div class="canvas">
+  <div class="canvas-label"><b>插件与模组</b><span>现版逻辑原样：已安装列表（筛选/搜索/缺前置条）＋「获取模组」视图（三标签市场）。两屏只是同一页的两个视图，皮肤重做。</span></div>
+  <div class="app">
+    <div class="shell">
+      <aside class="side">
+        <div class="side-brand">
+          <svg class="logo" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="3" fill="#6fbf44"/><rect y="3" width="8" height="1" fill="#5d9c3a"/><rect y="4" width="8" height="4" fill="#8b5a2b"/></svg>
+          <div><div class="nm">ServerBox</div><small>M1 · WIN</small></div>
+        </div>
+        <div class="side-cap"><b>世界</b><span>WORLDS</span><span class="n">2</span></div>
+        <div class="inst-list rows">
+          <div class="inst on">
+            <svg class="ava" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="3" fill="#6fbf44"/><rect y="4" width="8" height="4" fill="#8b5a2b"/></svg>
+            <div style="min-width:0"><div class="nm">混合forge测试</div><div class="sb">MOHIST · 1.20.1</div></div>
+            <span class="st run"></span>
+          </div>
+          <div class="inst">
+            <svg class="ava" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="8" fill="#7d7d7d"/></svg>
+            <div style="min-width:0"><div class="nm">测试转换</div><div class="sb">FORGE · 1.20.1</div></div>
+            <span class="st"></span>
+          </div>
+        </div>
+        <div class="side-foot"><button class="btn primary" style="width:100%"><svg class="ic"><use href="#i-plus"/></svg>新建世界</button></div>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <nav class="tabs">
+            <a><svg class="ic"><use href="#i-dash"/></svg>概览</a>
+            <a><svg class="ic"><use href="#i-players"/></svg>玩家</a>
+            <a><svg class="ic"><use href="#i-config"/></svg>配置</a>
+            <a class="on"><svg class="ic"><use href="#i-plugin"/></svg>插件与模组</a>
+            <a><svg class="ic"><use href="#i-box"/></svg>整合包</a>
+            <a><svg class="ic"><use href="#i-folder"/></svg>文件</a>
+            <a><svg class="ic"><use href="#i-backup"/></svg>备份与还原</a>
+            <a><svg class="ic"><use href="#i-clock"/></svg>计划任务</a>
+            <a><svg class="ic"><use href="#i-gear"/></svg>设置</a>
+          </nav>
+        </div>
+
+        <div class="instop"><h1>已安装</h1></div>
+
+        <!-- 筛选 + 搜索（现版同位） -->
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <div class="input" style="width:280px">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <input placeholder="搜名字 / 文件名 / modId">
+          </div>
+          <span class="chip g">全部 6</span><span class="chip">已启用 4</span><span class="chip">已禁用 1</span><span class="chip w">缺前置 1</span><span class="chip">读不出信息 0</span>
+          <span style="margin-left:auto"></span>
+          <button class="btn primary sm"><svg class="ic"><use href="#i-dl-box"/></svg>获取模组</button>
+        </div>
+
+        <!-- 缺前置问题条（现版同位：只显示必需的） -->
+        <div class="notebox warn" style="margin-bottom:12px; max-width:62ch">
+          <svg class="ic"><use href="#i-warn"/></svg>
+          <p><b>Sodium Extra</b> 缺必需前置 <b>sodium 0.5.11</b>，装上它才能启用。</p>
+          <div class="acts"><button class="btn ghost sm">装前置</button></div>
+        </div>
+
+        <!-- 已安装列表（modrow 同构） -->
+        <div class="frame rows">
+          <div class="lrow">
+            <span class="ic-ava"><svg class="ic"><use href="#i-plugin"/></svg></span>
+            <div class="nm"><b>Entity Culling</b><span>entityculling 1.6.2 · fabric · 82 KB</span></div>
+            <span class="meta">mods/entityculling-fabric-1.6.2.jar</span>
+            <span class="tgl on"><i></i></span>
+            <div class="ops"><button class="ibtn" title="详情"><svg class="ic"><use href="#i-search"/></svg></button><button class="ibtn" title="删除"><svg class="ic"><use href="#i-trash"/></svg></button></div>
+          </div>
+          <div class="lrow">
+            <span class="ic-ava"><svg class="ic"><use href="#i-plugin"/></svg></span>
+            <div class="nm"><b>Cloth Config API</b><span>cloth-config 11.1.136 · fabric · 1.4 MB</span></div>
+            <span class="meta">mods/cloth-config-api-11.1.136.jar</span>
+            <span class="tgl on"><i></i></span>
+            <div class="ops"><button class="ibtn" title="详情"><svg class="ic"><use href="#i-search"/></svg></button><button class="ibtn" title="删除"><svg class="ic"><use href="#i-trash"/></svg></button></div>
+          </div>
+          <div class="lrow">
+            <span class="ic-ava" style="color:var(--amber)"><svg class="ic"><use href="#i-warn"/></svg></span>
+            <div class="nm"><b>Sodium Extra</b><span>sodium-extra 0.5.4 · fabric · 缺前置 <b>sodium 0.5.11</b></span></div>
+            <span class="meta">mods/sodium-extra-0.5.4.jar</span>
+            <span class="chip w">缺前置</span>
+            <div class="ops"><button class="btn ghost sm">装前置</button><button class="ibtn" title="删除"><svg class="ic"><use href="#i-trash"/></svg></button></div>
+          </div>
+          <div class="lrow">
+            <span class="ic-ava"><svg class="ic"><use href="#i-plugin"/></svg></span>
+            <div class="nm"><b>FerriteCore</b><span>ferrite-core 6.0.1 · fabric · 892 KB</span></div>
+            <span class="meta">mods/ferrite-core-6.0.1.jar</span>
+            <span class="tgl"><i></i></span>
+            <div class="ops"><button class="ibtn" title="详情"><svg class="ic"><use href="#i-search"/></svg></button><button class="ibtn" title="删除"><svg class="ic"><use href="#i-trash"/></svg></button></div>
+          </div>
+          <div class="lrow">
+            <span class="ic-ava"><svg class="ic"><use href="#i-box"/></svg></span>
+            <div class="nm"><b>ServerBoxCompanion</b><span>0.2.0 · 面板自带 · 不要手动删</span></div>
+            <span class="meta">plugins/ServerBoxCompanion.jar</span>
+            <span class="chip c">面板自带</span>
+            <div class="ops"><button class="ibtn" title="详情"><svg class="ic"><use href="#i-search"/></svg></button></div>
+          </div>
+        </div>
+
+        <!-- 获取模组视图（现版同构：返回 + 三标签 + 排序/分类 chips + 结果） -->
+        <div class="canvas-label" style="margin-top:26px"><b>同页第二个视图：获取模组</b><span>「← 返回已安装」+ 三标签 + 排序/分类 chips + 结果列表——结构照旧。</span></div>
+        <div class="frame">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;flex-wrap:wrap">
+            <button class="btn ghost sm"><svg class="ic"><use href="#i-arrow-l"/></svg>返回已安装</button>
+            <b style="font-size:15px">获取模组</b>
+            <span style="font-size:12px;color:var(--ink3)">装进 10086 的 mods 目录，下载完自动出现在「已安装」列表里</span>
+          </div>
+          <div style="display:flex;gap:6px;padding:0 14px 12px;flex-wrap:wrap">
+            <span class="chip g">在线市场</span><span class="chip">从直链</span><span class="chip">本地上传</span>
+          </div>
+          <div style="padding:0 14px 12px">
+            <div class="input" style="max-width:520px">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <input placeholder="搜模组名字，支持中文，例如 暮色森林">
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+              <span class="chip g">热门下载</span><span class="chip">最新收录</span><span class="chip">最近更新</span><span class="chip">最多关注</span>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+              <span class="chip g">全部</span><span class="chip">优化</span><span class="chip">实用</span><span class="chip">存储</span><span class="chip">科技</span><span class="chip">魔法</span><span class="chip">世界生成</span><span class="chip">生物</span><span class="chip">装备</span><span class="chip">管理</span>
+            </div>
+            <div class="fhint" style="margin-top:8px">命中：热门下载 · 已按实例过滤：加载器 fabric · MC 1.20.1　·　来源 Modrinth</div>
+          </div>
+          <div class="rows">
+            <div class="lrow">
+              <span class="ic-ava"><svg class="ic"><use href="#i-box"/></svg></span>
+              <div class="nm"><b>JourneyMap</b><span>旅行地图 · 在游戏里显示周边地形与路标</span></div>
+              <span class="meta">1,747,118 下载<br>2026-09-21 更新</span>
+              <button class="btn ghost sm"><svg class="ic"><use href="#i-dl-box"/></svg>安装</button>
+            </div>
+            <div class="lrow">
+              <span class="ic-ava"><svg class="ic"><use href="#i-box"/></svg></span>
+              <div class="nm"><b>ImmediatelyFast</b><span>加速即时渲染模式</span></div>
+              <span class="meta">1,277,374 下载<br>2026-09-17 更新</span>
+              <button class="btn ghost sm"><svg class="ic"><use href="#i-dl-box"/></svg>安装</button>
+            </div>
+            <div class="lrow">
+              <span class="ic-ava"><svg class="ic"><use href="#i-box"/></svg></span>
+              <div class="nm"><b>[ETF] Entity Texture Features</b><span>实体纹理随机化与表情</span></div>
+              <span class="meta">1,104,944 下载<br>2026-09-02 更新</span>
+              <button class="btn ghost sm"><svg class="ic"><use href="#i-dl-box"/></svg>安装</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════ 配置（现版同构换皮：fnav + 一组一屏）══════════ -->
+<section class="screen" id="scr-config">
+<div class="canvas">
+  <div class="canvas-label"><b>配置</b><span>现版逻辑原样：左侧 fnav 分组 + 一组一屏 + 上一组/下一组；搜索框与字段计数照旧。只换皮。</span></div>
+  <div class="app">
+    <div class="shell">
+      <aside class="side">
+        <div class="side-brand">
+          <svg class="logo" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="3" fill="#6fbf44"/><rect y="3" width="8" height="1" fill="#5d9c3a"/><rect y="4" width="8" height="4" fill="#8b5a2b"/></svg>
+          <div><div class="nm">ServerBox</div><small>M1 · WIN</small></div>
+        </div>
+        <div class="side-cap"><b>世界</b><span>WORLDS</span><span class="n">2</span></div>
+        <div class="inst-list rows">
+          <div class="inst on">
+            <svg class="ava" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="3" fill="#6fbf44"/><rect y="4" width="8" height="4" fill="#8b5a2b"/></svg>
+            <div style="min-width:0"><div class="nm">混合forge测试</div><div class="sb">MOHIST · 1.20.1</div></div>
+            <span class="st run"></span>
+          </div>
+        </div>
+        <div class="side-foot"><button class="btn primary" style="width:100%"><svg class="ic"><use href="#i-plus"/></svg>新建世界</button></div>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <nav class="tabs">
+            <a><svg class="ic"><use href="#i-dash"/></svg>概览</a>
+            <a><svg class="ic"><use href="#i-players"/></svg>玩家</a>
+            <a class="on"><svg class="ic"><use href="#i-config"/></svg>配置</a>
+            <a><svg class="ic"><use href="#i-plugin"/></svg>插件与模组</a>
+            <a><svg class="ic"><use href="#i-box"/></svg>整合包</a>
+            <a><svg class="ic"><use href="#i-folder"/></svg>文件</a>
+            <a><svg class="ic"><use href="#i-backup"/></svg>备份与还原</a>
+            <a><svg class="ic"><use href="#i-clock"/></svg>计划任务</a>
+            <a><svg class="ic"><use href="#i-gear"/></svg>设置</a>
+          </nav>
+        </div>
+
+        <div class="instop">
+          <h1>配置</h1>
+          <p style="font-size:13px;color:var(--ink3);margin-top:5px;max-width:62ch">在调混合forge测试。「实例设置」是我们自己的配置，改完立刻生效；其余分组是服务端自己的 server.properties，多数要重启才读到。</p>
+        </div>
+
+        <div style="margin-bottom:12px;display:flex;align-items:center;gap:12px">
+          <div class="input" style="width:340px">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <input placeholder="搜字段名 / 键名，例如「端口」或 port">
+          </div>
+          <span style="font-family:var(--mono);font-size:11.5px;color:var(--ink3)">66 个字段</span>
+        </div>
+
+        <div class="cfg">
+          <div class="fnav rows">
+            <div class="fitem">实例设置<span class="n">6</span></div>
+            <div class="fitem on">服务端文件</div>
+            <div class="fitem">其他配置文件</div>
+            <div class="fitem">网络与身份<span class="n">9</span></div>
+            <div class="fitem">玩法<span class="n">9</span></div>
+            <div class="fitem">世界生成<span class="n">8</span></div>
+            <div class="fitem">玩家管理<span class="n">6</span></div>
+            <div class="fitem">性能与稳定<span class="n">7</span></div>
+            <div class="fitem">可见性与查询<span class="n">4</span></div>
+            <div class="fitem">资源包<span class="n">4</span></div>
+            <div class="fitem">远程控制<span class="n">5</span></div>
+            <div class="fitem">其它<span class="n">8</span></div>
+          </div>
+
+          <div class="cfgpane frame">
+            <div class="cfg-head">
+              <b>服务端文件</b>
+              <span class="sub">已选 <b style="color:var(--ink2)">mohist-1.20.1-921-server.jar</b> · 换服务端、先验重下一份，或转成混合端（模组 + 插件）</span>
+              <span class="pg">第 2 / 12 组</span>
+            </div>
+            <div class="vpick">
+              <div class="vcol rows">
+                <div class="vitem on">1.20.1</div>
+                <div class="vitem">1.19.4</div>
+                <div class="vitem">1.19.2</div>
+                <div class="vfoot">10 个正式版<br>已滤掉快照与预发布</div>
+              </div>
+              <div class="bcol rows">
+                <div class="brow"><code>#471</code><span class="bm">Forge 47.4.13 · 大小未知 · 需要 Java 17</span><span class="bt">2026-01-16 21:01</span></div>
+                <div class="brow"><code>#425</code><span class="bm">Forge 47.4.13 · 大小未知 · 需要 Java 17</span><span class="bt">2025-12-26 18:13</span></div>
+              </div>
+            </div>
+            <div class="cfg-acts">
+              <button class="btn primary"><svg class="ic"><use href="#i-down"/></svg>下载并替换</button>
+              <span class="fhint" style="margin-top:0">下载会覆盖 server.jar，旧的将被删掉。连接被掐断会自动重试，接着已有进度；源站给了校验和的会校验一遍。换完服务端记得看一眼「实例设置」里的端口和内存还合不合适。</span>
+            </div>
+            <div class="cfg-head" style="border-top:1px solid var(--line)">
+              <b>转换为混合端</b>
+              <span class="chip">Mohist</span>
+              <span class="sub">模组 + 插件同时跑</span>
+            </div>
+            <div style="padding:0 16px 14px">
+              <div class="notebox" style="max-width:none">
+                <svg class="ic"><use href="#i-warn"/></svg>
+                <p>混合端的本质还是你这个模组端，只是多了一层 Bukkit 实现——所以 mods/ 里的模组不用重装，换完之后也能装插件了。<br><br>转换只做两件事：下载混合端的启动文件、把它设成新的启动文件，再把类型改过来。mods/、plugins/、world/、各种配置都原样保留。但有<b>三件事你必须先知道</b>：① 混合端会用它自带的 libraries 并把缺的补上——旧启动文件我们留着不动，所以理论上能换回去，但日志被刷过之后不保证能干净清空；② 少数用 Mixin / ASM 改底层类的核心模组，可能跟 Bukkit 实现打架——这是混合端的固有风险，上游普遍明确不受理由此出的问题；③ 存档多数能直接读，但同样不保证。转之前先做一次备份。</p>
+              </div>
+            </div>
+            <div class="rows">
+              <div class="lrow">
+                <span class="ic-ava"><svg class="ic"><use href="#i-box"/></svg></span>
+                <div class="nm"><b>Arclight</b><span>同样是 Forge + Bukkit 的整端 jar，装好之后行为接近 Mohist。⚠ 它只发布在 GitHub，下载会经第三方加速代理转一道，mods/ 与 world/ 原样保留。</span></div>
+                <button class="btn ghost sm">转换</button>
+              </div>
+            </div>
+            <div class="cfg-foot">
+              <span class="hint">一组一屏，切换用左边或这里的按钮</span>
+              <div style="display:flex;gap:8px">
+                <button class="btn ghost sm"><svg class="ic"><use href="#i-arrow-l"/></svg>上一组</button>
+                <button class="btn ghost sm">下一组<svg class="ic"><use href="#i-arrow-r"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════ 手机档 520（现版同构换皮）══════════ -->
+<section class="screen" id="scr-mobile">
+<div class="canvas canvas-narrow">
+  <div class="canvas-label"><b>手机档 · 520</b><span>现版同构：抽屉顶栏（汉堡+品牌+状态）→ 横滚页签 → 概览内容（标题块/指标/控制台）。只换皮。</span></div>
+  <div class="m-app">
+    <div class="m-top">
+      <span class="burger"><i></i><i></i><i></i></span>
+      <span class="bt">ServerBox</span>
+      <span class="pill run"><i></i>运行中</span>
+    </div>
+    <div class="m-tabs">
+      <a class="on">概览</a><a>玩家</a><a>配置</a><a>插件</a><a>整合包</a><a>文件</a><a>备份</a><a>任务</a><a>设置</a>
+    </div>
+    <div class="m-main">
+      <div class="instop" style="padding:0">
+        <h1 style="font-size:17px">混合forge测试 <span class="pill run"><i></i>运行中</span></h1>
+        <div class="meta"><span><span class="mono">1.20.1</span> · 端口 <span class="mono">25565</span></span></div>
+      </div>
+      <div class="frame mband" style="grid-template-columns:1fr 1fr">
+        <div class="metric">
+          <div class="lab"><svg class="ic"><use href="#i-cpu"/></svg>CPU 占用</div>
+          <div class="val"><b>34</b><span class="u">%</span></div>
+          <div class="bar"><i style="width:34%"></i></div>
+          <div class="note">峰值 41%</div>
+        </div>
+        <div class="metric">
+          <div class="lab"><svg class="ic"><use href="#i-mem"/></svg>内存</div>
+          <div class="val"><b>1.8</b><span class="u">/ 4.0 GB</span></div>
+          <div class="bar"><i class="w" style="width:45%"></i></div>
+          <div class="note">峰值 2.1 GB</div>
+        </div>
+        <div class="metric">
+          <div class="lab"><svg class="ic"><use href="#i-players"/></svg>在线玩家</div>
+          <div class="val"><b>3</b><span class="u">/ 20</span></div>
+          <div class="bar"><i style="width:15%"></i></div>
+          <div class="note">依据日志实时统计</div>
+        </div>
+        <div class="metric">
+          <div class="lab"><svg class="ic"><use href="#i-clock"/></svg>运行时长</div>
+          <div class="val"><b>3:42</b><span class="u">时:分</span></div>
+          <div class="bar"><i style="width:100%"></i></div>
+          <div class="note">PID 8216</div>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="fhead"><h3><svg class="ic"><use href="#i-term"/></svg>控制台</h3><span class="live"><i></i>LIVE</span><span class="sp"></span><button class="btn ghost sm">跟随</button><button class="btn ghost sm">清空</button></div>
+        <div class="term" style="font-size:12px">
+          <div class="ln"><span class="t">22:01</span><span class="lv info">INFO</span><span class="msg">Steve joined the game</span></div>
+          <div class="ln"><span class="t">22:04</span><span class="lv warn">WARN</span><span class="msg warn">Can't keep up! Running 2043ms behind</span></div>
+          <div class="ln"><span class="t">22:05</span><span class="lv info">INFO</span><span class="msg">Alex joined the game</span></div>
+        </div>
+        <div class="cmdbuf"><span class="pr">&gt;</span><input placeholder="输入命令，回车发送"></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn primary" style="flex:1"><svg class="ic"><use href="#i-play"/></svg>启动</button>
+        <button class="btn danger-ghost" style="flex:1"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<script>
+document.querySelectorAll('.dbar-tab[data-go]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    document.querySelectorAll('.dbar-tab').forEach(function (x) { x.classList.remove('on') });
+    b.classList.add('on');
+    document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('on') });
+    document.getElementById('scr-' + b.dataset.go).classList.add('on');
+    window.scrollTo(0, 0);
+  });
+});
+var mbandB = false;
+document.getElementById('mband-toggle').addEventListener('click', function () {
+  mbandB = !mbandB;
+  document.querySelectorAll('.mband').forEach(function (m) {
+    if (mbandB) {
+      m.classList.add('b');
+      m.querySelectorAll('.metric').forEach(function (el, i) {
+        if (!el.dataset.b) {
+          var map = [
+            ['i-cpu', 'CPU', 34, '34% · 峰值 41%', ''],
+            ['i-mem', '内存', 45, '1.8 / 4.0 GB', 'w'],
+            ['i-players', '玩家', 15, '3 / 20', ''],
+            ['i-clock', '时长', 100, '3:42 · PID 8216', ''],
+          ];
+          var d = map[i % 4];
+          el.innerHTML = '<div class="rrow"><span class="tile"><svg class="ic"><use href="#' + d[0] + '"/></svg></span>' +
+            '<span class="nm">' + d[1] + '</span><span class="bar"><i class="' + d[4] + '" style="width:' + d[2] + '%"></i></span>' +
+            '<span class="num">' + d[3] + '</span></div>';
+          el.dataset.b = '1';
+        }
+      });
+    } else { location.reload(); }
+  });
+});
+document.getElementById('grid-toggle').addEventListener('click', function () {
+  document.body.classList.toggle('grid-overlay');
+});
+</script>
+</body>
+</html>

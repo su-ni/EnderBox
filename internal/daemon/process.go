@@ -76,7 +76,16 @@ type Process struct {
 	// intentional 人为停服标记。收尾 goroutine 靠它区分「崩溃」和「正常停止」——
 	// 不能拿 status 当依据：Kill 要让状态立刻可读会先写成 Stopped，
 	// 而 goroutine 只认 Stopping，于是「强制停止」被误记成崩溃、还会触发自动重启。
+	//
+	// 三条置位路径，缺一条就会出现「明明正常关服却被判崩溃」：
+	//   ①Stop() / Kill()   —— 我们主动停机；
+	//   ②Send("stop")      —— 用户在控制台手敲（这条曾经漏了，就是这次的 bug）；
+	//   ③track() 看见 "Stopping server" —— 服务端自己承认在关服，最可靠。
 	intentional bool
+	// everReady 服务端成功启动过（日志里出现过就绪那行，见 isReadyLine）。
+	// 只给「退出码 0 = 正常关机」这条兜底判据当前提：起不来就退出的
+	// （eula 没同意、端口被占）绝不会先打出就绪行，所以不会被这条误判成正常。
+	everReady bool
 
 	logs *LogBuffer
 	job  jobHandle
@@ -139,11 +148,6 @@ func isArgsFile(p string) bool {
 	return strings.HasSuffix(strings.ToLower(filepath.FromSlash(p)), "_args.txt")
 }
 
-// isProxy 代理端：自己不开世界，只把玩家转发给后面的服务器。
-func isProxy(t Type) bool {
-	return t == TypeVelocity || t == TypeBungee
-}
-
 // Start 拉起进程
 func (p *Process) Start(javaPath string) error {
 	p.mu.Lock()
@@ -155,6 +159,22 @@ func (p *Process) Start(javaPath string) error {
 
 	cmd := exec.Command(javaPath, buildArgs(p.inst)...)
 	cmd.Dir = p.inst.Dir
+	// ⚠⚠ 这里**不能**图省事地加 `DETACHED_PROCESS` 让 java 脱离控制台。
+	//
+	// 试过了，代价是 `internal/daemon` 的核心护栏测试 `TestE2EConsoleStopIsNotCrash`
+	// （停服三层判定，用真 Java 跑）**直接挂掉**：
+	//     不加 → PASS，2.2 秒
+	//     加   → FAIL，60 秒超时（等 "Done" 那一行等不到）
+	//
+	// 已排除两个想当然的解释：
+	//   ① 不是「java 起不来」—— 单独跑的 flag 对照实验（`-version`）里，
+	//      无 flag / DETACHED / NEW_PROCESS_GROUP / 两者都有，四个组合全部 67ms 正常返回；
+	//   ② 不是「输出没 flush」—— 假服务端 `tools/fakeserver/FakeServer.java` 里
+	//      明确调了 `System.out.flush()`。
+	//
+	// 结论：detached 之后，**这个常驻进程的 stdout 管道拿不到数据**，但根因未定位。
+	// 想彻底解决「关面板别把服也关了」，需要的是**绕开管道**的方案（读 `logs/latest.log` +
+	// 命令走 RCON），那是另一件事，不能靠一个 flag 蒙过去。详见 `docs/PROCESS-LIFECYCLE.md`。
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -180,6 +200,7 @@ func (p *Process) Start(javaPath string) error {
 	p.startedAt = &now
 	p.errMsg = ""
 	p.intentional = false
+	p.everReady = false
 	p.done = make(chan struct{})
 
 	// 挂到 Job Object，保证崩了也能把整棵进程树带走
@@ -191,13 +212,13 @@ func (p *Process) Start(javaPath string) error {
 	go func() {
 		err := cmd.Wait()
 		p.mu.Lock()
-		if !p.intentional {
+		if stoppedGracefully(p.intentional, p.everReady, err) {
+			p.status = StatusStopped
+		} else {
 			p.status = StatusCrashed
 			if err != nil {
 				p.errMsg = err.Error()
 			}
-		} else {
-			p.status = StatusStopped
 		}
 		p.mu.Unlock()
 		closeJob(p.job)
@@ -224,6 +245,28 @@ func (p *Process) pump(r io.Reader) {
 	}
 }
 
+// stoppedGracefully 这次退出算「正常停止」吗？收尾 goroutine 靠它决定写不写崩溃档、
+// 要不要触发自动重启。
+//
+// 三条判据，任意一条成立就算正常：
+//
+//	①intentional —— 我们或用户明确要求的（Stop / Kill / 控制台手敲 stop）；
+//	②服务端自曝关服 —— 看到 "Stopping server" 时 track 置的那一位（也在 intentional 上）；
+//	③退出码 0（cmd.Wait 返回 nil）且确实成功启动过 —— 它自己把 main 跑完了，
+//	  不是被人打死的。强杀（taskkill /F）和 JVM 抛异常都会是非 0 退出码。
+//
+// 全不成立才是崩溃 —— 这正是「服务端起不来」和「被 OOM/插件搞死」的形态。
+//
+// 抽成纯函数是为了能被单测钉死：这套判据一旦漏掉某条停机路径，表现就是
+// 「明明正常关服却报崩溃 + 乱重启」，用户直接看得见，不能只靠真机去试。
+// waitErr 就是 exec.Cmd.Wait 的返回值：nil == 退出码 0。
+func stoppedGracefully(intentional, everReady bool, waitErr error) bool {
+	if intentional {
+		return true
+	}
+	return waitErr == nil && everReady
+}
+
 // Send 向控制台写入一条命令，并把这条命令回显进日志。
 // 不回显的话，用户敲完 list 会盯着屏幕怀疑自己到底按没按回车 ——
 // 服务端对很多命令的回应要等好几秒。
@@ -233,14 +276,31 @@ func (p *Process) Send(cmd string) error {
 		return fmt.Errorf("命令是空的")
 	}
 	p.mu.Lock()
+	// 用户手敲 stop 走的是这条通用命令通道，不是 Stop() 那个专用停机流程。
+	// 标记必须在这里补上：否则服务端优雅退出了，收尾 goroutine 却因为没有标记
+	// 把它判成崩溃 —— 存档、报「已崩溃」、还自动重启，用户一脸问号。
+	//
+	// 必须在写 stdin **之前**置位：服务端可能几毫秒内就退出了，
+	// 收尾 goroutine 一旦抢先判定，这一笔就再也补不回来。
+	if stopCommands[strings.ToLower(cmd)] {
+		p.intentional = true
+	}
 	w := p.stdin
 	p.mu.Unlock()
 	if w == nil {
 		return fmt.Errorf("进程未运行")
 	}
-	p.logs.Append("[ServerBox] > " + cmd)
+	p.logs.Append("[EnderBox] > " + cmd)
 	_, err := io.WriteString(w, cmd+"\n")
 	return err
+}
+
+// stopCommands 敲下去就等于「我要关服」的控制台命令。
+// 按各服务端实现的别名收：原版/Paper/Forge/Fabric 都是 stop，
+// CraftBukkit 系另认 end。代理端（Velocity/BungeeCord）同样认 stop。
+var stopCommands = map[string]bool{
+	"stop": true,
+	"end":  true,
 }
 
 // normalizeCommand 把用户敲的东西收拾成服务端控制台认识的样子。

@@ -79,8 +79,10 @@ func TestPromoMCVersionsParsing(t *testing.T) {
 	seen := map[string]int{}
 	for _, v := range got {
 		seen[v.ID]++
-		if !v.Stable {
-			t.Errorf("%s 应该被标为正式版", v.ID)
+		// 推荐表里不该混进快照/预发布（它们都带 `-`）。这条以前靠 Version.Stable
+		// 断言，字段删掉之后把「正式版」的判据直接写在这里 —— 强度不变。
+		if v.ID == "" || strings.Contains(v.ID, "-") {
+			t.Errorf("%s 不是合法的正式版版本号", v.ID)
 		}
 	}
 	for _, want := range []string{"1.20.4", "26.3", "1.7.10"} {

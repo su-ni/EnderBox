@@ -29,6 +29,9 @@ runtimes/
 tools/fakeserver/*.class
 tools/fakeserver/server.jar
 
+# companion 插件的编译中间目录（jar 由 build.sh 生成，源码在 src/）
+tools/companion/build/
+
 # IDE
 .idea/
 .vscode/
@@ -37,3 +40,15 @@ tools/fakeserver/server.jar
 # 系统
 Thumbs.db
 Desktop.ini
+
+# 开发临时/备份/验证产物（不入库）
+web_backup_20261007/
+web/_*.py
+*.bak*
+.probe/
+.showcase-data/
+.zcode/
+docs/shots/
+docs/probe-splash/
+docs/probe-stone/
+docs/verify-mcg/

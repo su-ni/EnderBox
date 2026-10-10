@@ -99,7 +99,7 @@ func VanillaVersions(mirror string) ([]Version, error) {
 		if v.Type != "release" {
 			continue
 		}
-		out = append(out, Version{ID: v.ID, Prerelease: false, Stable: true})
+		out = append(out, Version{ID: v.ID})
 	}
 	sortVersionsNewestFirst(out)
 	return out, nil

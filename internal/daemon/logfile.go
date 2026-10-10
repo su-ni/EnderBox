@@ -119,7 +119,7 @@ func (s *fileSink) Close() {
 // sessionBanner 会话分隔线：日志行本身不带额外时间戳（服务端自己已经给了），
 // 所以每次起服插一条锚点，否则翻历史时根本分不清哪一段是哪次运行。
 func sessionBanner() string {
-	return fmt.Sprintf("[ServerBox] ===== 会话开始 %s =====", time.Now().Format("2006-01-02 15:04:05"))
+	return fmt.Sprintf("[EnderBox] ===== 会话开始 %s =====", time.Now().Format("2006-01-02 15:04:05"))
 }
 
 // humanDelay 把 1m0s 这种 Go 默认格式换成中文里顺口的说法。
@@ -146,7 +146,7 @@ func (m *Manager) WriteCrashSnapshot(id string, lines []string, errMsg string) (
 	p := filepath.Join(dir, name)
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "# ServerBox 崩溃现场\n")
+	fmt.Fprintf(&sb, "# EnderBox 崩溃现场\n")
 	fmt.Fprintf(&sb, "# 时间：%s\n", time.Now().Format("2006-01-02 15:04:05"))
 	if errMsg != "" {
 		fmt.Fprintf(&sb, "# 退出信息：%s\n", errMsg)

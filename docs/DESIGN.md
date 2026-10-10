@@ -195,14 +195,16 @@ GET    /api/modrinth/search?q=&type=&version=
 | M3 | Java 管理 + 服务端安装器（Paper/Fabric/Forge/Velocity） |
 | M4 | 文件管理、插件上传、备份还原 |
 | M5 | Modrinth / CurseForge 检索与一键安装、整合包导入 |
-| M6 | Wails 桌面端打包、托盘、手机端适配打磨 |
+| M6 | Wails 桌面端：窗口 + 单实例 + 自动拉起守护进程 **已完成**（`cmd/desktop/`、`build-desktop.sh`）；**托盘 / 应用图标 / 开机自启**待做；手机端适配打磨 |
 
 ## 九、开工前置条件
 
 - [x] 安装 Go 1.27.1（装在 `F:\tools\go`，GOPATH / GOCACHE 也都在 F 盘，不碰 C 盘）
 - [x] 确认项目名称：ServerBox
 - [x] 建 git 仓库（main 分支）
-- [ ] 安装 Wails CLI（桌面端阶段才需要）
+- [x] 安装 Wails CLI（桌面端阶段才需要）
+      —— 2026-10-06 装好：`wails v2.16.0`。⚠ 本机 `CGO_ENABLED=0`、没有 gcc，
+      实测**不需要 CGO**（Windows 上用纯 Go 的 WebView2Loader）。详见 `NEXT-STEPS.md` 补记八。
 
 ## 十、M1 实测记录（2026-10-04）
 

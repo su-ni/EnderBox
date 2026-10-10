@@ -1,0 +1,119 @@
+<!-- ServerBox 设计稿 · 单屏模块：states
+     从 index.html 里原样切出来（index.html 仍是总预览，未改动）。
+     搬进 React 时一个文件对应一屏；class 名与 index.html 保持一致。 -->
+<section class="page" data-page="states">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">R</span>
+            <h2>状态速览</h2>
+            <span class="sub">四种「非正常」状态的样子 —— 实现时照这个来，别各写各的</span>
+          </div>
+
+          <!-- 断连横幅 -->
+          <div class="banner-danger reveal" style="--rd:.1s">
+            <svg class="pic" style="color:var(--bad);width:20px;height:20px"><use href="#i-ban"/></svg>
+            <div class="t">
+              <h3>和守护进程断开了</h3>
+              <p>页面里显示的读数停在断连前一刻，别再照着它下判断。确认 serverbox.exe 还在跑，或者它是不是换了端口。</p>
+            </div>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>重连</button>
+          </div>
+
+          <div class="grid-2" style="margin-top:0">
+            <!-- 加载骨架 -->
+            <div class="panel reveal" style="--rd:.14s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone"><svg class="pic" style="color:var(--cyan)"><use href="#i-info"/></svg><h2>正在连接守护进程…</h2></div>
+              <div class="statecard">
+                <div class="sk" style="width:56%"></div>
+                <div class="sk" style="width:82%;margin-top:12px"></div>
+                <div class="sk" style="width:64%;margin-top:12px"></div>
+                <div style="display:flex;gap:10px;margin-top:20px">
+                  <div class="sk" style="width:110px;height:32px"></div>
+                  <div class="sk" style="width:80px;height:32px"></div>
+                </div>
+                <p style="margin-top:16px;font-size:12.5px;color:var(--ink-3)">还没问过第一遍时用它 —— 既不是「没有世界」也不是「连不上」，别谎报故障。</p>
+              </div>
+            </div>
+
+            <!-- 空态：还没有世界 -->
+            <div class="panel reveal" style="--rd:.18s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone"><svg class="pic" style="color:var(--ok)"><use href="#i-grass"/></svg><h2>还没有世界</h2></div>
+              <div class="statecard">
+                <svg class="empty-ic" viewBox="0 0 16 16" style="color:var(--ink-3)"><use href="#i-grass"/></svg>
+                <h3>先在左边建一个</h3>
+                <p>5 步就有了一台自己的服务器：挑服务端 → 挑版本 → 选内存 → 装 Java → 点启动。剩下的交给我们。</p>
+                <div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
+                  <button class="btn btn-start" type="button"><svg class="pic"><use href="#i-plus"/></svg>新建世界</button>
+                  <button class="btn" type="button"><svg class="pic"><use href="#i-ul"/></svg>导入已有服务器</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <!-- 崩溃诊断 -->
+            <div class="panel reveal" style="--rd:.22s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone"><svg class="pic" style="color:var(--bad)"><use href="#i-ban"/></svg><h2>崩溃诊断</h2><span class="badge ban" style="margin-left:4px">已崩溃</span><div class="spacer"></div><span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">退出码 1</span></div>
+              <div class="statecard" style="padding:14px 18px 18px">
+                <div class="crash-step">
+                  <span class="no">01</span>
+                  <div class="b"><h4>现象</h4><p>启动后 3 秒退出，日志停在 <code>UnsupportedClassVersionError</code>。</p></div>
+                </div>
+                <div class="crash-step">
+                  <span class="no">02</span>
+                  <div class="b"><h4>原因</h4><p>MC 1.21.4 需要 Java 21，但当前用的是 Java 17。类是 65.0 版本编的，17 读不了。</p></div>
+                </div>
+                <div class="crash-step">
+                  <span class="no">03</span>
+                  <div class="b"><h4>怎么办</h4><p>把该实例的 Java 换到 21 —— 已经检测到本机装了 <code>JDK 21.0.9</code>，一键就能换。</p></div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+                  <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-check"/></svg>一键换成 Java 21</button>
+                  <button class="btn sm" type="button"><svg class="pic"><use href="#i-dl"/></svg>看完整日志</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 组件状态一览 -->
+            <div class="panel reveal" style="--rd:.26s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone"><svg class="pic" style="color:var(--copper)"><use href="#i-lever"/></svg><h2>组件状态一览</h2></div>
+              <div style="padding:14px 16px">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                  <div>
+                    <div class="eyebrow" style="margin-bottom:8px">按钮</div>
+                    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+                      <button class="btn btn-primary sm" type="button">主操作 / 悬停有附魔闪光</button>
+                      <button class="btn sm" type="button">次要</button>
+                      <button class="btn sm" type="button" disabled style="opacity:.45;cursor:not-allowed">禁用</button>
+                      <button class="btn btn-danger sm" type="button">危险</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="eyebrow" style="margin-bottom:8px">徽记 / 输入 / 开关</div>
+                    <div style="display:flex;flex-direction:column;gap:9px;align-items:flex-start">
+                      <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <span class="badge op">OP 4</span><span class="badge wl">白名单</span><span class="badge ban">已封禁</span><span class="badge">普通</span>
+                      </div>
+                      <input class="inp" style="max-width:190px" placeholder="输入框 · 聚焦时右下发青光">
+                      <div style="display:flex;gap:12px;align-items:center">
+                        <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                        <span class="tog" role="switch" aria-checked="false"><span class="knob"></span></span>
+                        <span class="chk on"></span>
+                        <span class="chk"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line-1)">
+                  <div class="eyebrow" style="margin-bottom:8px">方块刻度条 / 火花线</div>
+                  <div class="meter" data-pct="72" data-tone="cy"></div>
+                  <div class="meter row" data-pct="45" data-tone="on" style="margin-top:8px"></div>
+                  <svg class="spark" data-seed="72" viewBox="0 0 120 30" preserveAspectRatio="none" style="height:34px;margin-top:10px"></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>

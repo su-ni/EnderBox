@@ -1,10 +1,8 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { IconInfo, IconWarn } from './Icons'
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { Icon } from './design'
 
-/**
- * 区块标题。整页只有它能用 3px 黑线 —— 黑线是「新的一块开始了」的信号，
- * 用多了就变成噪音（面板外框、按钮、chip 各有各的黑边，页面就糊了）。
- */
+/** 区块标题：设计稿 .sec-head（idx + h2 + sub + 右侧动作） */
 export function SectionHead({
   idx,
   title,
@@ -17,44 +15,12 @@ export function SectionHead({
   right?: ReactNode
 }) {
   return (
-    <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-2 border-b-[3px] border-black pb-2.5">
-      <span className="eyebrow">{idx}</span>
-      <h2 className="text-[16px] leading-tight font-bold text-ink-1">{title}</h2>
-      {note && <span className="text-[12px] text-ink-3">{note}</span>}
-      {right && <span className="ml-auto flex items-center gap-2">{right}</span>}
-    </div>
-  )
-}
-
-/**
- * 列表行：列表类页面（插件、备份…）统一用它。
- * 版式固定成「图标 · 标题+标签 / 元信息 · 右侧动作」，
- * 页面就不用各自拼字号字号组合 —— 那正是「每页看起来都不一样」的来源。
- */
-export function ListRow({
-  icon,
-  title,
-  tags,
-  meta,
-  actions,
-}: {
-  icon?: ReactNode
-  title: string
-  tags?: ReactNode
-  meta?: ReactNode
-  actions?: ReactNode
-}) {
-  return (
-    <div className="row-b flex flex-wrap items-center gap-x-3.5 gap-y-1.5 px-4 py-3">
-      {icon && <span className="shrink-0">{icon}</span>}
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-          <span className="truncate text-[14px] leading-tight font-semibold text-ink-1">{title}</span>
-          {tags}
-        </div>
-        {meta && <div className="mono-meta mt-0.5 truncate" title={typeof meta === 'string' ? meta : undefined}>{meta}</div>}
-      </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+    <div className="sec-head" style={{ flexWrap: 'wrap' }}>
+      <span className="idx">{idx}</span>
+      <h2>{title}</h2>
+      {note && <span className="sub">{note}</span>}
+      {right && <span className="spacer" />}
+      {right}
     </div>
   )
 }
@@ -78,7 +44,8 @@ export function Field({
   )
 }
 
-/** 开关。span 上带 role=switch，键盘可聚焦 */
+/** 开关。设计稿的 .tog + .knob 原样用；外面套一层无样式 button 壳负责键盘可达。
+    （设计稿里 .tog 是个静态 span，真实现必须可聚焦可回车，所以壳不能省） */
 export function Toggle({
   on,
   onChange,
@@ -98,9 +65,12 @@ export function Toggle({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!on)}
-      className={`tg-sw${on ? ' on' : ''}`}
-      style={disabled ? { opacity: 0.4, cursor: 'default' } : undefined}
-    />
+      className="tog-btn"
+    >
+      <span className={`tog${on ? ' on' : ''}`}>
+        <span className="knob" />
+      </span>
+    </button>
   )
 }
 
@@ -132,21 +102,11 @@ export function ToggleRow({
 /** 「这块还没接后端」的统一提示条。不假装功能存在，也不留一片死灰的控件。 */
 export function NotReady({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-start gap-2.5 border-l-[3px] border-warn bg-[#1a1812] px-4 py-3">
-      <span className="mt-[3px] shrink-0 text-warn">
-        <IconInfo size={13} />
+    <div className="nbox w" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <span style={{ marginTop: 3, flexShrink: 0, color: 'var(--warn)' }}>
+        <Icon name="info" size={13} />
       </span>
-      <p className="min-w-0 text-[12.5px] leading-[1.7] text-[#e7dcb2]">{children}</p>
-    </div>
-  )
-}
-
-/** 危险区：还原、删除这类不可逆操作都放这里，左侧红条 + 深红底 */
-export function DangerZone({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="border-l-[3px] border-danger bg-[#1c1314] px-4 py-3.5">
-      <p className="text-[13.5px] font-bold text-[#ffc2c2]">{title}</p>
-      <div className="mt-2.5">{children}</div>
+      <p style={{ minWidth: 0 }}>{children}</p>
     </div>
   )
 }
@@ -182,6 +142,8 @@ export function Dialog({
   onClose,
   danger = false,
   width = 440,
+  icon,
+  iconColor,
 }: {
   title: string
   children: ReactNode
@@ -190,6 +152,9 @@ export function Dialog({
   /** 不可逆操作（删除、强杀）—— 标题条换成红底，让人在按确认前多看一眼 */
   danger?: boolean
   width?: number
+  /** 标题左侧的精灵图标（设计稿 .dlg-head 的 .pic）—— 只给少数「有性格」的弹窗用 */
+  icon?: string
+  iconColor?: string
 }) {
   const boxRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -231,35 +196,172 @@ export function Dialog({
     }
   }, [onClose])
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto px-4 py-[8vh]">
-      {/* 点遮罩关闭：这是所有人的肌肉记忆，不做反而显得坏掉了 */}
-      <div className="fixed inset-0 bg-black/70" onClick={onClose} aria-hidden="true" />
+  /*
+    ⚠ 覆盖层一律 portal 到 document.body，不能就地渲染。
+
+    祖先链上只要有一个元素挂着 transform / filter / backdrop-filter / will-change，
+    position:fixed 就改认它当包含块 —— 于是「撑满视口」变成「撑满那个祖先」。
+    本站的入场动画（.stagger / .anim-in / .anim-in-x）结束时就留下一个
+    identity transform，抽屉压到 200 多像素高就是这么来的。
+    portal 之后祖先只剩 body，这类坑一次免疫，以后谁再给页面加动画也踩不到。
+  */
+  return createPortal(
+    /*
+      ⚠ 单层 .dlg-overlay（设计稿原生的弹窗外壳）：遮罩、布局、滚动一个元素全包。
+
+      为什么不能回到「滚动容器 + 独立遮罩 + 静态内容容器」那套两层结构：
+      那样写的结果是**所有弹窗整体蒙灰、点哪儿都直接关掉**（真机上翻车过）。
+      根因是 CSS 层叠规则：同一层叠上下文里，「z-index:auto 的定位元素」
+      画在「无定位的静态元素」之上 —— fixed 遮罩把静态的 .dlg 整个盖住了，
+      于是看是黑的、点击全落在遮罩的 onClose 上。单层后 .dlg 是 overlay 的子元素，
+      两者是父子不是同层兄弟，不存在竞逐；点击只要 target === overlay 就说明点到了框外。
+
+      ⚠ 垂直居中靠 design-overrides.css 的 `.dlg-overlay > .dlg { margin: auto }`，
+      不用 align-items —— 设计稿本身是 flex-start 顶对齐（用户抱怨过「弹窗上浮」），
+      margin:auto 在内容超高时自动退化为 0、能完整滚动，比 center 安全（后者会裁掉顶部）。
+    */
+    <div
+      className="dlg-overlay"
+      onClick={(e) => {
+        // 只有点在 overlay 自己的空白区才算「点框外」；点在 .dlg 内部（含其 padding）都不关
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
       <div
         ref={boxRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="pxb relative w-full bg-panel"
+        className="dlg"
         style={{ maxWidth: width }}
       >
-        <div
-          className="flex items-center gap-2.5 border-b-[3px] border-black px-4 py-3"
-          style={{ background: danger ? '#1c1314' : 'var(--color-panel-2)' }}
-        >
-          <span className="shrink-0" style={{ color: danger ? 'var(--color-danger)' : 'var(--color-warn)' }}>
-            <IconWarn size={14} />
-          </span>
-          <h2 id={titleId} className="text-[14px] leading-tight font-bold text-ink-1">
-            {title}
-          </h2>
+        {/*
+          标题带用设计稿的 .dlg-head（sf-2 底 + 2px 下描边）。
+          危险操作加 .danger 变体（红底 + 红字）—— 设计稿没有这个变体，
+          见 design-overrides.css 里的说明；标题条原本是 3px 黑粗边，那是上一版的材质。
+        */}
+        <div className={`dlg-head${danger ? ' danger' : ''}`}>
+          {/*
+            警告三角**只在危险操作时出现**。
+            原来不分场合地挂一个黄色三角，于是「新建任务」「编辑配置」「模组详情」
+            这些中性对话框也顶着个警告图标 —— 它既不警告也不危险，是纯噪音，
+            还会让人以为「我是不是点到什么危险的地方了」。
+            真正的危险操作（删除实例、强杀、还原备份）才配得上这个记号。
+          */}
+          {/* 设计稿 .dlg-head 的图标位：图标在标题左侧，不是每只弹窗都配一个 */}
+          {icon && <Icon name={icon} style={{ color: iconColor ?? 'var(--cyan)' }} />}
+          {danger && (
+            <span className="shrink-0" style={{ color: 'var(--bad)' }}>
+              <Icon name="ban" size={14} />
+            </span>
+          )}
+          <h2 id={titleId}>{title}</h2>
         </div>
-        <div className="px-4 py-3.5">{children}</div>
-        <div className="flex flex-wrap justify-end gap-2 border-t-[3px] border-black bg-[#0c0f0c] px-4 py-3">
-          {actions}
+        {/* .dlg-body 自带 padding 与 max-height:60vh 滚动 —— 内容再长也顶不破屏幕 */}
+        <div className="dlg-body">{children}</div>
+        <div className="dlg-foot">
+          <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
+  )
+}
+
+/**
+ * 右侧滑出的抽屉。
+ *
+ * 为什么用抽屉而不是对话框：详情要和身后的名单**同屏**参照。
+ * 「这个人是谁」的答案常常就在他旁边那几个人身上；对话框一开把名单整个盖住，
+ * 关掉还得重新定位回原来那一行。点两次之后人就不想再点第三次了。
+ *
+ * 宽度给 `min(width, 100vw)`：窄屏时铺满，不学桌面端那样留一条缝 ——
+ * 那点缝既显示不出后面有什么，又白白吃掉几十像素。
+ */
+export function Sheet({
+  title,
+  subtitle,
+  subtitleProse,
+  onClose,
+  children,
+  footer,
+  width = 420,
+}: {
+  title: ReactNode
+  subtitle?: ReactNode
+  /**
+   * 副标题默认等宽（UUID / 坐标那类机器数据正好）。
+   * 中文散文传 true —— 等宽字体没有汉字，回退字形发飘；散文副标题走正文栈且允许折行。
+   */
+  subtitleProse?: boolean
+  onClose: () => void
+  children: ReactNode
+  footer?: ReactNode
+  width?: number
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null
+    // 焦点落到关闭键上：抽屉没有「确认」这个终点，进去第一件事不该是误触某个危险按钮
+    ref.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('keydown', onKey, true)
+      prev?.focus?.()
+    }
+  }, [onClose])
+
+  // 同 Dialog：portal 到 body，避开祖先 transform 造出来的假包含块
+  return createPortal(
+    <div className="fixed inset-0 z-[70]">
+      {/*
+        遮罩**刻意很淡**（对话框那边是 /70）。
+        抽屉的价值就在于「详情和身后的名单同屏参照」—— 压到看不清名单，
+        这个形态就只剩下「比对话框窄一点」这一个区别了，还白白丢掉唯一的好处。
+        淡到「能看出多了一层、点得到、关得掉」就够了。
+      */}
+      <div className="fixed inset-0 bg-black/15" onClick={onClose} aria-hidden="true" />
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="sheet"
+        style={{ ['--sheet-w' as string]: `${width}px` } as CSSProperties}
+      >
+        <div className="sheet-head">
+          <div className="min-w-0 flex-1">
+            <h2 id={titleId} className="sheet-title">
+              {title}
+            </h2>
+            {subtitle && (
+              <div className={`sheet-sub${subtitleProse ? ' sheet-sub-prose' : ''}`}>{subtitle}</div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="ibtn"
+            data-autofocus
+            onClick={onClose}
+            title="关闭（Esc）"
+            aria-label="关闭"
+          >
+            <Icon name="x" size={13} />
+          </button>
+        </div>
+        <div className="sheet-body">{children}</div>
+        {footer && <div className="sheet-foot">{footer}</div>}
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -376,6 +478,48 @@ export function fmtTime(iso: string): string {
 }
 
 /**
+ * 相对时间：「3 个月前」这种。
+ *
+ * 为什么不用绝对日期：挑模组版本时，人真正想知道的是「这版还新不新」。
+ * `2023-08-14` 得在脑子里减一次才知道是三年前，而「1 年 10 个月前」一眼就够。
+ * 太长的时候退回绝对日期 —— 「237 天前」不如直接给日期。
+ */
+export function fmtAgo(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000)
+  if (days < 0) return '刚刚'
+  if (days === 0) return '今天'
+  if (days === 1) return '昨天'
+  if (days < 30) return `${days} 天前`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months} 个月前`
+  const years = Math.floor(days / 365)
+  const rest = Math.floor((days - years * 365) / 30)
+  return rest > 0 ? `${years} 年 ${rest} 个月前` : `${years} 年前`
+}
+
+/**
+ * 相对时间（分钟级）：「刚刚 / 6 分钟前 / 3 小时前」。
+ *
+ * 和 fmtAgo 的区别只在**粒度**：fmtAgo 回答「这版模组还新不新」（天级就够），
+ * 这个回答「刚才那件事过去多久了」—— 下载跑完两三分钟，天级看不出差别。
+ * 超过一天退回绝对日期：台账里「2 天前」还要再做一次减法，不如直接给日期。
+ * 解析不出来返回空串（不摆占位符 —— 调用方自己决定那格要不要留）。
+ */
+export function fmtAgoMin(iso: string): string {
+  const t = Date.parse(iso)
+  if (Number.isNaN(t)) return ''
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000))
+  if (s < 90) return '刚刚'
+  if (s < 3600) return `${Math.floor(s / 60)} 分钟前`
+  if (s < 86400) return `${Math.floor(s / 3600)} 小时前`
+  const d = new Date(t)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+/**
  * 骨架屏：数据还没到时的占位。
  *
  * 为什么不用「读取中…」三个字：文字占位会让人以为已经加载完了、只是内容为空 ——
@@ -385,16 +529,27 @@ export function Skeleton({ w = '100%', h = 9 }: { w?: string; h?: number }) {
   return <span className="sk" style={{ width: w, height: h }} aria-hidden="true" />
 }
 
-/** 列表类页面的骨架。版式刻意对齐 ListRow，数据到位时不会「跳」一下。 */
+/** 列表类页面的骨架。版式刻意对齐 .rlist / .rrow，数据到位时不会「跳」一下。 */
 export function SkeletonList({ rows = 3, icon = true }: { rows?: number; icon?: boolean }) {
   return (
-    <div className="px-card" role="status" aria-busy="true" aria-label="正在读取">
+    <div className="panel" role="status" aria-busy="true" aria-label="正在读取">
+      <i className="corner" />
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="row-b flex items-center gap-3.5 px-4 py-3.5">
-          {icon && <Skeleton w="18px" h={18} />}
-          <div className="min-w-0 flex-1">
+        <div
+          key={i}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '32px minmax(0, 1fr) auto',
+            gap: 12,
+            alignItems: 'center',
+            padding: '12px 14px',
+            borderTop: i > 0 ? '1px solid var(--line-1)' : undefined,
+          }}
+        >
+          {icon && <Skeleton w="32px" h={32} />}
+          <div className="min-w-0">
             <Skeleton w={`${54 - i * 9}%`} h={11} />
-            <div className="mt-2">
+            <div style={{ marginTop: 8 }}>
               <Skeleton w="36%" />
             </div>
           </div>
@@ -408,7 +563,14 @@ export function SkeletonList({ rows = 3, icon = true }: { rows?: number; icon?: 
 /** 表单/配置类页面的骨架：对齐「标签 → 控件」的版式 */
 export function SkeletonFields({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="px-card px-5 py-4" role="status" aria-busy="true" aria-label="正在读取">
+    <div
+      className="panel"
+      style={{ padding: '16px 20px' }}
+      role="status"
+      aria-busy="true"
+      aria-label="正在读取"
+    >
+      <i className="corner" />
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="py-3">
           <Skeleton w={`${32 - i * 3}%`} h={10} />

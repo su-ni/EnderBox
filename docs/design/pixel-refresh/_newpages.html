@@ -1,0 +1,530 @@
+        <!-- ════════ 屏 6 · 插件与模组 ════════ -->
+        <section class="page" data-page="plugins">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">03</span>
+            <h2>插件与模组</h2>
+            <span class="sub">Paper 这类读 plugins/，Forge / Fabric 这类读 mods/ —— 目录按服务端类型自动切换，不让你自己挑</span>
+            <div class="spacer"></div>
+            <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-plus"/></svg>安装</button>
+          </div>
+
+          <!-- 依赖问题：只报「必需」的，可选前置不刷屏 -->
+          <div class="banner-danger reveal" style="--rd:.1s">
+            <svg class="pic" style="color:var(--warn);width:20px;height:20px"><use href="#i-info"/></svg>
+            <div class="t">
+              <h3>有 2 个模组缺少必需前置</h3>
+              <p>缺必需前置的模组在服务端加载阶段就会被丢掉，压根不会进游戏。点「装前置」会先把缺的那个按你的 MC 版本挑好版本再装 —— 不会替你默认装最新版。</p>
+            </div>
+            <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-dl"/></svg>装前置（2）</button>
+          </div>
+
+          <div class="panel reveal" style="--rd:.14s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--cyan)"><use href="#i-table"/></svg>
+              <h2>已安装</h2>
+              <span style="font-size:12.5px;color:var(--ink-3)">12 个 · 启用 9 · 禁用 1</span>
+              <input class="inp" style="max-width:240px;margin-left:8px" placeholder="搜名字 / 文件名 / modId">
+              <div class="spacer"></div>
+              <div class="filters">
+                <button class="chipf on" type="button">全部<span class="n">12</span></button>
+                <button class="chipf" type="button">已启用<span class="n">9</span></button>
+                <button class="chipf" type="button">已禁用<span class="n">1</span></button>
+                <button class="chipf" type="button">缺前置<span class="n">2</span></button>
+                <button class="chipf" type="button">读不出信息<span class="n">1</span></button>
+              </div>
+            </div>
+
+            <div class="rlist">
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">Sodium <span class="badge">FABRIC</span><span class="badge">1.21.4</span></div>
+                  <div class="rsub">大幅优化渲染，几乎不掉画质 · jellysquid3</div>
+                </div>
+                <div class="rmeta">sodium-fabric-1.21.4.jar · 1.2 MB</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow dep">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">Create <span class="badge">FORGE</span><span class="badge">1.20.1</span><span class="badge ban">缺前置</span></div>
+                  <div class="rsub">需要 <b style="color:var(--warn)">flywheel</b> 才能加载 —— 现在它在服务端启动阶段就被丢掉了</div>
+                </div>
+                <div class="rmeta">create-1.20.1-6.0.4.jar · 14.8 MB</div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button"><svg class="pic"><use href="#i-dl"/></svg>装前置</button>
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow dep">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">Jade <span class="badge">FORGE</span><span class="badge">1.20.1</span><span class="badge ban">缺前置</span></div>
+                  <div class="rsub">需要 <b style="color:var(--warn)">iceberg</b></div>
+                </div>
+                <div class="rmeta">jade-1.20.1-11.9.2.jar · 402 KB</div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button"><svg class="pic"><use href="#i-dl"/></svg>装前置</button>
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--emerald)"><use href="#i-cmd"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">ServerBoxCompanion <span class="badge">BUKKIT</span><span class="badge op">v0.2.0</span></div>
+                  <div class="rsub">面板的实时数据由它提供 · 我们自己写的插件</div>
+                </div>
+                <div class="rmeta">plugins/ServerBoxCompanion.jar · 46 KB</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow off">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">LegacyGuard <span class="badge">BUKKIT</span><span class="badge">已禁用</span></div>
+                  <div class="rsub">上次启动时它报了 Unsupported API version 1.13 —— 先禁用，别让它拖住整台服</div>
+                </div>
+                <div class="rmeta">LegacyGuard-1.13.jar · 88 KB</div>
+                <div class="ract">
+                  <span class="tog" role="switch" aria-checked="false"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--ink-3)"><use href="#i-ban"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">mystery-mod-7 <span class="badge">读不出信息</span></div>
+                  <div class="rsub">jar 里没有认识的元数据文件 —— 名字就是文件名，其余留空，不瞎猜</div>
+                </div>
+                <div class="rmeta">mystery-mod-7.jar · 2.1 MB</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="con-foot">
+              <svg class="pic" style="color:var(--ink-3)"><use href="#i-info"/></svg>
+              开关改的是文件后缀（<code>.jar</code> ↔ <code>.jar.disabled</code>），下次启动才生效；删除是不可逆的，唯一的后悔药在备份页。
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 7 · 备份与还原 ════════ -->
+        <section class="page" data-page="backup">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">04</span>
+            <h2>备份与还原</h2>
+            <span class="sub">「只存存档」还原时只会替换这份备份里确实含有的条目 —— server.jar 和 plugins 不会被删掉</span>
+            <div class="spacer"></div>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>刷新</button>
+            <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-plus"/></svg>立刻备份</button>
+          </div>
+
+          <div class="grid-2">
+            <!-- 备份列表 -->
+            <div class="panel reveal" style="--rd:.12s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--copper)"><use href="#i-chest"/></svg>
+                <h2>备份列表</h2>
+                <span style="font-size:12.5px;color:var(--ink-3)">8 份 · 占 4.2 GB</span>
+                <div class="spacer"></div>
+                <button class="btn xs" type="button">名称<svg class="pic"><use href="#i-chev-l"/></svg></button>
+                <button class="btn xs" type="button">时间<svg class="pic"><use href="#i-chev-l"/></svg></button>
+              </div>
+
+              <div class="rlist">
+                <div class="rrow">
+                  <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-clock"/></svg></div>
+                  <div class="rmain">
+                    <div class="rtitle">每天 03:00 自动备份 <span class="badge op">自动</span></div>
+                    <div class="rrow-sub">
+                      <span>2026-10-07 03:00:04</span>
+                      <span>整个实例目录</span>
+                      <span>642.3 MB</span>
+                    </div>
+                  </div>
+                  <div class="rmeta">backup-auto-20261007-0300.zip</div>
+                  <div class="ract">
+                    <button class="btn btn-primary xs" type="button"><svg class="pic"><use href="#i-restart"/></svg>还原</button>
+                    <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-dl"/></svg></button>
+                    <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-trash"/></svg></button>
+                  </div>
+                </div>
+
+                <div class="rrow">
+                  <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--ok)"><use href="#i-grass"/></svg></div>
+                  <div class="rmain">
+                    <div class="rtitle">装 Create 之前 <span class="badge">手动</span></div>
+                    <div class="rrow-sub">
+                      <span>2026-10-06 21:14:38</span>
+                      <span>只存存档</span>
+                      <span>118.6 MB</span>
+                    </div>
+                  </div>
+                  <div class="rmeta">backup-20261006-2114.zip</div>
+                  <div class="ract">
+                    <button class="btn btn-primary xs" type="button"><svg class="pic"><use href="#i-restart"/></svg>还原</button>
+                    <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-dl"/></svg></button>
+                    <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-trash"/></svg></button>
+                  </div>
+                </div>
+
+                <div class="rrow">
+                  <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-clock"/></svg></div>
+                  <div class="rmain">
+                    <div class="rtitle">每天 03:00 自动备份 <span class="badge op">自动</span></div>
+                    <div class="rrow-sub">
+                      <span>2026-10-06 03:00:03</span>
+                      <span>整个实例目录</span>
+                      <span>640.1 MB</span>
+                    </div>
+                  </div>
+                  <div class="rmeta">backup-auto-20261006-0300.zip</div>
+                  <div class="ract">
+                    <button class="btn btn-primary xs" type="button"><svg class="pic"><use href="#i-restart"/></svg>还原</button>
+                    <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-dl"/></svg></button>
+                    <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-trash"/></svg></button>
+                  </div>
+                </div>
+
+                <div class="rrow">
+                  <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--ink-3)"><use href="#i-chest"/></svg></div>
+                  <div class="rmain">
+                    <div class="rtitle">每隔 6 小时 <span class="badge op">自动</span></div>
+                    <div class="rrow-sub">
+                      <span>2026-10-05 18:00:02</span>
+                      <span>只存存档</span>
+                      <span>117.9 MB</span>
+                    </div>
+                  </div>
+                  <div class="rmeta">backup-auto-20261005-1800.zip</div>
+                  <div class="ract">
+                    <button class="btn btn-primary xs" type="button"><svg class="pic"><use href="#i-restart"/></svg>还原</button>
+                    <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-dl"/></svg></button>
+                    <button class="btn btn-ghost xs" type="button"><svg class="pic"><use href="#i-trash"/></svg></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 自动备份策略 -->
+            <div class="panel reveal" style="--rd:.16s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--ok)"><use href="#i-clock"/></svg>
+                <h2>自动备份策略</h2>
+                <div class="spacer"></div>
+                <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+              </div>
+
+              <div style="padding:4px 16px 16px">
+                <div class="field">
+                  <div><div class="lb">触发方式</div><div class="hint">两种可以一起开</div></div>
+                  <div class="filters" data-multi>
+                    <button class="chipf on" type="button">每天固定时刻</button>
+                    <button class="chipf on" type="button">每隔几小时</button>
+                  </div>
+                </div>
+                <div class="field">
+                  <div><div class="lb">每天的时刻</div><div class="hint">挑没人玩的时候</div></div>
+                  <div class="stepper" style="flex-wrap:wrap;gap:8px">
+                    <button class="chipf" type="button">03:00 <span style="color:var(--bad)">×</span></button>
+                    <button class="chipf" type="button">12:00 <span style="color:var(--bad)">×</span></button>
+                    <button class="chipf" type="button"><svg class="pic" style="width:12px;height:12px"><use href="#i-plus"/></svg>加一个</button>
+                  </div>
+                </div>
+                <div class="field">
+                  <div><div class="lb">每隔几小时</div><div class="hint">从上次跑完算起</div></div>
+                  <div class="stepper"><button type="button">−</button><input class="inp" value="6"><button type="button">+</button></div>
+                </div>
+                <div class="field">
+                  <div><div class="lb">保留几份</div><div class="hint">超了删最旧的，手动备份也算在内</div></div>
+                  <div class="stepper"><button type="button">−</button><input class="inp" value="7"><button type="button">+</button></div>
+                </div>
+                <div class="field">
+                  <div><div class="lb">备份范围</div><div class="hint">「只存存档」更快也更小</div></div>
+                  <div class="filters">
+                    <button class="chipf on" type="button">整个实例目录</button>
+                    <button class="chipf" type="button">只存存档</button>
+                  </div>
+                </div>
+
+                <div class="pol-foot">
+                  <div class="row"><span class="k">上次自动备份</span><span class="v">2026-10-07 03:00:04</span></div>
+                  <div class="row"><span class="k">下次</span><span class="v">2026-10-07 09:00 · 还有 4 小时 12 分</span></div>
+                  <div class="row"><span class="k">停服前不自动备</span><span class="v">改为由计划任务显式决定</span></div>
+                </div>
+
+                <div class="unsaved">
+                  <span class="dotw"></span>
+                  <span style="font-size:12.5px;color:var(--ink-1)">策略改动<b style="font-family:var(--f-pix);color:var(--copper)"> 立即生效</b>，正在进行的备份不会被打断</span>
+                  <div class="spacer" style="margin-left:auto"></div>
+                  <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-check"/></svg>保存</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 8 · 计划任务 ════════ -->
+        <section class="page" data-page="tasks">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">05</span>
+            <h2>计划任务</h2>
+            <span class="sub">任务是<b style="color:var(--ink-1)">有顺序的动作流水线</b> —— 前一步做完才做下一步，最多 10 步。和自动备份共用同一个调度循环</span>
+            <div class="spacer"></div>
+            <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-plus"/></svg>新建任务</button>
+          </div>
+
+          <div class="grid-2">
+            <div class="panel reveal" style="--rd:.12s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-clock"/></svg>
+                <h2>任务列表</h2>
+                <span style="font-size:12.5px;color:var(--ink-3)">4 个 · 启用 3</span>
+              </div>
+
+              <div class="rlist">
+                <div class="rrow">
+                  <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--ok)"><use href="#i-clock"/></svg></div>
+                  <div class="rmain">
+                    <div class="rtitle">凌晨自动重启 <span class="badge">每天 04:00</span><span class="badge op">3 步</span></div>
+                    <div class="rrow-sub"><span>上次 今天 04:00:11</span><span>下次 明天 04:00</span></div>
+                  </div>
+                  <div class="rmeta">广播 → 延时 → 重启</div>
+                  <div class="ract">
+                    <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                    <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                  </div>
+                </div>
+
+                <div class="rrow">
+                  <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-clock"/></svg></div>
+                  <div class="rmain">
+                    <div class="rtitle">开服后发欢迎 <span class="badge">启动之后</span><span class="badge op">2 步</span></div>
+                    <div class="rrow-sub"><span>上次 今天 03:52:07</span><span>下次 下次启动</span></div>
+                  </div>
+                  <div class="rmeta">延时 → 控制台指令</div>
+                  <div class="ract">
+                    <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                    <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                  </div>
+                </div>
+
+                <div class="rrow">
+                  <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-clock"/></svg></div>
+                  <div class="rmain">
+                    <div class="rtitle">每小时清一次地面 <span class="badge">每隔 60 分</span><span class="badge op">2 步</span></div>
+                    <div class="rrow-sub"><span>上次 今天 04:00:00</span><span>下次 今天 05:00</span></div>
+                  </div>
+                  <div class="rmeta">控制台指令 → 广播</div>
+                  <div class="ract">
+                    <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                    <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                  </div>
+                </div>
+
+                <div class="rrow off">
+                  <div class="ricon"><svg class="pic" style="width:18px;height:18px"><use href="#i-clock"/></svg></div>
+                  <div class="rmain">
+                    <div class="rtitle">周五大扫除 <span class="badge">每周 五 22:00</span><span class="badge op">4 步</span></div>
+                    <div class="rrow-sub"><span>上次 10-02 22:00:09</span><span>下次 暂停中</span></div>
+                  </div>
+                  <div class="rmeta">广播 → 备份 → 延时 → 重启</div>
+                  <div class="ract">
+                    <span class="tog" role="switch" aria-checked="false"><span class="knob"></span></span>
+                    <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 选中任务的流水线 -->
+            <div class="panel reveal" style="--rd:.16s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--copper)"><use href="#i-lever"/></svg>
+                <h2>凌晨自动重启</h2>
+                <span class="badge">每天 04:00</span>
+                <div class="spacer"></div>
+                <button class="btn xs" type="button"><svg class="pic"><use href="#i-play"/></svg>试跑</button>
+                <button class="btn btn-primary xs" type="button"><svg class="pic"><use href="#i-check"/></svg>保存</button>
+              </div>
+
+              <div style="padding:14px 18px 18px">
+                <div class="crash-step">
+                  <span class="no">01</span>
+                  <div class="b">
+                    <h4>广播</h4>
+                    <p>还有 5 分钟自动重启，去安全的地方躲一下</p>
+                  </div>
+                </div>
+                <div class="crash-step">
+                  <span class="no">02</span>
+                  <div class="b">
+                    <h4>延时</h4>
+                    <p>等 300 秒 —— 让上一步的话有时间被看完</p>
+                  </div>
+                </div>
+                <div class="crash-step">
+                  <span class="no">03</span>
+                  <div class="b">
+                    <h4>重启</h4>
+                    <p>按面板自己的停机流程走：先 <code>stop</code>，等进程真退出再 <code>start</code>，避免撞端口</p>
+                  </div>
+                </div>
+                <div class="crash-step add">
+                  <span class="no">+</span>
+                  <div class="b">
+                    <h4>加一步</h4>
+                    <p>可选：<b style="color:var(--ink-1)">控制台指令</b> · 备份 · 延时 · 启动 · 停止 · 强杀</p>
+                  </div>
+                </div>
+
+                <div class="pol-foot" style="margin-top:14px">
+                  <div class="row"><span class="k">上次运行</span><span class="v">今天 04:00:11 · 全程 5 分 12 秒</span></div>
+                  <div class="row"><span class="k">下次</span><span class="v">明天 04:00 · 还有 23 小时 48 分</span></div>
+                  <div class="row"><span class="k">触发方式</span><span class="v">每天 04:00 / 也可改成每周、每隔 N 分钟、五段式 CRON</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ 屏 9 · 设置 ════════ -->
+        <section class="page" data-page="settings">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">06</span>
+            <h2>设置</h2>
+            <span class="sub">这里改的是面板自己，不是某一个世界 —— 针对单个世界的往左上角的「配置」去</span>
+          </div>
+
+          <div class="cfg-wrap">
+            <div class="panel reveal" style="--rd:.1s">
+              <i class="corner"></i>
+              <div class="cfg-nav" id="setNav">
+                <button class="on" data-pane="access" type="button"><svg class="pic"><use href="#i-crown"/></svg>访问与安全<span class="n">5</span></button>
+                <button data-pane="daemon" type="button"><svg class="pic"><use href="#i-lever"/></svg>守护与启动<span class="n">3</span></button>
+                <button data-pane="mirror" type="button"><svg class="pic"><use href="#i-dl"/></svg>下载与市场<span class="n">2</span></button>
+                <button data-pane="data" type="button"><svg class="pic"><use href="#i-chest"/></svg>数据与日志<span class="n">2</span></button>
+                <button data-pane="about" type="button"><svg class="pic"><use href="#i-info"/></svg>关于<span class="n">3</span></button>
+              </div>
+            </div>
+
+            <div class="panel reveal" style="--rd:.14s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-crown"/></svg>
+                <h2 id="setTitle">访问与安全</h2>
+                <span style="font-size:12.5px;color:var(--ink-3)" id="setSub">默认不挡人 —— 改了这个家以外的地方访问就会被问密码</span>
+              </div>
+
+              <!-- 访问与安全 -->
+              <div class="cfg-pane on" data-pane="access">
+                <div style="padding:6px 16px 16px">
+                  <div class="field">
+                    <div><div class="lb">要求登录</div><div class="hint">关着的时候，同一个家里的设备进来不用问密码</div></div>
+                    <div class="tog" role="switch" aria-checked="false"><span class="knob"></span></div>
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">信任本机回环</div><div class="hint">开着时 127.0.0.1 的访问一律放行（不看代理头）</div></div>
+                    <div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div>
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">会话时长（小时）</div><div class="hint">到点就得重新输一次密码</div></div>
+                    <div class="stepper"><button type="button">−</button><input class="inp" value="12"><button type="button">+</button></div>
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">面板密码</div><div class="hint">改密码要验证旧密码，改完所有已登录的设备都会掉线</div></div>
+                    <button class="btn sm" type="button"><svg class="pic"><use href="#i-lever"/></svg>修改密码</button>
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">API 令牌</div><div class="hint">给脚本用。面板只存它的哈希，令牌原文在创建时只显示一次</div></div>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                      <span class="badge op">2 个有效</span>
+                      <button class="btn sm" type="button"><svg class="pic"><use href="#i-plus"/></svg>新建一个</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 守护与启动 -->
+              <div class="cfg-pane" data-pane="daemon">
+                <div style="padding:6px 16px 16px">
+                  <div class="field">
+                    <div><div class="lb">监听地址</div><div class="hint">改完要重启守护进程才生效</div></div>
+                    <input class="inp" value="127.0.0.1:23456">
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">开机自启</div><div class="hint">写注册表 Run 项，登录进桌面就拉起守护进程</div></div>
+                    <div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div>
+                  </div>
+                  <div class="field notready">
+                    <div><div class="lb">注册为 Windows 服务 <span class="badge ban">还没接</span></div><div class="hint">做成服务之后，不登录也能跑 —— 但需要管理员权限，且和桌面壳的开关方式要统一，还没定</div></div>
+                    <button class="btn sm" type="button" disabled style="opacity:.45;cursor:not-allowed">暂不可用</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 下载与市场 -->
+              <div class="cfg-pane" data-pane="mirror">
+                <div style="padding:6px 16px 16px">
+                  <div class="field">
+                    <div><div class="lb">默认下载镜像</div><div class="hint">服务端 jar 从哪下。留空走官方源</div></div>
+                    <input class="inp" placeholder="留空 = 官方源">
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">模组市场地址</div><div class="hint">Modrinth API 的根地址 —— 国内访问不畅时换成镜像即可</div></div>
+                    <input class="inp" value="https://api.modrinth.com/v2">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 数据与日志 -->
+              <div class="cfg-pane" data-pane="data">
+                <div style="padding:6px 16px 16px">
+                  <div class="field">
+                    <div><div class="lb">数据目录</div><div class="hint">所有实例、配置、日志都在这里</div></div>
+                    <input class="inp" value="F:\tmp\sboxdata">
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">崩溃日志保留</div><div class="hint">每次崩溃的末 200 行单独存一份</div></div>
+                    <div class="stepper"><button type="button">−</button><input class="inp" value="20"><button type="button">+</button></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 关于 -->
+              <div class="cfg-pane" data-pane="about">
+                <div style="padding:6px 16px 16px">
+                  <div class="field"><div><div class="lb">版本</div><div class="hint">桌面版前面会有个壳版本号</div></div><span style="font-family:var(--f-term);font-size:16px">v0.1.0+dev</span></div>
+                  <div class="field"><div><div class="lb">Go 版本</div><div class="hint">编译这个 exe 用的</div></div><span style="font-family:var(--f-term);font-size:16px">go1.27.1</span></div>
+                  <div class="field"><div><div class="lb">内网镶嵌</div><div class="hint">前端界面整个嵌在 exe 里，离线也能打开</div></div><span class="badge op">已嵌入</span></div>
+                </div>
+              </div>
+
+              <div class="unsaved">
+                <span class="dotw"></span>
+                <span style="font-size:12.5px;color:var(--ink-1)">改动<b style="font-family:var(--f-pix);color:var(--copper)">失焦即存</b>，不用点保存</span>
+              </div>
+            </div>
+          </div>
+        </section>
+

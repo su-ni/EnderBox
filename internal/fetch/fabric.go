@@ -37,7 +37,7 @@ func FabricVersions() ([]Version, error) {
 		if !g.Stable {
 			continue
 		}
-		out = append(out, Version{ID: g.Version, Prerelease: false, Stable: true})
+		out = append(out, Version{ID: g.Version})
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("Fabric 返回的游戏版本列表是空的（检查 %s/versions/game）", fabricMetaBase)

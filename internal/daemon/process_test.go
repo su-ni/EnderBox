@@ -113,8 +113,8 @@ func TestNormalizeConsoleLineDropsPromptAndHandlesCarriageReturn(t *testing.T) {
 		},
 		{
 			name: "我们自己的回显行不受影响",
-			in:   "[ServerBox] > help",
-			want: "[ServerBox] > help",
+			in:   "[EnderBox] > help",
+			want: "[EnderBox] > help",
 		},
 		{
 			name: "以 > 开头的正文不能被误杀",
@@ -129,4 +129,3 @@ func TestNormalizeConsoleLineDropsPromptAndHandlesCarriageReturn(t *testing.T) {
 		}
 	}
 }
-

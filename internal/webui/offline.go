@@ -12,7 +12,7 @@ const offlinePage = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ServerBox · 这个二进制里没有前端产物</title>
+<title>EnderBox · 这个二进制里没有前端产物</title>
 <style>
   :root{
     --bg:#111311; --panel:#1c201d; --line:#3d453d;

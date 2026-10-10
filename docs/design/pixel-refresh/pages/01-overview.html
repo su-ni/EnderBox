@@ -1,0 +1,113 @@
+<!-- ServerBox 设计稿 · 单屏模块：overview
+     从 index.html 里原样切出来（index.html 仍是总预览，未改动）。
+     搬进 React 时一个文件对应一屏；class 名与 index.html 保持一致。 -->
+<section class="page on" data-page="overview">
+          <div class="panel reveal" style="--rd:.12s">
+            <i class="corner"></i>
+            <div class="preflight">
+              <div class="hearts">
+                <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+                <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+                <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+                <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+                <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+                <svg class="heart" style="color:#2a333d"><use href="#i-heart"/></svg>
+              </div>
+              <div class="big"><b>5</b><span class="of">/ 6 项通过</span></div>
+              <div class="txt">
+                <h3>启动前体检</h3>
+                <p>Java 21 已就绪、端口 25565 空闲、eula.txt 已同意、server.jar 存在、磁盘余量充足。<span style="color:var(--warn)">未通过：max-players 仍为默认 20</span></p>
+              </div>
+              <button class="btn sm" type="button"><svg class="pic"><use href="#i-restart"/></svg>重新体检</button>
+              <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-check"/></svg>一键修复</button>
+            </div>
+          </div>
+
+          <!-- 指标带 v2：大数 + 方块刻度条 + 60 点历史曲线 -->
+          <div class="metrics">
+            <div class="metric tex-diamond reveal" style="--rd:.16s" data-jitter="42">
+              <div class="top"><svg class="pic" style="color:var(--cyan)"><use href="#i-cpu"/></svg><span class="lb">CPU</span><span class="tag">峰值 78%</span></div>
+              <div class="val"><b data-count="42">42</b><span class="u">%</span></div>
+              <div class="meter" data-pct="42" data-tone="cy"></div>
+              <svg class="spark" data-seed="42" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <div class="sparkcap"><span>近 60 采样</span><span class="pk">峰值 78%</span></div>
+              <div class="note"><span class="pulse-dot" style="width:6px;height:6px"></span>进程 98372 · 8 核占用</div>
+            </div>
+            <div class="metric tex-diamond reveal" style="--rd:.2s" data-jitter="2380">
+              <div class="top"><svg class="pic" style="color:var(--copper)"><use href="#i-mem"/></svg><span class="lb">MEMORY</span><span class="tag">峰值 3.1 GB</span></div>
+              <div class="val"><b data-count="2380">2380</b><span class="u">MB</span><span class="of">/ 4096</span></div>
+              <div class="meter" data-pct="58" data-tone="on"></div>
+              <svg class="spark g" data-seed="58" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <div class="sparkcap"><span>近 60 采样</span><span class="pk">峰值 3.1 GB</span></div>
+              <div class="note">堆内已提交 2.4 GB · G1GC</div>
+            </div>
+            <div class="metric tex-diamond reveal" style="--rd:.24s" data-jitter="3">
+              <div class="top"><svg class="pic" style="color:var(--ok)"><use href="#i-users"/></svg><span class="lb">PLAYERS</span><span class="tag">上限 20</span></div>
+              <div class="val"><b data-count="3">3</b><span class="u">人</span><span class="of">/ 20</span></div>
+              <div class="meter" data-pct="15" data-tone="on"></div>
+              <svg class="spark y" data-seed="15" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <div class="sparkcap"><span>近 60 采样</span><span class="pk">峰值 6 人</span></div>
+              <div class="note"><span class="pulse-dot" style="width:6px;height:6px"></span>小小米 · Su_Ni · 红石大师</div>
+            </div>
+            <div class="metric tex-diamond reveal" style="--rd:.28s" data-jitter="0">
+              <div class="top"><svg class="pic" style="color:var(--gold)"><use href="#i-time"/></svg><span class="lb">UPTIME</span><span class="tag">TPS 20.0</span></div>
+              <div class="val"><b style="font-size:24px">6:42:11</b></div>
+              <div class="meter" data-pct="100" data-tone="xp"></div>
+              <svg class="spark o" data-seed="80" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <div class="sparkcap"><span>近 60 采样 · TPS</span><span class="pk">最低 19.2</span></div>
+              <div class="note">最近重启 4 小时前 · 无崩溃</div>
+            </div>
+          </div>
+
+          <!-- 控制台预览 + 右侧档案 -->
+          <div class="grid-2 reveal" style="--rd:.32s">
+            <div class="panel" style="margin-bottom:0">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-cmd"/></svg>
+                <h2>控制台</h2>
+                <span class="con-live"><span class="pulse-dot"></span>LIVE</span>
+                <div class="spacer"></div>
+                <button class="btn xs" type="button">跟随</button>
+                <button class="btn btn-ghost xs" type="button">清空</button>
+              </div>
+              <div class="con-body" style="min-height:236px;max-height:270px">
+                <div class="log-line" data-lv="INFO"><span class="t">03:11:40</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Tick 50 | uptime 300s | heap 42MB | players 3</span></div>
+                <div class="log-line" data-lv="WARN"><span class="t">03:11:56</span><span class="lv" style="color:#f2c14e">WARN</span><span class="m">Can't keep up! Is the server overloaded? Running 2140ms behind</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:12:17</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Tick 100 | uptime 605s | heap 88MB | players 3</span></div>
+                <div class="log-line joined" data-lv="INFO"><span class="t">03:12:42</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m"><em>小小米</em> joined the game</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:13:07</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Tick 150 | uptime 903s | heap 96MB | players 4</span></div>
+                <div class="log-line" data-lv="INFO"><span class="t">03:14:23</span><span class="lv" style="color:#4aedd9">INFO</span><span class="m">Saving chunks for level 'world'/minecraft:overworld</span></div>
+              </div>
+              <div class="con-input">
+                <span class="ps1">生存服 · 长期档 &gt;</span>
+                <input placeholder="输入指令后回车，例如 list / op Steve / whitelist on" aria-label="服务器指令">
+                <span class="caret"></span>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div class="panel" style="margin-bottom:0">
+                <i class="corner"></i>
+                <div class="con-head tex-stone"><svg class="pic" style="color:var(--cyan)"><use href="#i-book"/></svg><h2>服务器档案</h2></div>
+                <div style="padding:4px 14px 12px">
+                  <div class="field" style="grid-template-columns:110px 1fr;padding:9px 0"><div class="lb" style="font-weight:400;color:var(--ink-3);font-size:12.5px">服务端文件</div><div style="font-family:var(--f-term);font-size:15px">server.jar</div></div>
+                  <div class="field" style="grid-template-columns:110px 1fr;padding:9px 0"><div class="lb" style="font-weight:400;color:var(--ink-3);font-size:12.5px">内存上限</div><div style="font-family:var(--f-term);font-size:15px">4096 MB</div></div>
+                  <div class="field" style="grid-template-columns:110px 1fr;padding:9px 0"><div class="lb" style="font-weight:400;color:var(--ink-3);font-size:12.5px">开机自启</div><div><span class="badge wl">已开启</span></div></div>
+                  <div class="field" style="grid-template-columns:110px 1fr;padding:9px 0"><div class="lb" style="font-weight:400;color:var(--ink-3);font-size:12.5px">崩溃重启</div><div><span class="badge wl">5s 重试 3 次</span></div></div>
+                  <div class="field" style="grid-template-columns:110px 1fr;padding:9px 0;border-bottom:0"><div class="lb" style="font-weight:400;color:var(--ink-3);font-size:12.5px">Java 路径</div><div style="font-family:var(--f-term);font-size:15px">自动 · JDK 21.0.9</div></div>
+                </div>
+              </div>
+              <div class="panel" style="margin-bottom:0">
+                <i class="corner"></i>
+                <div class="con-head tex-stone"><svg class="pic" style="color:var(--copper)"><use href="#i-lever"/></svg><h2>快捷操作</h2></div>
+                <div class="quick-grid" style="padding:12px 14px">
+                  <button class="btn sm" type="button"><svg class="pic"><use href="#i-check"/></svg>保存世界</button>
+                  <button class="btn sm" type="button"><svg class="pic"><use href="#i-chest"/></svg>立即备份</button>
+                  <button class="btn sm" type="button"><svg class="pic"><use href="#i-users"/></svg>玩家列表</button>
+                  <button class="btn sm" type="button"><svg class="pic"><use href="#i-cmd"/></svg>发送指令</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>

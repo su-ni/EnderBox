@@ -56,13 +56,13 @@ func (m *Manager) InstallForge(o ForgeInstallOpts, onProgress func(string)) (str
 		ctx = context.Background()
 	}
 
-	m.Log(o.InstanceID, fmt.Sprintf("[ServerBox] 开始安装 Forge %s（要下载库文件，这一步比下载本身慢）", o.Tag))
+	m.Log(o.InstanceID, fmt.Sprintf("[EnderBox] 开始安装 Forge %s（要下载库文件，这一步比下载本身慢）", o.Tag))
 	onProgress("正在准备安装")
 
 	args := []string{"-jar", o.Installer, "--installServer", inst.Dir}
 	if o.MirrorURL != "" {
 		args = append(args, "--mirror", o.MirrorURL)
-		m.Log(o.InstanceID, fmt.Sprintf("[ServerBox] 库文件走镜像：%s", o.MirrorURL))
+		m.Log(o.InstanceID, fmt.Sprintf("[EnderBox] 库文件走镜像：%s", o.MirrorURL))
 	}
 	cmd := exec.CommandContext(ctx, o.JavaPath, args...)
 	cmd.Dir = inst.Dir
@@ -151,7 +151,7 @@ func (m *Manager) InstallForge(o ForgeInstallOpts, onProgress func(string)) (str
 		}
 	}
 	if !done {
-		m.Log(o.InstanceID, "[ServerBox] 注意：安装器退出码是 0，但没打「installed successfully」，接着按目录实况判断")
+		m.Log(o.InstanceID, "[EnderBox] 注意：安装器退出码是 0，但没打「installed successfully」，接着按目录实况判断")
 	}
 
 	launch, err := findForgeLaunchTarget(inst.Dir, o.Tag)
@@ -169,9 +169,9 @@ func (m *Manager) InstallForge(o ForgeInstallOpts, onProgress func(string)) (str
 		return "", fmt.Errorf("装好了但没记住该启动哪个文件（%w），去「配置」页把服务端文件填成 %s", err, launch)
 	}
 
-	m.Log(o.InstanceID, fmt.Sprintf("[ServerBox] Forge %s 装好了，服务端文件已指向 %s（%d 个库文件已就位）",
+	m.Log(o.InstanceID, fmt.Sprintf("[EnderBox] Forge %s 装好了，服务端文件已指向 %s（%d 个库文件已就位）",
 		o.Tag, launch, libs))
-	m.Log(o.InstanceID, fmt.Sprintf("[ServerBox] 安装器留在目录里了（%s）—— 以后要重装直接用它，不用再下一遍",
+	m.Log(o.InstanceID, fmt.Sprintf("[EnderBox] 安装器留在目录里了（%s）—— 以后要重装直接用它，不用再下一遍",
 		filepath.Base(o.Installer)))
 	return launch, nil
 }

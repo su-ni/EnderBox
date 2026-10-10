@@ -8,9 +8,9 @@ type IconProps = { size?: number; className?: string }
 export function IconBlock({
   size = 22,
   className,
-  top = '#5d9c3a',
+  top = '#4c8f2a',
   body = '#3b2a1a',
-  hi = '#7cc24f',
+  hi = '#6fbf44',
   lo = '#6f4520',
 }: IconProps & { top?: string; body?: string; hi?: string; lo?: string }) {
   return (
@@ -146,9 +146,9 @@ export function IconTerminal({ size = 14, className }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
       <rect width="16" height="16" fill="#070908" />
-      <rect x="2" y="3" width="5" height="2" fill="#5d9c3a" />
-      <rect x="2" y="7" width="9" height="2" fill="#4aedd9" />
-      <rect x="2" y="11" width="3" height="2" fill="#5d9c3a" />
+      <rect x="2" y="3" width="5" height="2" fill="#4c8f2a" />
+      <rect x="2" y="7" width="9" height="2" fill="#33d5cf" />
+      <rect x="2" y="11" width="3" height="2" fill="#4c8f2a" />
     </svg>
   )
 }
@@ -188,17 +188,28 @@ export function IconBack({ size = 12, className }: IconProps) {
 /** 各服务端类型的方块色板：同一套像素画，换配色即区分类型 */
 const TYPE_SKIN: Record<string, { top: string; body: string; hi: string; lo: string }> = {
   paper: { top: '#e6e8e3', body: '#8f978f', hi: '#ffffff', lo: '#6b736b' },
-  vanilla: { top: '#5d9c3a', body: '#3b2a1a', hi: '#7cc24f', lo: '#6f4520' },
+  vanilla: { top: '#4c8f2a', body: '#3b2a1a', hi: '#6fbf44', lo: '#6f4520' },
   fabric: { top: '#9fd8e8', body: '#3f7f92', hi: '#c6ecf7', lo: '#2d6274' },
   forge: { top: '#9c8b78', body: '#4a3f34', hi: '#b8a794', lo: '#332b23' },
   neoforge: { top: '#c8823c', body: '#8a5522', hi: '#e0a05c', lo: '#5f3a17' },
+  // 混合端：色相故意挑得离 Forge / Fabric 远一点（它们后面板里会显示出「不是纯模组端」）。
+  mohist: { top: '#b06a4a', body: '#6d3f2a', hi: '#cc8a66', lo: '#4b2a1c' },
+  arclight: { top: '#7a8fd6', body: '#3f4f8f', hi: '#a3b4ea', lo: '#2b3768' },
   velocity: { top: '#4fb6d8', body: '#1d6d8c', hi: '#7fd0ea', lo: '#124a61' },
   bungeecord: { top: '#8b5a2b', body: '#5e3a19', hi: '#a87540', lo: '#3f2710' },
 }
 
-export function IconTypeBlock({ type, size = 22 }: { type: string; size?: number }) {
+export function IconTypeBlock({
+  type,
+  size = 22,
+  className,
+}: {
+  type: string
+  size?: number
+  className?: string
+}) {
   const s = TYPE_SKIN[type] ?? TYPE_SKIN.vanilla
-  return <IconBlock size={size} {...s} />
+  return <IconBlock size={size} className={className} {...s} />
 }
 
 /** 汉堡菜单：移动端的世界列表抽屉靠它打开 */
@@ -224,6 +235,42 @@ export function IconClose({ size = 13, className }: IconProps) {
       <rect x="9" y="5" width="2" height="2" fill="currentColor" />
       <rect x="5" y="9" width="2" height="2" fill="currentColor" />
       <rect x="3" y="11" width="2" height="2" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** 复制。UUID 这类机器数据要能一键拿走 —— 让人手动拖选 36 个字符是在为难他。 */
+export function IconCopy({ size = 13, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <rect x="2" y="2" width="8" height="2" fill="currentColor" />
+      <rect x="2" y="4" width="2" height="6" fill="currentColor" />
+      <rect x="4" y="10" width="6" height="2" fill="currentColor" />
+      <rect x="6" y="6" width="8" height="2" fill="currentColor" />
+      <rect x="12" y="8" width="2" height="6" fill="currentColor" />
+      <rect x="6" y="12" width="8" height="2" fill="currentColor" />
+      <rect x="6" y="8" width="2" height="6" fill="currentColor" />
+    </svg>
+  )
+}
+
+/**
+ * 踢出：一扇门 + 向外的箭头。
+ *
+ * 单独做一个而不是复用 IconKill（电源键）：电源符号在这个界面里已经表示
+ * 「强制结束进程」了，两者都用它会让「把人请下线」看着像「把服务器关掉」。
+ */
+export function IconExit({ size = 13, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <rect x="2" y="2" width="2" height="12" fill="currentColor" />
+      <rect x="4" y="2" width="4" height="2" fill="currentColor" />
+      <rect x="4" y="12" width="4" height="2" fill="currentColor" />
+      <rect x="6" y="7" width="5" height="2" fill="currentColor" />
+      <rect x="9" y="5" width="2" height="2" fill="currentColor" />
+      <rect x="9" y="9" width="2" height="2" fill="currentColor" />
+      <rect x="11" y="6" width="2" height="4" fill="currentColor" />
+      <rect x="13" y="7" width="1" height="2" fill="currentColor" />
     </svg>
   )
 }
@@ -307,6 +354,20 @@ export function IconSave({ size = 14, className }: IconProps) {
   )
 }
 
+/** 像素红心：底部健康条的心条用。设计稿照 MC 满血色画，所以「通过」是红的不是绿的 */
+export function IconHeart({ size = 14, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <rect x="2" y="2" width="4" height="2" fill="currentColor" />
+      <rect x="10" y="2" width="4" height="2" fill="currentColor" />
+      <rect x="1" y="4" width="14" height="2" fill="currentColor" />
+      <rect x="0" y="6" width="16" height="5" fill="currentColor" />
+      <rect x="2" y="11" width="12" height="2" fill="currentColor" />
+      <rect x="5" y="13" width="6" height="1" fill="currentColor" />
+    </svg>
+  )
+}
+
 export function IconShield({ size = 14, className }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
@@ -335,6 +396,86 @@ export function IconInfo({ size = 14, className }: IconProps) {
     <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
       <rect x="7" y="2" width="2" height="3" fill="currentColor" />
       <rect x="7" y="7" width="2" height="7" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** 文件夹：文件管理页的目录行 */
+export function IconFolder({ size = 14, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <rect x="2" y="3" width="5" height="2" fill="currentColor" />
+      <rect x="2" y="5" width="12" height="8" fill="currentColor" opacity="0.55" />
+      <rect x="2" y="5" width="2" height="8" fill="currentColor" />
+      <rect x="12" y="5" width="2" height="8" fill="currentColor" />
+      <rect x="2" y="12" width="12" height="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** 文稿：文件管理页的普通文件行 */
+export function IconFile({ size = 14, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <rect x="3" y="2" width="8" height="2" fill="currentColor" />
+      <rect x="3" y="4" width="2" height="10" fill="currentColor" />
+      <rect x="11" y="4" width="2" height="4" fill="currentColor" />
+      <rect x="5" y="7" width="6" height="1" fill="currentColor" opacity="0.6" />
+      <rect x="5" y="9" width="6" height="1" fill="currentColor" opacity="0.6" />
+      <rect x="5" y="11" width="4" height="1" fill="currentColor" opacity="0.6" />
+    </svg>
+  )
+}
+
+/** 铅笔：编辑文本（配置文件） */
+export function IconEdit({ size = 14, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <rect x="9" y="2" width="2" height="2" fill="currentColor" />
+      <rect x="8" y="4" width="2" height="2" fill="currentColor" />
+      <rect x="7" y="6" width="2" height="2" fill="currentColor" />
+      <rect x="6" y="8" width="2" height="2" fill="currentColor" />
+      <rect x="4" y="10" width="2" height="2" fill="currentColor" />
+      <rect x="3" y="12" width="3" height="2" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** 链条：从直链安装 */
+export function IconLink({ size = 14, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <rect x="2" y="6" width="5" height="2" fill="currentColor" />
+      <rect x="2" y="8" width="2" height="3" fill="currentColor" />
+      <rect x="5" y="9" width="2" height="2" fill="currentColor" />
+      <rect x="9" y="6" width="5" height="2" fill="currentColor" />
+      <rect x="12" y="8" width="2" height="3" fill="currentColor" />
+      <rect x="9" y="9" width="2" height="2" fill="currentColor" />
+      <rect x="7" y="7" width="2" height="2" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** 打包箱：zip / 解压 */
+export function IconArchive({ size = 14, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <rect x="2" y="2" width="12" height="2" fill="currentColor" />
+      <rect x="3" y="4" width="10" height="10" fill="currentColor" opacity="0.5" />
+      <rect x="3" y="4" width="10" height="2" fill="currentColor" />
+      <rect x="7" y="6" width="2" height="3" fill="currentColor" />
+      <rect x="7" y="10" width="2" height="2" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** 返回上一级 */
+export function IconUp({ size = 13, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" className={className} aria-hidden="true">
+      <rect x="7" y="3" width="2" height="10" fill="currentColor" />
+      <rect x="5" y="5" width="2" height="2" fill="currentColor" />
+      <rect x="9" y="5" width="2" height="2" fill="currentColor" />
     </svg>
   )
 }

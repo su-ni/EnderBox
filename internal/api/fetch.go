@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/su-ni/ServerBox/internal/daemon"
-	"github.com/su-ni/ServerBox/internal/fetch"
+	"github.com/su-ni/EnderBox/internal/daemon"
+	"github.com/su-ni/EnderBox/internal/fetch"
 )
 
 // 服务端 jar 的下载接口。
@@ -27,6 +27,7 @@ func (s *Server) fetchRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/fetch/tasks", s.fetchTasks)
 	mux.HandleFunc("GET /api/fetch/tasks/{taskId}", s.fetchTask)
 	mux.HandleFunc("POST /api/fetch/tasks/{taskId}/cancel", s.fetchCancel)
+	mux.HandleFunc("POST /api/fetch/tasks/{taskId}/dismiss", s.fetchDismiss)
 	mux.HandleFunc("POST /api/instances/{id}/server-jar", s.downloadServerJar)
 }
 
@@ -89,6 +90,10 @@ func (s *Server) fetchVersions(w http.ResponseWriter, r *http.Request) {
 		vs, err = fetch.ForgeVersions()
 	case fetch.KindVelocity:
 		vs, err = fetch.VelocityVersions()
+	case fetch.KindMohist:
+		vs, err = fetch.MohistVersions()
+	case fetch.KindArclight:
+		vs, err = fetch.ArclightVersions()
 	}
 	if err != nil {
 		// 上游挂了 / 结构变了都要说清楚是哪个源的问题，别只回「失败」
@@ -129,6 +134,10 @@ func (s *Server) fetchBuilds(w http.ResponseWriter, r *http.Request) {
 		bs, err = fetch.ForgeBuilds(s.mirrorOf(r), ver, limit)
 	case fetch.KindVelocity:
 		bs, err = fetch.VelocityBuilds(ver, limit)
+	case fetch.KindMohist:
+		bs, err = fetch.MohistBuilds(ver, limit)
+	case fetch.KindArclight:
+		bs, err = fetch.ArclightBuilds(ver, limit)
 	}
 	if err != nil {
 		writeErr(w, 502, err.Error())
@@ -172,6 +181,38 @@ func (s *Server) fetchCancel(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
+// fetchDismiss 把一条已结束的任务记录从表里删掉（用户手动清账本）。
+// 还在跑的返回 409 且说明原因 —— 想删正在跑的先取消，别让用户对着一个
+// 删不掉的按钮猜（没有反馈的失败比失败更糟）。
+func (s *Server) fetchDismiss(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("taskId")
+	if t, ok := s.dl.Get(id); ok && t.State == fetch.StateRunning {
+		writeErr(w, 409, "任务还在跑 —— 先取消，等它结束再删记录")
+		return
+	}
+	if !s.dl.Dismiss(id) {
+		writeErr(w, 404, "任务不存在（可能已被清理）")
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+// serverJarReq 下一次服务端 jar 需要的信息。
+//
+// 全部字段都可以留空：留空时按实例自己的配置兜底（type 用实例的类型、version 用实例的
+// MC 版本、build/tag 留空表示「自动挑最适合的那个」）。preflight 的「一键补齐服务端文件」
+// 就是靠这一点——用户不需要先回答一遍他在向导里已经回答过的问题。
+type serverJarReq struct {
+	Type    string `json:"type"`
+	Version string `json:"version"`
+	Build   int    `json:"build"`
+	Mirror  string `json:"mirror"`
+	// Tag 上游对某个构建的稳定标识。Forge 必须带：它的版本号不是整数
+	// （49.0.30 / 14.23.5.2860），只能按字符串回源站定位，
+	// 靠 build 序号会因为上游加了新构建而错位成另一个版本。
+	Tag string `json:"tag"`
+}
+
 // downloadServerJar 给某个实例下服务端 jar。
 //
 // 落盘位置用的是实例自己的 JarPath（不是固定叫 server.jar）——
@@ -183,122 +224,180 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "实例不存在")
 		return
 	}
-	// Instance 本身不带运行状态（那个在 View 里），所以去列表里找一下
-	for _, v := range s.mgr.List() {
-		if v.ID != id {
-			continue
-		}
-		if v.Status == daemon.StatusRunning || v.Status == daemon.StatusStarting || v.Status == daemon.StatusStopping {
-			writeErr(w, 409, "实例正在运行，先停服再换服务端文件（Windows 上运行中的 jar 是锁着的，覆盖不了）")
-			return
-		}
-		break
-	}
-
-	var body struct {
-		Type    string `json:"type"`
-		Version string `json:"version"`
-		Build   int    `json:"build"`
-		Mirror  string `json:"mirror"`
-		// Tag 上游对某个构建的稳定标识。Forge 必须带：它的版本号不是整数
-		// （49.0.30 / 14.23.5.2860），只能按字符串回源站定位，
-		// 靠 build 序号会因为上游加了新构建而错位成另一个版本。
-		Tag string `json:"tag"`
-	}
+	var body serverJarReq
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, 400, "请求体解析失败: "+err.Error())
 		return
 	}
-	if body.Version == "" {
-		writeErr(w, 400, "缺少 version")
+	task, err := s.startServerJar(inst, body)
+	if err != nil {
+		writeErr(w, 502, err.Error())
 		return
 	}
+	writeJSON(w, 202, task)
+}
 
+// jarResolvers 按服务端类型解析「这次到底要下哪个文件」。
+//
+// ⚠ 为什么是 map 而不是 switch：这个函数链路上**原本有三个 switch**（版本列表、构建列表、
+// 下载各一个），加类型时最容易漏的就是最后这一个 —— 而且漏了**不会编译报错**，
+// 只会让界面上明明写着「可用」的类型，点下去回一句「XX 还不能自动下载」，
+// 把「我们忘了写」说成「上游不支持」。2026-10-06 真发生过（Mohist / Arclight 就是）。
+// 改成 map 之后，「有没有漏类型」变成一个**能被测试问出来的问题**：
+// TestJarResolversCoverEveryAvailableKind 拿 Sources() 逐个核对。
+// 以后再加类型，先往这张表里加一行，忘了就会红。
+//
+// 约定：resolver **只依赖 body**（镜像在调用方已兜底成全局默认值），不碰 s.mgr —— 保持可测。
+var jarResolvers = map[fetch.Kind]func(body serverJarReq) (fetch.Build, error){
+	fetch.KindPaper:    resolvePaperBuild,
+	fetch.KindVanilla:  resolveVanillaBuild,
+	fetch.KindFabric:   resolveFabricBuild,
+	fetch.KindForge:    resolveForgeBuild,
+	fetch.KindVelocity: resolveVelocityBuild,
+	fetch.KindMohist:   resolveMohistBuild,
+	fetch.KindArclight: resolveArclightBuild,
+}
+
+func resolvePaperBuild(body serverJarReq) (fetch.Build, error) {
+	return resolveByBuildID(body.Version, body.Build, fetch.PaperLatestBuild,
+		func() ([]fetch.Build, error) { return fetch.PaperBuilds(body.Version, 0) })
+}
+
+// resolveVelocityBuild Velocity 和 Paper 的形态一样：有整数构建号，可按号精确回源。
+func resolveVelocityBuild(body serverJarReq) (fetch.Build, error) {
+	return resolveByBuildID(body.Version, body.Build, fetch.VelocityLatestBuild,
+		func() ([]fetch.Build, error) { return fetch.VelocityBuilds(body.Version, 0) })
+}
+
+// resolveByBuildID 「给了构建号就按号找，没给就取最新」这件的公共实现。
+// 不这么抽的话 Paper / Velocity 两份几乎一样的代码迟早会各自长歪。
+func resolveByBuildID(
+	ver string, id int,
+	latest func(string) (fetch.Build, error),
+	list func() ([]fetch.Build, error),
+) (fetch.Build, error) {
+	if id <= 0 {
+		return latest(ver)
+	}
+	bs, err := list()
+	if err != nil {
+		return fetch.Build{}, err
+	}
+	for _, b := range bs {
+		if b.ID == id {
+			return b, nil
+		}
+	}
+	return fetch.Build{}, fmt.Errorf("版本 %s 下没有构建 %d", ver, id)
+}
+
+// resolveVanillaBuild / resolveFabricBuild 这两家都只有「一个构建」，
+// 不存在按号挑的问题，取列表第一个即可。
+// ⚠ 列表为空必须**报错**，不能把一个零值 Build 交出去 —— 零值 Build 的 URL 是空的，
+// 拿它去下载只会得到一句像「源站挂了」的错，把排查方向带偏。
+func resolveVanillaBuild(body serverJarReq) (fetch.Build, error) {
+	bs, err := fetch.VanillaBuilds(body.Mirror, body.Version)
+	if err != nil {
+		return fetch.Build{}, err
+	}
+	if len(bs) == 0 {
+		return fetch.Build{}, fmt.Errorf("原版没有 %s 这个版本", body.Version)
+	}
+	return bs[0], nil
+}
+
+func resolveFabricBuild(body serverJarReq) (fetch.Build, error) {
+	bs, err := fetch.FabricBuilds(body.Mirror, body.Version)
+	if err != nil {
+		return fetch.Build{}, err
+	}
+	if len(bs) == 0 {
+		return fetch.Build{}, fmt.Errorf("Fabric 没有为 %s 提供启动器", body.Version)
+	}
+	return bs[0], nil
+}
+
+// resolveForgeBuild Forge 少了 tag 就没法准确定位（它的版本号不是整数，49.0.30 / 14.23.5.2860）。
+// 真没带也不报错 —— 退回「这个版本的推荐构建」，那是最合理的默认，
+// 报错只会让用户对着一个他无从下手的信息发呆。
+func resolveForgeBuild(body serverJarReq) (fetch.Build, error) {
+	tag := body.Tag
+	if tag == "" {
+		bs, err := fetch.ForgeBuilds(body.Mirror, body.Version, 20)
+		if err != nil {
+			return fetch.Build{}, err
+		}
+		if len(bs) == 0 {
+			return fetch.Build{}, fmt.Errorf("Forge 没有为 %s 出过任何构建", body.Version)
+		}
+		tag = bs[0].Tag
+	}
+	return fetch.ForgeInstaller(tag, body.Mirror)
+}
+
+// resolveMohistBuild 混合端：build 号是自增整数，可按号回源精确取。
+func resolveMohistBuild(body serverJarReq) (fetch.Build, error) {
+	if body.Build > 0 {
+		return fetch.MohistBuild(body.Version, body.Build)
+	}
+	return fetch.MohistLatestBuild(body.Version)
+}
+
+// resolveArclightBuild ⚠ Arclight **没有构建号**（Build.ID 恒为 0），
+// 它的身份挂在 Tag 上（release tag，形如 `Trials/1.0.6`）。
+// 所以这里只能看 Tag，别拿 body.Build 判断 —— 那恒为 0，会把用户挑的构建
+// 悄悄换成「最新那个」，用户以为下的是 A、拿到的却是 B。
+func resolveArclightBuild(body serverJarReq) (fetch.Build, error) {
+	if body.Tag != "" {
+		return fetch.ArclightBuildByTag(body.Tag, body.Version)
+	}
+	return fetch.ArclightLatestBuild(body.Version)
+}
+
+// startServerJar 真正把下载任务起起来。路由和 preflight 的一键修复共用这一条路径 ——
+// 两份实现的话，「一键补齐」迟早会漏掉某个类型特有的处理（比如 Forge 还得跑安装器）。
+//
+// version / type 留空时用实例自己的配置兜底；build / tag 留空表示自动挑。
+func (s *Server) startServerJar(inst daemon.Instance, body serverJarReq) (*fetch.Task, error) {
+	id := inst.ID
+	// 运行中不让换文件：Windows 上运行中的 jar 是锁着的，覆盖不了。
+	// 放在这里而不是路由层，是为了让「一键补齐」也走同一道闸。
+	// 判据与「转换」共用 instanceRunning，两条路不许各判各的。
+	if s.instanceRunning(id) {
+		return nil, fmt.Errorf("实例正在运行，先停服再换服务端文件（Windows 上运行中的 jar 是锁着的，覆盖不了）")
+	}
+	if strings.TrimSpace(body.Type) == "" {
+		body.Type = string(inst.Type)
+	}
+	if strings.TrimSpace(body.Version) == "" {
+		body.Version = inst.MCVersion
+	}
+	if body.Version == "" {
+		return nil, fmt.Errorf("实例没记录游戏版本，没法自动挑服务端文件 —— 去「配置」页填上版本，或者手动把 jar 放进实例目录")
+	}
 	// 请求体没带源就用全局默认值（设置页里配的那个）
 	if body.Mirror == "" {
 		body.Mirror = s.set.Get().DefaultMirror
 	}
 
-	var build fetch.Build
-	var err error
-	switch fetch.Kind(body.Type) {
-	case fetch.KindPaper:
-		if body.Build > 0 {
-			bs, e := fetch.PaperBuilds(body.Version, 0)
-			if e != nil {
-				err = e
-				break
-			}
-			for _, b := range bs {
-				if b.ID == body.Build {
-					build = b
-					break
-				}
-			}
-			if build.URL == "" {
-				err = fmt.Errorf("版本 %s 下没有构建 %d", body.Version, body.Build)
-			}
-		} else {
-			build, err = fetch.PaperLatestBuild(body.Version)
+	k := fetch.Kind(body.Type)
+	resolve, ok := jarResolvers[k]
+	if !ok {
+		// 两种「没有分支」要分开说：认识但没实现，和压根不认识（拼错/前端传了个野值）。
+		if src, known := fetch.SourceOf(k); known {
+			return nil, fmt.Errorf("%s 还不能自动下载，%s", src.Label, src.Note)
 		}
-	case fetch.KindVanilla:
-		var bs []fetch.Build
-		bs, err = fetch.VanillaBuilds(body.Mirror, body.Version)
-		if err == nil && len(bs) > 0 {
-			build = bs[0]
-		}
-	case fetch.KindFabric:
-		// Fabric 只有一个构建（最新稳定 Loader），不需要按 build 号挑
-		var bs []fetch.Build
-		bs, err = fetch.FabricBuilds(body.Mirror, body.Version)
-		if err == nil && len(bs) > 0 {
-			build = bs[0]
-		}
-	case fetch.KindForge:
-		// Forge 少了 tag 就没法准确定位（版本号不是整数），所以前端必须带。
-		// 真没带也不报错 —— 退回「这个版本的推荐构建」，那是最合理的默认，
-		// 报错只会让用户对着一个他无从下手的信息发呆。
-		if body.Tag == "" {
-			var bs []fetch.Build
-			if bs, err = fetch.ForgeBuilds(body.Mirror, body.Version, 20); err == nil {
-				if len(bs) > 0 {
-					body.Tag = bs[0].Tag
-				} else {
-					err = fmt.Errorf("Forge 没有为 %s 出过任何构建", body.Version)
-				}
-			}
-		}
-		if err == nil {
-			build, err = fetch.ForgeInstaller(body.Tag, body.Mirror)
-		}
-	case fetch.KindVelocity:
-		if body.Build > 0 {
-			var bs []fetch.Build
-			bs, err = fetch.VelocityBuilds(body.Version, 0)
-			if err == nil {
-				for _, b := range bs {
-					if b.ID == body.Build {
-						build = b
-						break
-					}
-				}
-				if build.URL == "" {
-					err = fmt.Errorf("版本 %s 下没有构建 %d", body.Version, body.Build)
-				}
-			}
-		} else {
-			build, err = fetch.VelocityLatestBuild(body.Version)
-		}
-	default:
-		if src, ok := fetch.SourceOf(fetch.Kind(body.Type)); ok {
-			err = fmt.Errorf("%s 还不能自动下载，%s", src.Label, src.Note)
-		} else {
-			err = fmt.Errorf("不认识的服务端类型：%s", body.Type)
-		}
+		return nil, fmt.Errorf("不认识的服务端类型：%s", body.Type)
 	}
+	build, err := resolve(body)
 	if err != nil {
-		writeErr(w, 502, err.Error())
-		return
+		return nil, err
+	}
+	if build.URL == "" {
+		// resolver 说成功、却没给出下载地址 —— 这是**我们自己的 bug**，
+		// 不是上游的问题。要是照旧往下走，会拿一个空 URL 去发请求，
+		// 报出来的错会像「源站挂了」，排查方向从一开始就是错的。
+		return nil, fmt.Errorf("内部错误：%s 解析出的下载地址是空的（这是面板的 bug，麻烦反馈一下）", k)
 	}
 	if build.JavaMajor == 0 && fetch.Kind(body.Type) == fetch.KindPaper {
 		build.JavaMajor = fetch.RequiredJava(body.Mirror, body.Version)
@@ -337,7 +436,7 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 			// ② 往实例控制台写一行，让用户在日志里能看见「什么时候换了服务端文件」。
 			//    大小用真正落盘的字节数，不用 build.Size —— 列表里那个多数时候是 0，
 			//    写出来就是「0 字节的安装器」这种一眼假的记录。
-			s.mgr.Log(id, fmt.Sprintf("[ServerBox] 服务端文件已就绪：%s（%d 字节，校验%s）",
+			s.mgr.Log(id, fmt.Sprintf("[EnderBox] 服务端文件已就绪：%s（%d 字节，校验%s）",
 				jarName, written, map[bool]string{true: "通过", false: "未提供"}[build.SHA != ""]))
 			return nil
 		},
@@ -373,8 +472,7 @@ func (s *Server) downloadServerJar(w http.ResponseWriter, r *http.Request) {
 
 	task, err := s.dl.Start(opts)
 	if err != nil {
-		writeErr(w, 500, err.Error())
-		return
+		return nil, err
 	}
-	writeJSON(w, 202, task)
+	return task, nil
 }

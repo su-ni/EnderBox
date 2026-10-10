@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/su-ni/ServerBox/internal/fetch"
-	"github.com/su-ni/ServerBox/internal/settings"
+	"github.com/su-ni/EnderBox/internal/fetch"
+	"github.com/su-ni/EnderBox/internal/settings"
 )
 
 // 全局设置接口。分两块：
@@ -37,6 +37,7 @@ type settingsView struct {
 	HasPassword   bool         `json:"hasPassword"`
 	PasswordSetAt string       `json:"passwordSetAt,omitempty"`
 	DefaultMirror string       `json:"defaultMirror"`
+	MarketBase    string       `json:"marketBase"`
 	ListenAddr    string       `json:"listenAddr"`
 	Tokens        []tokenView  `json:"tokens"`
 	Runtime       runtimeState `json:"runtime"`
@@ -69,6 +70,7 @@ func (s *Server) settingsView() settingsView {
 		SessionHours:  cfg.SessionHours,
 		HasPassword:   cfg.PasswordHash != "",
 		DefaultMirror: cfg.DefaultMirror,
+		MarketBase:    cfg.MarketBase,
 		ListenAddr:    cfg.ListenAddr,
 		Tokens:        make([]tokenView, 0, len(cfg.Tokens)),
 	}
@@ -128,6 +130,7 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 		TrustLoopback *bool   `json:"trustLoopback"`
 		SessionHours  *int    `json:"sessionHours"`
 		DefaultMirror *string `json:"defaultMirror"`
+		MarketBase    *string `json:"marketBase"`
 		ListenAddr    *string `json:"listenAddr"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -147,6 +150,15 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		if body.DefaultMirror != nil {
 			v.DefaultMirror = *body.DefaultMirror
+		}
+		if body.MarketBase != nil {
+			// 只做最基本的形状校验：必须是 http(s) 地址。
+			// 其余（能不能通）只能实际请求才知道，提前拦反而会挡住自建的局域网镜像。
+			mb := strings.TrimRight(strings.TrimSpace(*body.MarketBase), "/")
+			if mb != "" && !strings.HasPrefix(mb, "http://") && !strings.HasPrefix(mb, "https://") {
+				return errBadRequest("市场地址要写成 http:// 或 https:// 开头")
+			}
+			v.MarketBase = mb
 		}
 		if body.ListenAddr != nil {
 			if err := validateListenAddr(*body.ListenAddr); err != nil {

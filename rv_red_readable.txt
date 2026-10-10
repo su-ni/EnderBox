@@ -1,0 +1,7 @@
+﻿--- FAIL: TestExecuteDoesNotOverwriteUserModifiedOverride (0.01s)
+    executor_test.go:418: 鐢ㄦ埛鏀硅繃鐨勮鐩栨枃浠惰杩?Skipped锛歔]
+--- FAIL: TestExecuteDoesNotExtractUnplannedOverride (0.00s)
+    executor_test.go:448: 璁″垝澶栬鐩栨潯鐩杩?Skipped锛歔]
+FAIL
+FAIL	github.com/su-ni/ServerBox/internal/modpack	1.108s
+FAIL

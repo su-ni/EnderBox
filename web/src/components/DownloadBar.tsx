@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, type DownloadTask } from '../api'
+import { Icon } from './design'
 import { fmtSize } from './ui'
 
 /**
@@ -12,10 +13,13 @@ export function DownloadBar({
   taskId,
   onDone,
   onSettled,
+  onToast,
 }: {
   taskId: string
   onDone?: (t: DownloadTask) => void
   onSettled?: (t: DownloadTask) => void
+  /** 有就用来反馈取消的结果；没有也照样能取消 */
+  onToast?: (msg: string) => void
 }) {
   const [task, setTask] = useState<DownloadTask | null>(null)
   const [gone, setGone] = useState(false)
@@ -60,6 +64,21 @@ export function DownloadBar({
     }
     return <p className="text-[12.5px] text-ink-3">正在起下载任务…</p>
   }
+  /** 取消。已经下完的任务后端会拒绝，这时把原因说出来而不是假装成功 */
+  const cancel = async () => {
+    setTask((cur) => (cur ? { ...cur, step: '正在取消' } : cur))
+    try {
+      await api.cancelTask(taskId)
+      const t = await api.fetchTask(taskId)
+      setTask(t)
+      onSettled?.(t)
+      onToast?.('已取消下载')
+    } catch (e) {
+      setTask((cur) => cur)
+      onToast?.((e as Error).message)
+    }
+  }
+
   if (!task) return null
 
   const failed = task.state === 'failed'
@@ -72,13 +91,7 @@ export function DownloadBar({
   const unknownTotal = task.total <= 0 || installing
 
   return (
-    <div
-      className="border-l-[3px] px-4 py-3"
-      style={{
-        borderColor: failed ? 'var(--color-danger)' : done ? 'var(--color-accent-deep)' : 'var(--color-cyan)',
-        background: failed ? '#1c1314' : done ? '#141a13' : '#131b1a',
-      }}
-    >
+    <div className={`nbox ${failed ? 'd' : done ? 'ok' : 'live'}`}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="text-[13px] font-semibold text-ink-1">
           {failed ? (installing ? '安装失败' : '下载失败') : done ? '服务端文件已就绪' : task.step}
@@ -101,6 +114,17 @@ export function DownloadBar({
               ? `已下载 ${fmtSize(task.done)}`
               : `${fmtSize(task.done)} / ${fmtSize(task.total)}`}
           </span>
+        )}
+        {!done && !failed && (
+          <button
+            type="button"
+            className="btn btn-ghost sm shrink-0"
+            onClick={cancel}
+            title="取消这次下载"
+          >
+            <Icon name="x" size={12} />
+            取消
+          </button>
         )}
       </div>
 

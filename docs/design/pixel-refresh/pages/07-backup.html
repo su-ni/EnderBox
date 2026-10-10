@@ -1,0 +1,164 @@
+<!-- ServerBox 设计稿 · 单屏模块：backup
+     从 index.html 里原样切出来（index.html 仍是总预览，未改动）。
+     搬进 React 时一个文件对应一屏；class 名与 index.html 保持一致。 -->
+<section class="page" data-page="backup">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">07</span>
+            <h2>备份与还原</h2>
+            <span class="sub">正在管「生存服 · 长期档」的存档。服务器开着的时候备份，会先让服务端把地图刷盘再打包，不会拿到半个区块。当前范围：<b style="color:var(--ink-1)">只存存档</b>（在下面「自动备份」里改）</span>
+          </div>
+
+          <!-- 01 现在就来一份 -->
+          <div class="panel reveal" style="--rd:.12s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">01</span>
+              <h2>现在就来一份</h2>
+              <span style="font-size:12.5px;color:var(--ink-3)">备注可留空</span>
+            </div>
+            <div style="padding:14px 16px 16px;display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+              <div style="width:320px;max-width:100%">
+                <div style="font-size:12.5px;font-weight:600">这一份叫什么</div>
+                <input class="inp" style="width:100%;margin-top:7px" placeholder="例如：装完插件前" maxlength="24">
+              </div>
+              <button class="btn btn-primary" type="button"><svg class="pic"><use href="#i-chest"/></svg>立刻备份</button>
+            </div>
+          </div>
+
+          <!-- 02 备份文件 -->
+          <div class="panel reveal" style="--rd:.16s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">02</span>
+              <h2>备份文件</h2>
+              <span style="font-size:12.5px;color:var(--ink-3)">4 份 · 共 1.5 GB</span>
+              <div class="spacer"></div>
+              <button class="btn btn-ghost sm" type="button">刷新</button>
+            </div>
+
+            <div class="rlist">
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-chest"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">backup-auto-20261007-0300.zip <span class="chip s">自动</span></div>
+                  <div class="rsub">642.3 MB · 2026-10-07 03:00</div>
+                </div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button">还原</button>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除备份 backup-auto-20261007-0300.zip"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--ok)"><use href="#i-chest"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">装 Create 之前 <span class="chip s">手动</span></div>
+                  <div class="rsub">118.6 MB · 2026-10-06 21:14</div>
+                </div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button">还原</button>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除备份 装 Create 之前"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--warn)"><use href="#i-chest"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">backup-pre-restore-20261006-2040.zip <span class="chip s w">还原前自动存</span></div>
+                  <div class="rsub">638.9 MB · 2026-10-06 20:40</div>
+                </div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button">还原</button>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除备份 backup-pre-restore-20261006-2040.zip"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="con-foot">
+              <svg class="pic" style="color:var(--ink-3)"><use href="#i-info"/></svg>
+              还没有备份时：「世界越大越舍不得丢。先手动点一次上面那颗按钮试试。」
+            </div>
+          </div>
+
+          <!-- 03 自动备份 -->
+          <div class="panel reveal" style="--rd:.2s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">03</span>
+              <h2>自动备份</h2>
+              <span style="font-size:12.5px;color:var(--ink-3)">已开启</span>
+            </div>
+
+            <div style="padding:14px 16px 18px">
+              <div style="display:flex;align-items:flex-start;gap:16px">
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:600">开启自动备份</div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:4px">到点自动打包一份。服务器开着时会先让服务端刷盘再打包，不会拿到半个区块。</p>
+                </div>
+                <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+              </div>
+
+              <div class="fgrid" style="margin-top:18px;border-top:3px solid #000;padding-top:18px">
+                <div>
+                  <div style="font-size:12.5px;font-weight:600">每天的时刻</div>
+                  <div style="display:flex;gap:8px;margin-top:8px">
+                    <input class="inp" style="flex:1;min-width:0" placeholder="例如 04:00" maxlength="5">
+                    <button class="btn sm" type="button"><svg class="pic"><use href="#i-plus"/></svg>添加</button>
+                  </div>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+                    <button class="chip s g" type="button" title="点一下删掉">03:00 ×</button>
+                    <button class="chip s g" type="button" title="点一下删掉">12:00 ×</button>
+                  </div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:8px">留空 = 不用固定时刻。最多 6 个，点标签就能删。</p>
+                </div>
+
+                <div>
+                  <div style="font-size:12.5px;font-weight:600">每隔几小时</div>
+                  <div class="stepper" style="margin-top:8px;max-width:170px"><button type="button">−</button><input class="inp" value="0"><button type="button">+</button></div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:8px">0 = 不用间隔式。两种方式可以一起用，谁先到点按谁跑。</p>
+                </div>
+
+                <div>
+                  <div style="font-size:12.5px;font-weight:600">保留最近几份</div>
+                  <div class="stepper" style="margin-top:8px;max-width:170px"><button type="button">−</button><input class="inp" value="7"><button type="button">+</button></div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:8px">0 = 不限。超出的自动删最旧的 —— <b style="color:var(--ink-2)">手动备份也算在内</b>，重要的一份请额外留个副本。</p>
+                </div>
+
+                <div>
+                  <div style="font-size:12.5px;font-weight:600">备份范围</div>
+                  <div class="filters" style="margin-top:8px">
+                    <button class="chipf on" type="button">整个实例目录</button>
+                    <button class="chipf" type="button">只存存档</button>
+                  </div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:8px">连插件、模组、配置一起打包，还原后整个环境回到同一时刻的一致状态。体积最大。手动备份同样用这个范围。</p>
+                </div>
+              </div>
+
+              <div class="pol-foot" style="margin-top:18px">
+                <div class="row"><span class="k">上次自动备份</span><span class="v">2026-10-07 03:00</span></div>
+                <div class="row"><span class="k">下次预计</span><span class="v">2026-10-07 12:00</span></div>
+              </div>
+
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px">
+                <button class="btn btn-primary" type="button"><svg class="pic"><use href="#i-check"/></svg>保存自动备份设置</button>
+                <span style="font-size:12px;color:var(--ink-3)">改了要保存才生效。刚打开的策略不会立刻补跑一次。</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 还原确认：点列表里的「还原」才出现，是整页风险最高的交互 -->
+          <div class="danger-zone reveal" style="--rd:.24s">
+            <h3>还原会把当前世界换成备份里的样子</h3>
+            <p>
+              目标：<span style="font-family:var(--f-term);font-size:14px;color:#ffd9d9">backup-20261006-2114.zip</span><br>
+              流程是：停服 → 先把现在这份状态自动存成「还原前」备份 → 清空世界目录 → 解压覆盖 → 之前开着就重新拉起来。所以就算选错了也还有一份后悔药，但玩家会掉线一次。
+            </p>
+            <p style="display:flex;align-items:center;gap:8px;color:var(--warn)">
+              <svg class="pic"><use href="#i-ban"/></svg>服务器正在运行，还原会先停服。
+            </p>
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+              <button class="btn btn-ghost" type="button">取消</button>
+              <button class="btn btn-danger" type="button">停服并还原到这一份</button>
+            </div>
+          </div>
+        </section>

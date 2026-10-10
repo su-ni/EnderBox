@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/su-ni/ServerBox/internal/store"
+	"github.com/su-ni/EnderBox/internal/store"
 )
 
 // 自动重启的护栏。
@@ -29,6 +29,14 @@ var restartBackoff = []time.Duration{5 * time.Second, 20 * time.Second, 60 * tim
 // 「我们这边炸了」是两回事，混成一个状态码，界面就只能显示一句没用的错误。
 var ErrInstanceRunning = errors.New("实例正在运行")
 
+// ErrInstanceNotFound 目标实例不存在。让上层能给出 404 而不是 400 ——
+// 「你填错了」和「这东西没了」是两回事，混成一个码界面就没法给出有用的提示。
+var ErrInstanceNotFound = errors.New("实例不存在")
+
+// ErrNoWorldArchive 「只存存档」时实例里一个世界目录都没有。
+// 这是用户改一下范围就能解决的事，属于输入的错（400），不是我们这边炸了（500）。
+var ErrNoWorldArchive = errors.New("没找到世界存档")
+
 type restartState struct {
 	fails int
 }
@@ -41,6 +49,13 @@ type Manager struct {
 	procs    map[string]*Process
 	logs     map[string]*LogBuffer
 	restarts map[string]*restartState
+	// backupsRunning 正在打包的实例。big world 的 zip 要跑几分钟，
+	// 定时到点和用户手点撞一起时就靠它防重入。
+	backupsRunning map[string]bool
+	// tasks 计划任务，**独立于实例配置存**（理由见 tasks.go 顶部那段）。
+	tasks *store.Store[taskSet]
+	// tasksRunning 正在执行的任务，按任务 ID 记。上一轮没结束就不许再进来。
+	tasksRunning map[string]bool
 }
 
 func NewManager(baseDir string) (*Manager, error) {
@@ -56,12 +71,29 @@ func NewManager(baseDir string) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 任务库坏了（JSON 语法错误）不该把整个守护进程打死：它只是附属数据，
+	// 而服务起不来用户连界面都进不去、更没法自己修。把坏文件挪到一边、用空库继续 ——
+	// 挪而不是删，用户想手工抢救还有得救。
+	tasks, err := store.New[taskSet](tasksFile(baseDir))
+	if err != nil {
+		bad := tasksFile(baseDir) + ".bad-" + time.Now().Format("20060102-150405")
+		if rerr := os.Rename(tasksFile(baseDir), bad); rerr != nil {
+			return nil, fmt.Errorf("任务库损坏且无法移走(%v): %w", rerr, err)
+		}
+		fmt.Fprintf(os.Stderr, "警告：任务库读取失败(%v)，已挪到 %s，本次以空任务列表启动\n", err, bad)
+		if tasks, err = store.New[taskSet](tasksFile(baseDir)); err != nil {
+			return nil, err
+		}
+	}
 	return &Manager{
-		baseDir:  baseDir,
-		st:       st,
-		procs:    map[string]*Process{},
-		logs:     map[string]*LogBuffer{},
-		restarts: map[string]*restartState{},
+		baseDir:        baseDir,
+		st:             st,
+		tasks:          tasks,
+		procs:          map[string]*Process{},
+		logs:           map[string]*LogBuffer{},
+		restarts:       map[string]*restartState{},
+		backupsRunning: map[string]bool{},
+		tasksRunning:   map[string]bool{},
 	}, nil
 }
 
@@ -111,24 +143,52 @@ func (m *Manager) List() []View {
 	})
 	out := make([]View, 0, len(insts))
 	for _, inst := range insts {
-		v := View{Instance: inst}
-		if p, ok := m.procs[inst.ID]; ok {
-			v.RuntimeState = RuntimeState{
-				Status:    p.Status(),
-				PID:       p.PID(),
-				StartedAt: p.StartedAt(),
-				Error:     p.Error(),
-			}
-		} else {
-			v.RuntimeState = RuntimeState{Status: StatusStopped}
-		}
-		out = append(out, v)
+		out = append(out, m.viewOf(inst))
 	}
 	return out
 }
 
+// viewOf 给实例配上运行时状态。
+// List() 和 View() 必须共用这一份 —— 各写一遍迟早会分叉成
+// 「列表里显示在跑、详情里显示已停」这种自相矛盾的结果。
+func (m *Manager) viewOf(inst Instance) View {
+	// 发出去之前补上策略的空值（nil slice → null 会打崩前端；见 fillPolicyDefaults）
+	inst.Backup = fillPolicyDefaults(inst.Backup)
+	v := View{Instance: inst}
+	// 用 m.proc 取（内部持锁）。直接读 m.procs 是绕开锁的 map 读，
+	// 而 start/Delete 在别的 goroutine 里写它 —— go test -race 下会报数据竞争。
+	if p, ok := m.proc(inst.ID); ok {
+		v.RuntimeState = RuntimeState{
+			Status:    p.Status(),
+			PID:       p.PID(),
+			StartedAt: p.StartedAt(),
+			Error:     p.Error(),
+		}
+		// 进程退出后 p 仍留在 m.procs 里（supervise 不删它，为的是留住崩溃原因），
+		// 照实返回就会出现「stopped + pid=168124」这种自相矛盾的组合。
+		// 口径与 Metrics() 对齐：不在跑就一律不报 PID 和启动时间。
+		// Error 要留着 —— 那是崩溃原因，界面靠它解释「为什么炸了」。
+		if v.RuntimeState.Status != StatusRunning && v.RuntimeState.Status != StatusStopping {
+			v.RuntimeState.PID = 0
+			v.RuntimeState.StartedAt = nil
+		}
+	} else {
+		v.RuntimeState = RuntimeState{Status: StatusStopped}
+	}
+	return v
+}
+
 func (m *Manager) Get(id string) (Instance, bool) {
 	return m.st.Get(id)
+}
+
+// View 单个实例的视图：配置 + 运行时状态。状态判定的唯一入口，别自己另算一套。
+func (m *Manager) View(id string) (View, bool) {
+	inst, ok := m.st.Get(id)
+	if !ok {
+		return View{}, false
+	}
+	return m.viewOf(inst), true
 }
 
 // BaseDir 数据目录，设置页要显示「东西存在哪」
@@ -163,6 +223,7 @@ func (m *Manager) Create(inst *Instance) error {
 		inst.JarPath = "server.jar"
 	}
 	inst.CreatedAt = time.Now()
+	inst.Backup = fillPolicyDefaults(inst.Backup)
 	return m.st.Put(inst.ID, *inst)
 }
 
@@ -173,6 +234,9 @@ func (m *Manager) Update(inst *Instance) error {
 	}
 	inst.CreatedAt = old.CreatedAt
 	inst.Dir = old.Dir
+	// 前端可能把 backup.atTimes 原样回传成 null（它拿的若是旧数据就是 null），
+	// 落盘前补一下，免得又把 null 写回去。
+	inst.Backup = fillPolicyDefaults(inst.Backup)
 	return m.st.Put(inst.ID, *inst)
 }
 
@@ -284,6 +348,13 @@ func (m *Manager) start(id string, javaPath string) error {
 	// logsFor 内部会加 m.mu，必须在持有 m.mu 之前调用，否则自死锁
 	logs := m.logsFor(id)
 
+	// 启动前把伴侣插件同步到位（开关开就放进去，关就拿掉）。
+	// 放在这里而不是创建实例时：用户随时可能改主意，改动必须是「下次启动生效」。
+	// 同步失败**不阻止启动** —— 实时数据是锦上添花，不该因为它让服务器起不来。
+	if err := m.SyncCompanion(inst); err != nil {
+		logs.Append("[EnderBox] 伴侣插件同步失败，实时数据会不可用：" + err.Error())
+	}
+
 	m.mu.Lock()
 	if p, ok := m.procs[id]; ok && (p.Status() == StatusRunning || p.Status() == StatusStarting) {
 		m.mu.Unlock()
@@ -298,10 +369,10 @@ func (m *Manager) start(id string, javaPath string) error {
 		m.mu.Lock()
 		delete(m.procs, id)
 		m.mu.Unlock()
-		logs.Append("[ServerBox] 启动失败：" + err.Error())
+		logs.Append("[EnderBox] 启动失败：" + err.Error())
 		return err
 	}
-	logs.Append(fmt.Sprintf("[ServerBox] 已启动 · java=%s · PID %d", javaPath, p.PID()))
+	logs.Append(fmt.Sprintf("[EnderBox] 已启动 · java=%s · PID %d", javaPath, p.PID()))
 	go m.supervise(id, javaPath, p)
 	return nil
 }
@@ -338,13 +409,13 @@ func (m *Manager) supervise(id, javaPath string, p *Process) {
 		lines = lines[len(lines)-crashSnapshotLines:]
 	}
 	if path, err := m.WriteCrashSnapshot(id, lines, p.Error()); err == nil {
-		logs.Append(fmt.Sprintf("[ServerBox] 进程异常退出，最后 %d 行已存档：%s", len(lines), path))
+		logs.Append(fmt.Sprintf("[EnderBox] 进程异常退出，最后 %d 行已存档：%s", len(lines), path))
 	} else {
-		logs.Append("[ServerBox] 进程异常退出（崩溃日志写盘失败：" + err.Error() + "）")
+		logs.Append("[EnderBox] 进程异常退出（崩溃日志写盘失败：" + err.Error() + "）")
 	}
 
 	if !inst.AutoRestart {
-		logs.Append("[ServerBox] 该实例没开崩溃自动重启。")
+		logs.Append("[EnderBox] 该实例没开崩溃自动重启。")
 		return
 	}
 
@@ -361,7 +432,7 @@ func (m *Manager) supervise(id, javaPath string, p *Process) {
 
 	if fails > maxAutoRestarts {
 		logs.Append(fmt.Sprintf(
-			"[ServerBox] 已连续崩溃 %d 次，自动重启 %d 次都没起来，就此停下。"+
+			"[EnderBox] 已连续崩溃 %d 次，自动重启 %d 次都没起来，就此停下。"+
 				"这种情况十有八九是配置问题（EULA 没同意、内存给多了、端口被占、服务端文件不对）——"+
 				"改好之后手动点启动。",
 			fails, fails-1))
@@ -369,7 +440,7 @@ func (m *Manager) supervise(id, javaPath string, p *Process) {
 	}
 
 	delay := restartBackoff[(fails-1)%len(restartBackoff)]
-	logs.Append(fmt.Sprintf("[ServerBox] %s后自动重启（第 %d/%d 次）", humanDelay(delay), fails, maxAutoRestarts))
+	logs.Append(fmt.Sprintf("[EnderBox] %s后自动重启（第 %d/%d 次）", humanDelay(delay), fails, maxAutoRestarts))
 	time.Sleep(delay)
 
 	// 睡着的这段时间里，用户可能自己点了启动、或者把实例删了 —— 那就别再插一脚
@@ -380,7 +451,7 @@ func (m *Manager) supervise(id, javaPath string, p *Process) {
 		return
 	}
 	if err := m.start(id, javaPath); err != nil {
-		logs.Append("[ServerBox] 自动重启失败：" + err.Error())
+		logs.Append("[EnderBox] 自动重启失败：" + err.Error())
 	}
 }
 

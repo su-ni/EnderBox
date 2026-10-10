@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/shirou/gopsutil/v4/mem"
+
+	"github.com/su-ni/EnderBox/internal/fetch"
 )
 
 // Issue 一条启动前检查结果。
@@ -59,6 +61,22 @@ func noEULA(t Type) bool {
 	return t == TypeVelocity || t == TypeBungee
 }
 
+// autoDownloadable 这个类型能不能自动下载，不能的话给一句人话原因。
+//
+// 真相源是 fetch.Sources()，**不许在这里另写一份名单** ——
+// 这个项目在「两处各写一份可用类型」上已经栽过一次（前端写死名单 → 判据变成死代码 →
+// 用户走进死循环）。后端接了新类型时这里自动跟着变。
+func autoDownloadable(t Type) (bool, string) {
+	src, ok := fetch.SourceOf(fetch.Kind(t))
+	if !ok {
+		return false, "这个服务端类型我们不认识"
+	}
+	if !src.Available {
+		return false, fmt.Sprintf("%s 还不能自动下载（%s）", src.Label, src.Note)
+	}
+	return true, ""
+}
+
 // JarPathOf 导出给 api 层用：下载服务端 jar 时要落在同一个位置，
 // 否则「下完了却起不来」—— 因为 Start 找的是 resolveJar 的结果。
 func JarPathOf(inst Instance) string { return resolveJar(inst) }
@@ -107,7 +125,7 @@ func (m *Manager) AcceptEULA(id string) error {
 	}
 	p := filepath.Join(inst.Dir, "eula.txt")
 
-	head := "# 由 ServerBox 写入。eula=true 表示你同意 Minecraft 最终用户许可协议\n" +
+	head := "# 由 EnderBox 写入。eula=true 表示你同意 Minecraft 最终用户许可协议\n" +
 		"# https://aka.ms/MinecraftEULA\n"
 
 	if b, err := os.ReadFile(p); err == nil {
@@ -168,18 +186,29 @@ func (m *Manager) Preflight(id string) PreflightResult {
 
 	// ── 1. 服务端文件 ──
 	if st, err := os.Stat(res.JarPath); err != nil || st.IsDir() {
-		detail := fmt.Sprintf("找不到 %s。", res.JarPath)
-		if alt := findAnyJar(inst); alt != "" {
-			detail += fmt.Sprintf("不过这个目录里有 %s —— 如果就是想用它，把「服务端文件」改成这个名字就行。", filepath.Base(alt))
-		} else {
-			// 目录是空的：直接说清楚要干什么，别只说「文件不存在」
-			detail += "服务端 jar 得先放进去，这个目录现在是空的。"
+		issue := Issue{
+			Code:  "jar_missing",
+			Level: "block",
+			Title: "缺少服务端文件",
 		}
-		res.Issues = append(res.Issues, Issue{
-			Code: "jar_missing", Level: "block",
-			Title:  "缺少服务端文件",
-			Detail: detail,
-		})
+		auto, why := autoDownloadable(inst.Type)
+		if alt := findAnyJar(inst); alt != "" {
+			issue.Detail = fmt.Sprintf("找不到 %s。不过这个目录里有 %s —— 如果就是想用它，把「服务端文件」改成这个名字就行。",
+				res.JarPath, filepath.Base(alt))
+		} else {
+			issue.Detail = fmt.Sprintf("找不到 %s。", res.JarPath)
+		}
+		if auto {
+			// 给一条能走通的路。用户在这一步最需要的是「那我该干嘛」，
+			// 而不是一句「文件不存在」—— 向导里下过一次，这里凭什么只能手动放。
+			issue.Detail += fmt.Sprintf("可以直接按这个实例的类型（%s %s）重新拉一份自动装好。",
+				inst.Type, inst.MCVersion)
+			issue.Fix = "download_jar"
+		} else {
+			// 不能自动下载的类型要如实说清为什么，别给一个点了没用的按钮
+			issue.Detail += why + "。这种情况只能自己把服务端文件放进实例目录。"
+		}
+		res.Issues = append(res.Issues, issue)
 	} else {
 		res.JarFound = true
 	}

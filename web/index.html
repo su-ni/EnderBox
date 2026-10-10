@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ServerBox</title>
+    <title>EnderBox</title>
     <script>
       /* 无头截图调试探针：带 ?probe=1 时把文档宽度写进 title，
          用 chrome --dump-dom | grep '<title>' 就能量化判断有没有横向溢出。
@@ -14,13 +14,509 @@
         addEventListener('load', function () {
           setTimeout(function () {
             var d = document.documentElement
-            document.title = 'SW=' + d.scrollWidth + ' CW=' + d.clientWidth + ' BW=' + document.body.scrollWidth
+            var t =
+              'SW=' + d.scrollWidth + ' CW=' + d.clientWidth + ' BW=' + document.body.scrollWidth
+
+            /* 吸顶探针：截图只在 scrollTop=0 拍，光看截图证明不了「滚下去还吸着」。
+               这里真滚一段，再量首行的位置 —— 吸住了的话它的 top 会停在 0 附近，
+               没吸住就会是负数（跟着内容一起滚出去了）。
+               probe=sticky 时才跑（滚动会改变页面状态，别影响普通截图）。 */
+            if (location.search.indexOf('probe=sticky') >= 0) {
+              var main = document.querySelector('main')
+              var head = document.querySelector('.sticky-head')
+              t += ' | main=' + (main ? Math.round(main.scrollHeight - main.clientHeight) : 'NA')
+              t += ' head=' + (head ? Math.round(head.getBoundingClientRect().top) : 'NA')
+              /* 吸顶块的高度必须量：它是「控件常驻、只有列表滚」的代价。
+                 太高会把结果区挤没，这个数字是判断要不要砍的依据。 */
+              t += ' headH=' + (head ? Math.round(head.getBoundingClientRect().height) : 'NA')
+              t += ' vh=' + window.innerHeight
+              if (main && head) {
+                main.scrollTop = 400
+                t += ' | scrolled400 head=' + Math.round(head.getBoundingClientRect().top)
+                t += ' mainTop=' + Math.round(main.getBoundingClientRect().top)
+                /* 吸住之后必须变矮（用户原话「吸顶太大了」）：
+                   stuck=1 说明 JS 判定已吸住，headH2 是瘦身后的高度。 */
+                setTimeout(function () {
+                  var h2 = document.querySelector('.sticky-head')
+                  t =
+                    t +
+                    ' stuck=' +
+                    (h2 && h2.className.indexOf('stuck') >= 0 ? 1 : 0) +
+                    ' headH2=' +
+                    (h2 ? Math.round(h2.getBoundingClientRect().height) : 'NA')
+                  document.title = t
+                }, 700)
+                return
+              }
+            }
+            /* 底部健康条（HUD）体检。三件事必须同时成立，缺一个用户就会看见毛病：
+               ① HUD 是 fixed，不参与布局 —— 主区得自己留出等高的 padding-bottom，
+                  否则最后一行内容被它压住（重叠时 lastB > hudT 就是证据）；
+               ② 中间的内存条得真的被撑开（xpbar 宽度接近 0 就说明 flex 没生效）；
+               ③ 主区左右不留缝（mainL 应为 0），这是「全屏式」的核心诉求。 */
+            var hud = document.querySelector('.hud')
+            if (hud) {
+              var hr = hud.getBoundingClientRect()
+              t += ' | hudT=' + Math.round(hr.top) + ' hudH=' + Math.round(hr.height)
+              var xb = document.querySelector('.hud .xpbar')
+              var xz = document.querySelector('.hud .xpzone')
+              if (xb) t += ' xpbar=' + Math.round(xb.getBoundingClientRect().width)
+              if (xz) t += ' xpzone=' + Math.round(xz.getBoundingClientRect().width)
+              var pm = document.querySelector('main')
+              if (pm) {
+                var pr = pm.getBoundingClientRect()
+                var pcs = getComputedStyle(pm)
+                t +=
+                  ' mainL=' + Math.round(pr.left) +
+                  ' mainB=' + Math.round(pr.bottom) +
+                  ' mainPadL=' + pcs.paddingLeft +
+                  ' mainPadR=' + pcs.paddingRight +
+                  ' mainPadB=' + pcs.paddingBottom
+                /* ⚠ 判「有没有被 HUD 压住」要量 main 自己的可视底边，别量 lastElementChild。
+                   main 是滚动容器，内容长的时候最后一个子元素本来就在视口外面 ——
+                   那是「需要滚动」，不是被压住。拿它当判据会把长页面全误报一遍。 */
+                var first = pm.firstElementChild
+                if (first) t += ' firstL=' + Math.round(first.getBoundingClientRect().left)
+              }
+            }
+            /* 列表列对齐检查：同一个列表里同名列的左边缘必须一致。
+               「状态」这种列用 grid auto 或按内容排时，会因每行字数不同
+               （「已封禁」3 字 vs「离线」2 字）而各走各的，一列扫下来是锯齿。
+               输出去重后的 left 集合 —— 只有一个数才算对齐。 */
+            var ps = document.querySelectorAll('.prow .pstat')
+            if (ps.length) {
+              var seen = {}
+              for (var k = 0; k < ps.length; k++) {
+                seen[Math.round(ps[k].getBoundingClientRect().left)] = 1
+              }
+              t += ' | pstatL=' + Object.keys(seen).join(',')
+            }
+            /* 「游戏时长」列和「操作」列同理，各自也得是单值。 */
+            var pc = document.querySelectorAll('.prow .pcoords')
+            if (pc.length) {
+              var seenC = {}
+              for (var kc = 0; kc < pc.length; kc++) {
+                seenC[Math.round(pc[kc].getBoundingClientRect().left)] = 1
+              }
+              t += ' pcoordsL=' + Object.keys(seenC).join(',')
+            }
+            var pa = document.querySelectorAll('.prow .pact')
+            if (pa.length) {
+              var seenA = {}
+              for (var ka = 0; ka < pa.length; ka++) {
+                seenA[Math.round(pa[ka].getBoundingClientRect().left)] = 1
+              }
+              t += ' pactL=' + Object.keys(seenA).join(',')
+            }
+            /* 行高必须一致 —— 离线行少一个 badge 会矮一截，一列扫下来就是锯齿。 */
+            var pRows = document.querySelectorAll('.prow')
+            if (pRows.length) {
+              var rhs = []
+              for (var kr = 0; kr < pRows.length; kr++) {
+                rhs.push(Math.round(pRows[kr].getBoundingClientRect().height))
+              }
+              t += ' rowH=' + rhs.join('/')
+            }
+            /* 行内各区的高度 + 生效的 grid 行高 / min-height：
+               行比设计稿高时，靠这几个数定位是哪个盒子撑的。
+               ⚠ 元凶常常**在 CSS 侧**而不在 DOM 里 —— 本次就是 index.css 里老组件残留的
+                  `.prow{min-height:54px}` 把 28px 的格子撑成了 33px（design.css 没写
+                  min-height，那条就漏出来生效了）。量 min-height 能一眼看出这类污染。 */
+            var pr0 = pRows[0]
+            if (pr0) {
+              var parts = []
+              var sels = ['.chk', '.pav', '.pname', '.pstat', '.pcoords', '.pact']
+              for (var kp = 0; kp < sels.length; kp++) {
+                var pe = pr0.querySelector(sels[kp])
+                if (pe) parts.push(sels[kp].slice(1) + '=' + Math.round(pe.getBoundingClientRect().height))
+              }
+              var pcs = getComputedStyle(pr0)
+              t += ' | parts:' + parts.join(' ') +
+                ' gtr=' + pcs.gridTemplateRows.replace(/ /g, '_') +
+                ' mh=' + pcs.minHeight
+            }
+            /* ⚠ 水平裁切检查 —— SW==CW 抓不到的那类问题。
+               main 是 `overflow-x: hidden` 的滚动容器：内部元素横向溢出**不会**产生
+               文档滚动条，而是被直接裁掉（按钮只剩一半）。SW==CW 只能证明「没有滚动条」，
+               证明不了「没有内容被裁」，必须单独查一遍。
+               判据：元素右边缘超过 main 的可视右边缘。 */
+            var pm2 = document.querySelector('main')
+            if (pm2) {
+              var mr = pm2.getBoundingClientRect()
+              var cut = []
+              var all = pm2.querySelectorAll('*')
+              for (var q = 0; q < all.length; q++) {
+                var rr = all[q].getBoundingClientRect()
+                if (rr.width > 0 && rr.right > mr.right + 1) {
+                  var cc = typeof all[q].className === 'string' ? all[q].className : '(svg)'
+                  cut.push(cc.slice(0, 26) + '@' + Math.round(rr.right))
+                }
+              }
+              if (cut.length) t += ' | CUT=' + cut.slice(0, 3).join(' ; ')
+            }
+            /* 概览页排版测量：控制台与右列的高度必须一致（设计稿靠 .grid-2 的默认 stretch
+               让两列等高）。`.con-body` 的高度也要看 —— 设计稿给它的是内联硬限高，
+               一旦被 CSS 里的 min-height 顶开，整列就会变高、页面就要滚动。 */
+            var cb = document.querySelector('.con-body')
+            if (cb) {
+              t += ' conBody=' + Math.round(cb.getBoundingClientRect().height)
+              var ccs = getComputedStyle(cb)
+              t += '(min' + ccs.minHeight + ',max' + ccs.maxHeight + ')'
+            }
+            var g2 = document.querySelectorAll('.grid-2 > .panel')
+            if (g2.length) {
+              var hs = []
+              for (var gi = 0; gi < g2.length; gi++) {
+                hs.push(Math.round(g2[gi].getBoundingClientRect().height))
+              }
+              t += ' g2panels=' + hs.join('/')
+            }
+            var rh = document.querySelector('.grid-2 > div')
+            if (rh) t += ' rightCol=' + Math.round(rh.getBoundingClientRect().height)
+            /* 身份头 / 页签行的实际高度，和 .content 的内边距一起量 ——
+               和设计稿用**同一把尺子**，逐项对数字，别靠眼睛看图。 */
+            var wh = document.querySelector('.world-head')
+            if (wh) t += ' worldHeadH=' + Math.round(wh.getBoundingClientRect().height)
+            var tb = document.querySelector('.tabbar')
+            if (tb) t += ' tabbarH=' + Math.round(tb.getBoundingClientRect().height)
+            var ct = document.querySelector('.content')
+            if (ct) {
+              var cc = getComputedStyle(ct)
+              t += ' contentPad=' + cc.paddingTop + '/' + cc.paddingLeft + '/' + cc.paddingRight
+            }
+            t += ' vh=' + window.innerHeight + ' vw=' + window.innerWidth
+            /* ⚠ 无头下 `--window-size=W,H` 的**实际视口比 H 小**（窗口边框等占掉一截），
+               量出来的绝对坐标不能直接和 H 比 —— 必须先输出 vh，再拿它当基准。 */
+            /* 垂直越界：内容伸到 main 可视底边之下 = 会被底部健康条压住（或溢出视口）。
+               ⚠ CUT 那条只查水平方向，垂直方向要单独查一次。 */
+            if (pm2) {
+              var mr2 = pm2.getBoundingClientRect()
+              var drop = []
+              var all2 = pm2.querySelectorAll('*')
+              for (var w2 = 0; w2 < all2.length; w2++) {
+                var r2 = all2[w2].getBoundingClientRect()
+                if (r2.height > 0 && r2.bottom > mr2.bottom + 1) {
+                  var c2 = typeof all2[w2].className === 'string' ? all2[w2].className : '(svg)'
+                  drop.push(c2.slice(0, 24) + '@' + Math.round(r2.bottom))
+                }
+              }
+              if (drop.length) t += ' | DROP=' + drop.slice(0, 3).join(' ; ')
+            }
+            /* shell 的直接子元素落在哪 —— 用来查「某个视图没有左右间距 / 没占满剩余宽度」。
+               正常应该是 side 在 1..253、内容从 253 开始占满到右边。 */
+            var sh = document.querySelector('.shell')
+            if (sh) {
+              var kids = []
+              for (var ci = 0; ci < Math.min(sh.children.length, 3); ci++) {
+                var ck = sh.children[ci]
+                var ckr = ck.getBoundingClientRect()
+                var ckn = typeof ck.className === 'string' ? ck.className.slice(0, 20) : '?'
+                kids.push(ckn + ':' + Math.round(ckr.left) + '..' + Math.round(ckr.right))
+              }
+              t += ' | shellKids=' + kids.join(' ')
+            }
+            document.title = t
           }, 1500)
         })
       }
     </script>
   </head>
   <body>
+    <!-- 图标精灵：照搬设计稿（docs/design/pixel-refresh/index.html 顶部），
+         30 个手绘 16×16 方块图标。放在这里而不是 React 组件里 —— 它是纯静态 DOM，
+         挪成组件要逐个转 JSX，而 <use href="#i-xxx"> 只要 DOM 里有定义就能用。 -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <symbol id="i-grass" viewBox="0 0 16 16">
+      <rect x="1" y="2" width="14" height="12" fill="#7a5230"/>
+      <rect x="1" y="6" width="14" height="2" fill="#6b4420"/>
+      <rect x="1" y="2" width="14" height="4" fill="#5da832"/>
+      <rect x="1" y="2" width="14" height="2" fill="#74c23f"/>
+      <rect x="2" y="8" width="3" height="2" fill="#603c1c"/>
+      <rect x="9" y="9" width="4" height="2" fill="#603c1c"/>
+      <rect x="6" y="12" width="3" height="2" fill="#603c1c"/>
+    </symbol>
+    <symbol id="i-compass" viewBox="0 0 16 16">
+      <rect x="4" y="1" width="8" height="14" fill="#202932"/>
+      <rect x="1" y="4" width="14" height="8" fill="#202932"/>
+      <rect x="4" y="2" width="8" height="12" fill="#93a1ad"/>
+      <rect x="2" y="4" width="12" height="8" fill="#93a1ad"/>
+      <rect x="5" y="5" width="6" height="6" fill="#0f1418"/>
+      <rect x="7" y="2" width="2" height="7" fill="#e8564a"/>
+      <rect x="7" y="9" width="2" height="5" fill="#f2f6f9"/>
+    </symbol>
+    <symbol id="i-cmd" viewBox="0 0 16 16">
+      <rect x="1" y="1" width="14" height="14" fill="#8a4a13"/>
+      <rect x="2" y="2" width="12" height="12" fill="#e08a3c"/>
+      <rect x="2" y="2" width="12" height="2" fill="#f0a556"/>
+      <rect x="4" y="5" width="2" height="2" fill="#8a4a13"/>
+      <rect x="10" y="5" width="2" height="2" fill="#8a4a13"/>
+      <rect x="7" y="7" width="2" height="3" fill="#8a4a13"/>
+      <rect x="4" y="11" width="2" height="1" fill="#8a4a13"/>
+      <rect x="10" y="11" width="2" height="1" fill="#8a4a13"/>
+    </symbol>
+    <symbol id="i-head" viewBox="0 0 16 16">
+      <rect x="1" y="1" width="14" height="14" fill="#c8956a"/>
+      <rect x="1" y="1" width="14" height="5" fill="#5b3a1e"/>
+      <rect x="1" y="1" width="2" height="7" fill="#5b3a1e"/>
+      <rect x="13" y="1" width="2" height="7" fill="#5b3a1e"/>
+      <rect x="4" y="7" width="3" height="3" fill="#eef3f7"/>
+      <rect x="9" y="7" width="3" height="3" fill="#eef3f7"/>
+      <rect x="5" y="8" width="2" height="2" fill="#22262c"/>
+      <rect x="9" y="8" width="2" height="2" fill="#22262c"/>
+      <rect x="6" y="12" width="4" height="1" fill="#8a5f42"/>
+    </symbol>
+    <symbol id="i-book" viewBox="0 0 16 16">
+      <rect x="2" y="1" width="12" height="14" fill="#8a3a2a"/>
+      <rect x="4" y="2" width="9" height="12" fill="#f2eee0"/>
+      <rect x="2" y="1" width="3" height="14" fill="#a8492f"/>
+      <rect x="6" y="4" width="6" height="1" fill="#b9a98a"/>
+      <rect x="6" y="6" width="6" height="1" fill="#b9a98a"/>
+      <rect x="6" y="8" width="5" height="1" fill="#b9a98a"/>
+      <rect x="6" y="10" width="6" height="1" fill="#b9a98a"/>
+    </symbol>
+    <symbol id="i-chest" viewBox="0 0 16 16">
+      <rect x="1" y="3" width="14" height="10" fill="#7a5230"/>
+      <rect x="1" y="3" width="14" height="3" fill="#8b5f38"/>
+      <rect x="1" y="3" width="14" height="1" fill="#a5764a"/>
+      <rect x="1" y="6" width="14" height="1" fill="#5a3c1f"/>
+      <rect x="6" y="4" width="4" height="5" fill="#4a4f57"/>
+      <rect x="7" y="6" width="2" height="3" fill="#c9a227"/>
+      <rect x="1" y="12" width="14" height="1" fill="#5a3c1f"/>
+    </symbol>
+    <symbol id="i-table" viewBox="0 0 16 16">
+      <rect x="1" y="1" width="14" height="14" fill="#6b4420"/>
+      <rect x="1" y="1" width="14" height="3" fill="#8b5a2b"/>
+      <rect x="1" y="1" width="14" height="1" fill="#ab713d"/>
+      <rect x="7" y="1" width="1" height="3" fill="#3f2a12"/>
+      <rect x="1" y="6" width="14" height="1" fill="#3f2a12"/>
+      <rect x="7" y="6" width="1" height="9" fill="#3f2a12"/>
+      <rect x="3" y="8" width="2" height="2" fill="#a5764a"/>
+      <rect x="11" y="10" width="2" height="2" fill="#a5764a"/>
+    </symbol>
+    <!-- 游戏规则（gamerule）页签：告示牌 —— 木板上写着字，最像「规则」的物品。
+         与 i-table（整块工作台）的剪影区分得开：横板 + 立柱 vs 正方形。 -->
+    <symbol id="i-relation" viewBox="0 0 16 16">
+      <!-- 关系星图：中心方块 + 四个卫星 + 连线。纯 rect，和既有图标同一套像素规格 -->
+      <rect x="7" y="1" width="2" height="2" fill="currentColor"/><rect x="1" y="7" width="2" height="2" fill="currentColor"/><rect x="13" y="7" width="2" height="2" fill="currentColor"/><rect x="7" y="13" width="2" height="2" fill="currentColor"/>
+      <rect x="7" y="3" width="1" height="4" fill="currentColor"/><rect x="3" y="7" width="4" height="1" fill="currentColor"/><rect x="9" y="7" width="4" height="1" fill="currentColor"/><rect x="7" y="9" width="1" height="4" fill="currentColor"/>
+      <rect x="5" y="5" width="6" height="6" fill="currentColor"/><rect x="6" y="6" width="4" height="4" fill="#141820"/>
+    </symbol>
+    <symbol id="i-rule" viewBox="0 0 16 16">
+      <rect x="1" y="1" width="14" height="9" fill="#8b5a2b"/>
+      <rect x="1" y="1" width="14" height="1" fill="#ab713d"/>
+      <rect x="1" y="9" width="14" height="1" fill="#5e3a19"/>
+      <rect x="3" y="3" width="9" height="1" fill="#e6d3a8"/>
+      <rect x="3" y="5" width="6" height="1" fill="#e6d3a8"/>
+      <rect x="3" y="7" width="10" height="1" fill="#e6d3a8"/>
+      <rect x="7" y="10" width="2" height="5" fill="#6b4420"/>
+      <rect x="6" y="14" width="4" height="1" fill="#5e3a19"/>
+    </symbol>
+    <symbol id="i-clock" viewBox="0 0 16 16">
+      <rect x="4" y="1" width="8" height="14" fill="#1b2229"/>
+      <rect x="1" y="4" width="14" height="8" fill="#1b2229"/>
+      <rect x="4" y="2" width="8" height="12" fill="#d9d2b8"/>
+      <rect x="2" y="4" width="12" height="8" fill="#d9d2b8"/>
+      <rect x="7" y="4" width="2" height="5" fill="#c05a2a"/>
+      <rect x="8" y="7" width="4" height="2" fill="#c05a2a"/>
+    </symbol>
+    <symbol id="i-lever" viewBox="0 0 16 16">
+      <rect x="1" y="10" width="14" height="4" fill="#6b6b6b"/>
+      <rect x="1" y="10" width="14" height="1" fill="#9a9a9a"/>
+      <rect x="1" y="13" width="14" height="1" fill="#3f3f3f"/>
+      <rect x="7" y="2" width="3" height="9" fill="#8b5a2b"/>
+      <rect x="7" y="2" width="3" height="2" fill="#c07a3a"/>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 16 16">
+      <rect x="4" y="3" width="2" height="10" fill="currentColor"/>
+      <rect x="6" y="5" width="2" height="6" fill="currentColor"/>
+      <rect x="8" y="6" width="2" height="4" fill="currentColor"/>
+      <rect x="10" y="7" width="2" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-stop" viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" fill="currentColor"/></symbol>
+    <symbol id="i-restart" viewBox="0 0 16 16">
+      <rect x="6" y="2" width="6" height="2" fill="currentColor"/>
+      <rect x="11" y="4" width="2" height="5" fill="currentColor"/>
+      <rect x="9" y="11" width="4" height="2" fill="currentColor"/>
+      <rect x="4" y="12" width="5" height="2" fill="currentColor"/>
+      <rect x="2" y="5" width="2" height="7" fill="currentColor"/>
+      <rect x="3" y="3" width="3" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-refresh" viewBox="0 0 16 16">
+      <rect x="4" y="3" width="6" height="2" fill="currentColor"/>
+      <rect x="9" y="5" width="2" height="2" fill="currentColor"/>
+      <rect x="8" y="6" width="3" height="2" fill="currentColor"/>
+      <rect x="6" y="11" width="6" height="2" fill="currentColor"/>
+      <rect x="5" y="9" width="2" height="2" fill="currentColor"/>
+      <rect x="5" y="8" width="3" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 16 16">
+      <rect x="6" y="1" width="4" height="2" fill="currentColor"/>
+      <rect x="2" y="3" width="12" height="1" fill="currentColor"/>
+      <rect x="4" y="5" width="1" height="8" fill="currentColor"/>
+      <rect x="11" y="5" width="1" height="8" fill="currentColor"/>
+      <rect x="5" y="12" width="6" height="1" fill="currentColor"/>
+      <rect x="7" y="7" width="1" height="3" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 16 16">
+      <rect x="3" y="2" width="7" height="1" fill="currentColor"/>
+      <rect x="3" y="9" width="7" height="1" fill="currentColor"/>
+      <rect x="2" y="3" width="1" height="6" fill="currentColor"/>
+      <rect x="10" y="3" width="1" height="6" fill="currentColor"/>
+      <rect x="3" y="3" width="1" height="1" fill="currentColor"/>
+      <rect x="9" y="3" width="1" height="1" fill="currentColor"/>
+      <rect x="3" y="8" width="1" height="1" fill="currentColor"/>
+      <rect x="9" y="8" width="1" height="1" fill="currentColor"/>
+      <rect x="11" y="11" width="4" height="2" fill="currentColor"/>
+      <rect x="10" y="10" width="2" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 16 16">
+      <rect x="7" y="2" width="2" height="12" fill="currentColor"/>
+      <rect x="2" y="7" width="12" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-dl" viewBox="0 0 16 16">
+      <rect x="7" y="1" width="2" height="8" fill="currentColor"/>
+      <rect x="5" y="7" width="2" height="2" fill="currentColor"/>
+      <rect x="9" y="7" width="2" height="2" fill="currentColor"/>
+      <rect x="7" y="9" width="2" height="2" fill="currentColor"/>
+      <rect x="2" y="13" width="12" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-ul" viewBox="0 0 16 16">
+      <rect x="7" y="1" width="2" height="8" fill="currentColor"/>
+      <rect x="5" y="3" width="2" height="2" fill="currentColor"/>
+      <rect x="9" y="3" width="2" height="2" fill="currentColor"/>
+      <rect x="7" y="1" width="2" height="2" fill="currentColor"/>
+      <rect x="2" y="13" width="12" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-cpu" viewBox="0 0 16 16">
+      <rect x="4" y="4" width="8" height="1" fill="currentColor"/>
+      <rect x="4" y="11" width="8" height="1" fill="currentColor"/>
+      <rect x="4" y="5" width="1" height="6" fill="currentColor"/>
+      <rect x="11" y="5" width="1" height="6" fill="currentColor"/>
+      <rect x="6" y="6" width="4" height="4" fill="currentColor"/>
+      <rect x="6" y="2" width="1" height="2" fill="currentColor"/>
+      <rect x="9" y="2" width="1" height="2" fill="currentColor"/>
+      <rect x="6" y="12" width="1" height="2" fill="currentColor"/>
+      <rect x="9" y="12" width="1" height="2" fill="currentColor"/>
+      <rect x="2" y="6" width="2" height="1" fill="currentColor"/>
+      <rect x="12" y="6" width="2" height="1" fill="currentColor"/>
+      <rect x="2" y="9" width="2" height="1" fill="currentColor"/>
+      <rect x="12" y="9" width="2" height="1" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-mem" viewBox="0 0 16 16">
+      <rect x="1" y="5" width="14" height="6" fill="currentColor"/>
+      <rect x="3" y="11" width="1" height="2" fill="currentColor"/>
+      <rect x="6" y="11" width="1" height="2" fill="currentColor"/>
+      <rect x="9" y="11" width="1" height="2" fill="currentColor"/>
+      <rect x="12" y="11" width="1" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-users" viewBox="0 0 16 16">
+      <rect x="5" y="2" width="6" height="6" fill="currentColor"/>
+      <rect x="3" y="9" width="10" height="5" fill="currentColor"/>
+      <rect x="4" y="9" width="8" height="1" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-time" viewBox="0 0 16 16">
+      <rect x="4" y="2" width="8" height="1" fill="currentColor"/>
+      <rect x="4" y="13" width="8" height="1" fill="currentColor"/>
+      <rect x="2" y="4" width="1" height="8" fill="currentColor"/>
+      <rect x="13" y="4" width="1" height="8" fill="currentColor"/>
+      <rect x="3" y="3" width="1" height="1" fill="currentColor"/>
+      <rect x="12" y="3" width="1" height="1" fill="currentColor"/>
+      <rect x="3" y="12" width="1" height="1" fill="currentColor"/>
+      <rect x="12" y="12" width="1" height="1" fill="currentColor"/>
+      <rect x="7" y="4" width="1" height="5" fill="currentColor"/>
+      <rect x="8" y="8" width="4" height="1" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-heart" viewBox="0 0 16 16">
+      <rect x="3" y="2" width="4" height="2" fill="currentColor"/>
+      <rect x="9" y="2" width="4" height="2" fill="currentColor"/>
+      <rect x="2" y="4" width="12" height="3" fill="currentColor"/>
+      <rect x="4" y="7" width="8" height="3" fill="currentColor"/>
+      <rect x="6" y="10" width="4" height="2" fill="currentColor"/>
+      <rect x="7" y="12" width="2" height="1" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-info" viewBox="0 0 16 16">
+      <rect x="2" y="2" width="12" height="1" fill="currentColor"/>
+      <rect x="2" y="13" width="12" height="1" fill="currentColor"/>
+      <rect x="1" y="3" width="1" height="10" fill="currentColor"/>
+      <rect x="14" y="3" width="1" height="10" fill="currentColor"/>
+      <rect x="7" y="4" width="2" height="2" fill="currentColor"/>
+      <rect x="7" y="8" width="2" height="4" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 16 16">
+      <rect x="2" y="7" width="2" height="3" fill="currentColor"/>
+      <rect x="4" y="9" width="2" height="3" fill="currentColor"/>
+      <rect x="6" y="7" width="2" height="3" fill="currentColor"/>
+      <rect x="8" y="5" width="2" height="3" fill="currentColor"/>
+      <rect x="10" y="3" width="2" height="3" fill="currentColor"/>
+      <rect x="12" y="1" width="2" height="3" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-crown" viewBox="0 0 16 16">
+      <rect x="2" y="9" width="12" height="4" fill="currentColor"/>
+      <rect x="2" y="6" width="2" height="3" fill="currentColor"/>
+      <rect x="6" y="4" width="2" height="5" fill="currentColor"/>
+      <rect x="10" y="4" width="2" height="5" fill="currentColor"/>
+      <rect x="7" y="2" width="2" height="3" fill="currentColor"/>
+      <rect x="4" y="5" width="2" height="4" fill="currentColor"/>
+      <rect x="12" y="6" width="2" height="3" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-kick" viewBox="0 0 16 16">
+      <rect x="2" y="2" width="2" height="12" fill="currentColor"/>
+      <rect x="4" y="2" width="4" height="2" fill="currentColor"/>
+      <rect x="4" y="12" width="4" height="2" fill="currentColor"/>
+      <rect x="8" y="7" width="6" height="2" fill="currentColor"/>
+      <rect x="11" y="4" width="2" height="2" fill="currentColor"/>
+      <rect x="11" y="10" width="2" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-ban" viewBox="0 0 16 16">
+      <rect x="5" y="1" width="6" height="2" fill="currentColor"/>
+      <rect x="5" y="13" width="6" height="2" fill="currentColor"/>
+      <rect x="3" y="3" width="2" height="2" fill="currentColor"/>
+      <rect x="1" y="5" width="2" height="6" fill="currentColor"/>
+      <rect x="13" y="5" width="2" height="6" fill="currentColor"/>
+      <rect x="11" y="3" width="2" height="2" fill="currentColor"/>
+      <rect x="3" y="11" width="2" height="2" fill="currentColor"/>
+      <rect x="11" y="11" width="2" height="2" fill="currentColor"/>
+      <rect x="5" y="5" width="2" height="2" fill="currentColor"/>
+      <rect x="7" y="7" width="2" height="2" fill="currentColor"/>
+      <rect x="9" y="9" width="2" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-chev-r" viewBox="0 0 16 16">
+      <rect x="5" y="4" width="2" height="8" fill="currentColor"/>
+      <rect x="7" y="5" width="2" height="6" fill="currentColor"/>
+      <rect x="9" y="6" width="2" height="4" fill="currentColor"/>
+      <rect x="11" y="7" width="2" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-chev-l" viewBox="0 0 16 16">
+      <rect x="9" y="4" width="2" height="8" fill="currentColor"/>
+      <rect x="7" y="5" width="2" height="6" fill="currentColor"/>
+      <rect x="5" y="6" width="2" height="4" fill="currentColor"/>
+      <rect x="3" y="7" width="2" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-x" viewBox="0 0 16 16">
+      <rect x="3" y="3" width="2" height="2" fill="currentColor"/><rect x="5" y="5" width="2" height="2" fill="currentColor"/><rect x="7" y="7" width="2" height="2" fill="currentColor"/><rect x="9" y="9" width="2" height="2" fill="currentColor"/><rect x="11" y="11" width="2" height="2" fill="currentColor"/><rect x="11" y="3" width="2" height="2" fill="currentColor"/><rect x="9" y="5" width="2" height="2" fill="currentColor"/><rect x="5" y="9" width="2" height="2" fill="currentColor"/><rect x="3" y="11" width="2" height="2" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-folder" viewBox="0 0 16 16">
+      <rect x="1" y="3" width="6" height="2" fill="#b8862b"/><rect x="1" y="5" width="14" height="9" fill="#d9a52e"/><rect x="1" y="5" width="14" height="1" fill="#efc25a"/><rect x="1" y="13" width="14" height="1" fill="#9c7418"/>
+    </symbol>
+    <symbol id="i-cube" viewBox="0 0 16 16">
+      <rect x="2" y="3" width="12" height="10" fill="#8b5a2b"/><rect x="2" y="3" width="12" height="3" fill="#a5764a"/><rect x="2" y="3" width="12" height="1" fill="#c08a55"/><rect x="7" y="3" width="2" height="10" fill="#4a4f57"/><rect x="2" y="12" width="12" height="1" fill="#5a3c1f"/>
+    </symbol>
+    <symbol id="i-jar" viewBox="0 0 16 16">
+      <rect x="3" y="2" width="10" height="12" fill="#c9742a"/><rect x="3" y="2" width="10" height="2" fill="#e08a3c"/><rect x="3" y="2" width="10" height="1" fill="#f0a556"/><rect x="5" y="6" width="6" height="5" fill="#8a4a13"/><rect x="3" y="13" width="10" height="1" fill="#7a3f10"/>
+    </symbol>
+    <symbol id="i-zip" viewBox="0 0 16 16">
+      <rect x="3" y="1" width="10" height="14" fill="#d9b45a"/><rect x="3" y="1" width="10" height="1" fill="#f0d27a"/><rect x="7" y="1" width="2" height="14" fill="#8a6a1f"/><rect x="7" y="3" width="2" height="2" fill="#f0d27a"/><rect x="7" y="7" width="2" height="2" fill="#f0d27a"/><rect x="7" y="11" width="2" height="2" fill="#f0d27a"/>
+    </symbol>
+    <symbol id="i-file" viewBox="0 0 16 16">
+      <rect x="3" y="1" width="10" height="14" fill="#c8d2da"/><rect x="3" y="1" width="10" height="1" fill="#eef3f7"/><rect x="3" y="14" width="10" height="1" fill="#93a1ad"/><rect x="5" y="5" width="6" height="1" fill="#7f8b98"/><rect x="5" y="7" width="6" height="1" fill="#7f8b98"/><rect x="5" y="9" width="4" height="1" fill="#7f8b98"/>
+    </symbol>
+    <symbol id="i-lock" viewBox="0 0 16 16">
+      <rect x="5" y="2" width="6" height="2" fill="currentColor"/><rect x="4" y="4" width="2" height="3" fill="currentColor"/><rect x="10" y="4" width="2" height="3" fill="currentColor"/><rect x="3" y="7" width="10" height="7" fill="currentColor"/><rect x="7" y="9" width="2" height="3" fill="#131920"/>
+    </symbol>
+    <symbol id="i-star" viewBox="0 0 16 16">
+      <rect x="7" y="1" width="2" height="3" fill="currentColor"/><rect x="5" y="4" width="6" height="2" fill="currentColor"/><rect x="1" y="5" width="14" height="2" fill="currentColor"/><rect x="3" y="7" width="10" height="2" fill="currentColor"/><rect x="4" y="9" width="8" height="2" fill="currentColor"/><rect x="3" y="11" width="2" height="2" fill="currentColor"/><rect x="11" y="11" width="2" height="2" fill="currentColor"/><rect x="2" y="13" width="2" height="2" fill="currentColor"/><rect x="12" y="13" width="2" height="2" fill="currentColor"/>
+    </symbol>
+    </defs></svg>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

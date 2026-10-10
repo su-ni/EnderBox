@@ -29,9 +29,9 @@ echo "    文件数：$(find internal/webui/dist -type f | wc -l)"
 
 echo "==> 3/3 编译守护进程"
 VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
-OUT="bin/serverbox.exe"
-[ "$(uname -s)" = "Linux" ] && OUT="bin/serverbox"
-[ "$(uname -s)" = "Darwin" ] && OUT="bin/serverbox"
+OUT="bin/enderbox.exe"
+[ "$(uname -s)" = "Linux" ] && OUT="bin/enderbox"
+[ "$(uname -s)" = "Darwin" ] && OUT="bin/enderbox"
 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "$OUT" ./cmd/server
 
 echo

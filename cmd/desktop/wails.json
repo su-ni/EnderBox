@@ -1,0 +1,12 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "serverbox-desktop",
+  "outputfilename": "serverbox-desktop",
+  "info": {
+    "companyName": "ServerBox",
+    "productName": "ServerBox 控制台",
+    "productVersion": "0.1.0",
+    "copyright": "",
+    "comments": "本地开服器的桌面窗口"
+  }
+}

@@ -47,6 +47,9 @@ type Settings struct {
 	// ── 下载源 ──
 	// 新建实例 / 换服务端时默认用哪个源。空表示让用户每次自己选。
 	DefaultMirror string `json:"defaultMirror"`
+	// 在线模组市场用的地址。默认 Modrinth 官方 API —— 国内直连常被 Cloudflare 拦，
+	// 留一个可改的入口，用户换个镜像 / 代理就能用，而不是这块功能对他永远坏着。
+	MarketBase string `json:"marketBase"`
 
 	// ── 守护进程 ──
 	// 改完要重启守护进程才生效（监听端口没法在运行中热切换而不丢连接）
@@ -59,6 +62,7 @@ func defaults() Settings {
 		TrustLoopback: true,
 		SessionHours:  72,
 		DefaultMirror: "direct",
+		MarketBase:    "https://api.modrinth.com/v2",
 		ListenAddr:    ":23333",
 	}
 }
@@ -99,6 +103,9 @@ func (s *Store) repair() {
 	}
 	if s.cur.DefaultMirror == "" {
 		s.cur.DefaultMirror = d.DefaultMirror
+	}
+	if s.cur.MarketBase == "" {
+		s.cur.MarketBase = d.MarketBase
 	}
 	// 没设密码却开着 RequireAuth = 谁都进不来（包括你自己）。
 	// 这种情况直接视为没开，比锁死强。

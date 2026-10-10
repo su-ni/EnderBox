@@ -207,6 +207,39 @@ func TestDownloadRetriesTransientFailure(t *testing.T) {
 	}
 }
 
+// 目标目录不存在时也必须能下成 —— 父目录要**在下第一个字节之前**建好。
+// 回归的是真机踩到的 bug：JDK 下到 runtimes/.download（全新目录，从来没人建过）时，
+// 多线程下载往同目录写 .part.N 分片直接失败，报「无法写入分片文件 … The system cannot
+// find the path specified」；而落盘阶段的 MkdirAll 太晚，救不回来。
+// 服务器 jar 因为实例目录本来就存在，这条路径一直没被走到。
+func TestDownloadCreatesMissingDestDir(t *testing.T) {
+	data := testData(5 << 20) // 5 MB → 走多线程，必然要往目标目录写分片
+	srv := httptest.NewServer(rangeHandler(data, true))
+	defer srv.Close()
+
+	m := NewManager()
+	// 关键：这条路径上一级都不存在
+	dest := filepath.Join(t.TempDir(), "runtimes", ".download", "jdk.zip")
+	task, err := m.Start(Options{
+		Build:    Build{URL: srv.URL, SHA: sha256Of(data), SHAKind: "sha256", Name: "jdk.zip"},
+		DestPath: dest,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := waitTask(t, m, task.ID)
+	if got.State != StateDone {
+		t.Fatalf("目标目录不存在时下载应自动建目录，实际 %s：%s", got.State, got.Err)
+	}
+	out, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(out, data) {
+		t.Error("内容不一致")
+	}
+}
+
 // 校验和不匹配时必须判失败并把坏文件删掉 —— 留着它比删掉更危险（用户会拿去启动）。
 func TestDownloadRejectsWrongChecksum(t *testing.T) {
 	data := testData(3 << 20)

@@ -23,7 +23,7 @@ import (
 	"time"
 )
 
-// Kind 服务端类型。已经接了下载的五种在这里；剩下两种明确标「还没接」，
+// Kind 服务端类型。已经接了下载的七种在这里；剩下两种明确标「还没接」，
 // 不假装支持，也整块藏起来 —— 用户有权知道「有这个东西，只是现在走不通、卡在哪」。
 type Kind string
 
@@ -35,6 +35,13 @@ const (
 	// 见 forge.go 的文件头说明。
 	KindForge    Kind = "forge"
 	KindVelocity Kind = "velocity"
+
+	// 「混合端」：本体是模组端，另外挂了一套 Bukkit 实现，所以模组和插件能同时装。
+	// ⚠ 它们**不吃 Forge 那一套**：下下来就是一个能直接 `java -jar` 的服务端，
+	// 不需要跑 installer；首次启动它自己把 Forge 的库文件装进实例目录。
+	// 别图省事让它们复用 KindForge —— 那条路会去下安装器并跑 --installServer。
+	KindMohist   Kind = "mohist"
+	KindArclight Kind = "arclight"
 
 	// 下面这两个只是「界面上认识」，还没有对应的下载实现。
 	KindNeoForge   Kind = "neoforge"
@@ -73,12 +80,17 @@ func javaFallback(mc string) int {
 	}
 }
 
-// Version 一个可选的游戏版本
+// Version 一个可选的游戏版本。
+//
+// ⚠ 这里**只有正式版**：各源在返回前都把 rc / pre / snapshot / 非 stable 的滤掉了
+// （vanilla 认 type=="release"、fabric 认上游 stable 字段、paper 认名字里的 `-`、
+// forge 用官方推荐表）。所以曾经有过的 `prerelease` / `stable` 两个字段是恒定的
+// false/true，既不携带信息、又和 Build.Channel（构建通道的 STABLE/RECOMMENDED）
+// 撞名，容易让人以为「版本稳定性」可以直接读字段。已删除 ——
+// 「这个版本能不能放心选」这件事，判据只在各源的过滤逻辑里，不在返回体上。
 type Version struct {
-	ID         string `json:"id"`         // 1.21.4
-	Family     string `json:"family"`     // 1.21（Paper 的版本族，原版为空）
-	Prerelease bool   `json:"prerelease"` // rc / pre / snapshot
-	Stable     bool   `json:"stable"`     // 原版：type == release
+	ID     string `json:"id"`     // 1.21.4
+	Family string `json:"family"` // 1.21（Paper 的版本族，原版为空）
 }
 
 // Build 某个版本下的一次构建。原版没有构建概念，用 0 占位。
@@ -222,24 +234,40 @@ func forgeMavenBaseFor(mirror string) string {
 // Sources 返回支持的服务端类型。没接的也列出来并说明原因 ——
 // 界面上一句「暂不支持」比整块消失更容易让人理解。
 func Sources() []Source {
+	// ⚠⚠ Note 是**直接显示给用户**的界面文案（新建向导的类型卡），不是日志。
+	// 2026-10-09 清理过一轮：以前里面混着开发机的排查记录（「本机连不通」「只解析出 IPv6」
+	// 「连测三次」「实测 34 秒」）—— 那些结论只在写它的那台机器上成立，搬到用户机器上
+	// 既不成立也无法复现，还会把内部排查过程摊到界面上。
+	// 规矩：Note 只回答「能不能用、不能的话用户该走哪条路」；排查细节一律留在代码注释里。
+	//
+	// 附两条当初的实测结论（只给后来接手的人看，别写进 Note）：
+	//   · NeoForge 官方 maven 在**开发机**上只解析出 IPv6、连接被重置；它和 Forge 不是同一台主机，
+	//     两者不能互相参照（见 internal/fetch/forge.go 顶部注释）。
+	//   · BungeeCord 下载通道本身没问题（26,175,295 字节，连测三次稳定 10.5/11.3/11.4 秒，
+	//     均速 2.2~2.4 MB/s，与 Content-Length 逐字节一致）。卡住的是设计问题：它是滚动构建、
+	//     没有游戏版本概念，和向导「先选版本再选构建」的表单对不上，要接得另做一套入口。
 	return []Source{
 		{Type: KindPaper, Label: "Paper（含 Paper 系衍生）", Available: true,
-			Note: "官方源直连可用；Paper 没有可用的国内镜像，走直连。"},
+			Note: "官方源直连，没有可用的国内镜像。"},
 		{Type: KindVanilla, Label: "原版 Vanilla", Available: true,
-			Note: "可用官方源，也可以切 BMCLAPI 镜像。"},
+			Note: "官方源，也可以切 BMCLAPI 镜像。"},
 		{Type: KindFabric, Label: "Fabric", Available: true,
-			Note: "官方源直连可用。给的是一百多 KB 的启动器 jar，首次启动它会自己去下依赖 —— 所以第一次开服会慢一些，而且必须联网。"},
+			Note: "给的是一百多 KB 的启动器，首次启动会自己下依赖（要联网）。"},
 		{Type: KindVelocity, Label: "Velocity", Available: true,
-			Note: "和 Paper 用同一个源站，直连可用。"},
+			Note: "和 Paper 用同一个源站。"},
 		{Type: KindForge, Label: "Forge", Available: true,
-			Note: "默认走 BMCLAPI 镜像（官方那条 Cloudflare 路径实测会被中途掐断，镜像的文件与官方逐字节一致）。" +
-				"它和别家不一样：下的是安装器，下完还要在本机跑一遍才算装好 —— " +
-				"这一步会再下几十到一百多 MB 的库文件（实测 1.20.4 全流程 34 秒、1.12.2 31 秒）。" +
-				"所以会比别的类型慢一截，但只慢这一次。"},
+			Note: "走 BMCLAPI 镜像（与官方逐字节一致）；下完还要跑安装器，慢一截。"},
+		{Type: KindMohist, Label: "Mohist（模组 + 插件）", Available: true,
+			Note: "混合端，模组+插件同时装；首启装库，慢且要联网。"},
+		{Type: KindArclight, Label: "Arclight（模组 + 插件）", Available: true,
+			// ⚠ 这条必须说实话：它官方只发 GitHub Releases，这里走第三方加速代理转一道。
+			// 写成「官方直连」就是撒谎 —— 用户有权知道他的 jar 从哪来、中间过了谁的手。
+			Note: "⚠ 走第三方加速代理下载；混合端首启也装库。"},
 		{Type: KindNeoForge, Label: "NeoForge", Available: false,
-			Note: "官方 maven 在本机连不通（只解析出 IPv6 地址，连接被重置）。Forge 那台是通的，NeoForge 换成自己独立的主机了，两者不能互相参照。"},
+			// 不说「本机连不通」—— 用户在别的网络环境下未必如此，说了还会让人以为是自己的问题。
+			Note: "还没接自动下载 —— 下好 jar 再用「导入」纳管。"},
 		{Type: KindBungeeCord, Label: "BungeeCord", Available: false,
-			Note: "源站能连通但实测很慢（26 MB 的 jar 两分钟只跑到 9.9 MB），而且它是滚动构建、没有游戏版本概念，暂时没接。"},
+			Note: "还没接：滚动构建、没有版本之分 —— jar 用「导入」纳管。"},
 	}
 }
 
@@ -286,7 +314,7 @@ func newRequest(url string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "ServerBox/0.1 (Minecraft server manager)")
+	req.Header.Set("User-Agent", "EnderBox/0.1 (Minecraft server manager)")
 	req.Header.Set("Accept", "application/json")
 	return req, nil
 }

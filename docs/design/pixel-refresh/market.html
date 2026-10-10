@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ServerBox · 整合包市场</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-grass" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="12" fill="#7a5230"/><rect x="1" y="6" width="14" height="2" fill="#6b4420"/><rect x="1" y="2" width="14" height="4" fill="#5da832"/><rect x="1" y="2" width="14" height="2" fill="#74c23f"/><rect x="2" y="8" width="3" height="2" fill="#603c1c"/><rect x="9" y="9" width="4" height="2" fill="#603c1c"/><rect x="6" y="12" width="3" height="2" fill="#603c1c"/></symbol>
+<symbol id="i-cube" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" fill="#8b5a2b"/><rect x="2" y="3" width="12" height="3" fill="#a5764a"/><rect x="2" y="3" width="12" height="1" fill="#c08a55"/><rect x="7" y="3" width="2" height="10" fill="#4a4f57"/><rect x="2" y="12" width="12" height="1" fill="#5a3c1f"/></symbol>
+<symbol id="i-star" viewBox="0 0 16 16"><rect x="7" y="1" width="2" height="3" fill="currentColor"/><rect x="5" y="4" width="6" height="2" fill="currentColor"/><rect x="1" y="5" width="14" height="2" fill="currentColor"/><rect x="3" y="7" width="10" height="2" fill="currentColor"/><rect x="4" y="9" width="8" height="2" fill="currentColor"/><rect x="3" y="11" width="2" height="2" fill="currentColor"/><rect x="11" y="11" width="2" height="2" fill="currentColor"/><rect x="2" y="13" width="2" height="2" fill="currentColor"/><rect x="12" y="13" width="2" height="2" fill="currentColor"/></symbol>
+<symbol id="i-dl" viewBox="0 0 16 16"><rect x="7" y="1" width="2" height="8" fill="currentColor"/><rect x="5" y="7" width="2" height="2" fill="currentColor"/><rect x="9" y="7" width="2" height="2" fill="currentColor"/><rect x="7" y="9" width="2" height="2" fill="currentColor"/><rect x="2" y="13" width="12" height="2" fill="currentColor"/></symbol>
+<symbol id="i-search" viewBox="0 0 16 16"><rect x="3" y="2" width="7" height="1" fill="currentColor"/><rect x="3" y="9" width="7" height="1" fill="currentColor"/><rect x="2" y="3" width="1" height="6" fill="currentColor"/><rect x="10" y="3" width="1" height="6" fill="currentColor"/><rect x="3" y="3" width="1" height="1" fill="currentColor"/><rect x="9" y="3" width="1" height="1" fill="currentColor"/><rect x="3" y="8" width="1" height="1" fill="currentColor"/><rect x="9" y="8" width="1" height="1" fill="currentColor"/><rect x="11" y="11" width="4" height="2" fill="currentColor"/><rect x="10" y="10" width="2" height="2" fill="currentColor"/></symbol>
+<symbol id="i-users" viewBox="0 0 16 16"><rect x="5" y="2" width="6" height="6" fill="currentColor"/><rect x="3" y="9" width="10" height="5" fill="currentColor"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 16 16"><rect x="4" y="3" width="6" height="2" fill="currentColor"/><rect x="9" y="5" width="2" height="2" fill="currentColor"/><rect x="6" y="11" width="6" height="2" fill="currentColor"/><rect x="5" y="9" width="2" height="2" fill="currentColor"/></symbol>
+<symbol id="i-chev-l" viewBox="0 0 16 16"><rect x="9" y="4" width="2" height="8" fill="currentColor"/><rect x="7" y="5" width="2" height="6" fill="currentColor"/><rect x="5" y="6" width="2" height="4" fill="currentColor"/><rect x="3" y="7" width="2" height="2" fill="currentColor"/></symbol>
+<symbol id="i-chev-r" viewBox="0 0 16 16"><rect x="5" y="4" width="2" height="8" fill="currentColor"/><rect x="7" y="5" width="2" height="6" fill="currentColor"/><rect x="9" y="6" width="2" height="4" fill="currentColor"/><rect x="11" y="7" width="2" height="2" fill="currentColor"/></symbol>
+<symbol id="i-check" viewBox="0 0 16 16"><rect x="2" y="7" width="2" height="3" fill="currentColor"/><rect x="4" y="9" width="2" height="3" fill="currentColor"/><rect x="6" y="7" width="2" height="3" fill="currentColor"/><rect x="8" y="5" width="2" height="3" fill="currentColor"/><rect x="10" y="3" width="2" height="3" fill="currentColor"/><rect x="12" y="1" width="2" height="3" fill="currentColor"/></symbol>
+<symbol id="i-info" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="1" fill="currentColor"/><rect x="2" y="13" width="12" height="1" fill="currentColor"/><rect x="1" y="3" width="1" height="10" fill="currentColor"/><rect x="14" y="3" width="1" height="10" fill="currentColor"/><rect x="7" y="4" width="2" height="2" fill="currentColor"/><rect x="7" y="8" width="2" height="4" fill="currentColor"/></symbol>
+<symbol id="i-ban" viewBox="0 0 16 16"><rect x="5" y="1" width="6" height="2" fill="currentColor"/><rect x="5" y="13" width="6" height="2" fill="currentColor"/><rect x="3" y="3" width="2" height="2" fill="currentColor"/><rect x="1" y="5" width="2" height="6" fill="currentColor"/><rect x="13" y="5" width="2" height="6" fill="currentColor"/><rect x="11" y="3" width="2" height="2" fill="currentColor"/><rect x="3" y="11" width="2" height="2" fill="currentColor"/><rect x="11" y="11" width="2" height="2" fill="currentColor"/><rect x="5" y="5" width="2" height="2" fill="currentColor"/><rect x="7" y="7" width="2" height="2" fill="currentColor"/><rect x="9" y="9" width="2" height="2" fill="currentColor"/></symbol>
+<symbol id="i-jar" viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" fill="#c9742a"/><rect x="3" y="2" width="10" height="2" fill="#e08a3c"/><rect x="3" y="2" width="10" height="1" fill="#f0a556"/><rect x="5" y="6" width="6" height="5" fill="#8a4a13"/></symbol>
+</defs></svg>
+
+<div class="atmos" aria-hidden="true"><div class="grid"></div><div class="glow-a"></div><div class="glow-b"></div><div class="vignette"></div></div>
+
+<div class="draftbar">
+  <b>SERVERBOX · 整合包市场</b>
+  <div class="sw" style="display:flex;gap:4px"><i style="background:#131920"></i><i style="background:#33d5cf"></i><i style="background:#e08a3c"></i></div>
+  <span style="font-size:12px;color:var(--ink-3)">搜得到 → 看得清 → 装得对</span>
+  <div class="flownav" style="margin-left:auto">
+    <a href="index.html">面板</a><a href="wizard.html">新建向导</a><a href="market.html" class="on">整合包市场</a><a href="login.html">登录页</a><a href="spec.html">设计规范</a>
+  </div>
+</div>
+
+<div class="app">
+  <div class="strata"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 16 16"><use href="#i-cube"/></svg></div>
+      <div><div class="nm">SERVERBOX</div><div class="sub">整合包市场</div></div>
+    </div>
+    <div class="spacer"></div>
+    <a class="btn btn-ghost sm" href="index.html">回面板</a>
+  </header>
+
+  <main class="main" style="padding-bottom:28px">
+    <div class="content">
+
+      <!-- ═══ 视图 A：列表 ═══ -->
+      <div id="mkList">
+        <div class="sec-head reveal" style="--rd:.02s">
+          <span class="idx">MARKET</span>
+          <h2>整合包市场</h2>
+          <span class="sub">市场只负责「搜得到、筛得准」，选版本和安装都在详情页</span>
+          <div class="spacer"></div>
+          <button class="btn sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>刷新</button>
+        </div>
+
+        <div class="panel reveal" style="--rd:.06s">
+          <i class="corner"></i>
+          <div class="toolbar">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:240px">
+              <svg class="pic" style="color:var(--ink-3)"><use href="#i-search"/></svg>
+              <input class="inp" placeholder="搜整合包，例如 create / 机械动力">
+            </div>
+            <span class="sel"><span class="lb">排序</span>下载量 <svg class="pic" style="width:10px;height:10px"><use href="#i-chev-r"/></svg></span>
+            <span class="sel"><span class="lb">来源</span>自动（官方不通就换镜像） <svg class="pic" style="width:10px;height:10px"><use href="#i-chev-r"/></svg></span>
+          </div>
+          <div class="toolbar" style="border-top:0">
+            <span class="eyebrow" style="margin-right:4px">SORT</span>
+            <div class="filters">
+              <button class="chipf" type="button">自动</button>
+              <button class="chipf on" type="button">下载量</button>
+              <button class="chipf" type="button">最近更新</button>
+              <button class="chipf" type="button">最新发布</button>
+              <button class="chipf" type="button">最多关注</button>
+            </div>
+            <div class="spacer" style="margin-left:auto"></div>
+            <span class="eyebrow" style="margin-right:4px">SOURCE</span>
+            <div class="filters">
+              <button class="chipf on" type="button">自动</button>
+              <button class="chipf" type="button">仅 Modrinth 官方</button>
+              <button class="chipf" type="button">仅国内镜像</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mk-grid">
+          <div class="mk-card reveal" data-pack="1" style="--rd:.08s">
+            <div class="mk-top">
+              <svg class="mk-ico" viewBox="0 0 16 16"><use href="#i-cube"/></svg>
+              <div class="tx"><h3>机械动力 · Create Above and Beyond</h3><p>simibubi · 科技自动化</p></div>
+            </div>
+            <p class="mk-desc">围绕 Create 的自动化整合包：从风车到蒸汽机再到列车，把「造机器」本身做成一条主线。</p>
+            <div class="mk-tags"><span class="badge">科技</span><span class="badge">冒险</span><span class="badge op">1.18.2</span><span class="badge wl">Forge</span></div>
+            <div class="mk-stats"><span><b>2.4M</b> 下载</span><span><b>18.2k</b> 关注</span><span>3 天前更新</span></div>
+          </div>
+          <div class="mk-card reveal" data-pack="2" style="--rd:.11s">
+            <div class="mk-top">
+              <svg class="mk-ico" viewBox="0 0 16 16" style="filter:hue-rotate(150deg)"><use href="#i-cube"/></svg>
+              <div class="tx"><h3>空岛 · SkyFactory 5</h3><p>darkosto · 从一棵树开始</p></div>
+            </div>
+            <p class="mk-desc">经典空岛生存的现代版本，科技与魔法双线，前期节奏很快。</p>
+            <div class="mk-tags"><span class="badge">空岛</span><span class="badge">科技</span><span class="badge op">1.18.2</span><span class="badge wl">Forge</span></div>
+            <div class="mk-stats"><span><b>1.1M</b> 下载</span><span><b>9.4k</b> 关注</span><span>2 周前更新</span></div>
+          </div>
+          <div class="mk-card reveal" data-pack="3" style="--rd:.14s">
+            <div class="mk-top">
+              <svg class="mk-ico" viewBox="0 0 16 16" style="filter:hue-rotate(40deg)"><use href="#i-cube"/></svg>
+              <div class="tx"><h3>中世纪 · Medieval MC</h3><p>Luna Pixel Studios · 建筑与冒险</p></div>
+            </div>
+            <p class="mk-desc">偏 RPG 的中世纪包：地牢、装备词条、Boss 战，适合几个人一起肝。</p>
+            <div class="mk-tags"><span class="badge">冒险</span><span class="badge">魔法</span><span class="badge op">1.20.1</span><span class="badge wl">Forge</span></div>
+            <div class="mk-stats"><span><b>3.8M</b> 下载</span><span><b>26k</b> 关注</span><span>5 天前更新</span></div>
+          </div>
+          <div class="mk-card reveal" data-pack="4" style="--rd:.17s">
+            <div class="mk-top">
+              <svg class="mk-ico" viewBox="0 0 16 16" style="filter:hue-rotate(200deg)"><use href="#i-cube"/></svg>
+              <div class="tx"><h3>科技复兴 · All the Mods 9</h3><p>ATM Team · 全家桶</p></div>
+            </div>
+            <p class="mk-desc">把市面上主流科技模组几乎全塞进来的庞然大物，建议内存给到 8 GB 以上。</p>
+            <div class="mk-tags"><span class="badge">科技</span><span class="badge">硬核</span><span class="badge op">1.20.1</span><span class="badge wl">Forge</span></div>
+            <div class="mk-stats"><span><b>5.2M</b> 下载</span><span><b>31k</b> 关注</span><span>昨天更新</span></div>
+          </div>
+          <div class="mk-card reveal" data-pack="5" style="--rd:.2s">
+            <div class="mk-top">
+              <svg class="mk-ico" viewBox="0 0 16 16" style="filter:hue-rotate(280deg)"><use href="#i-cube"/></svg>
+              <div class="tx"><h3>轻量原味 · Better MC</h3><p>Luna Pixel Studios · 原版加强</p></div>
+            </div>
+            <p class="mk-desc">在原版基础上补结构与生物群系，不加复杂机制，适合「只想玩得舒服点」。</p>
+            <div class="mk-tags"><span class="badge">轻量</span><span class="badge">原味</span><span class="badge op">1.20.1</span><span class="badge wl">Forge</span></div>
+            <div class="mk-stats"><span><b>6.9M</b> 下载</span><span><b>40k</b> 关注</span><span>4 天前更新</span></div>
+          </div>
+          <div class="mk-card reveal" data-pack="6" style="--rd:.23s">
+            <div class="mk-top">
+              <svg class="mk-ico" viewBox="0 0 16 16" style="filter:hue-rotate(320deg)"><use href="#i-cube"/></svg>
+              <div class="tx"><h3>冒险 · Prominence II RPG</h3><p>Hypnotizd · 剧情向</p></div>
+            </div>
+            <p class="mk-desc">带任务书与职业技能树的 RPG 包，单人也能推很久。</p>
+            <div class="mk-tags"><span class="badge">冒险</span><span class="badge">RPG</span><span class="badge op">1.20.1</span><span class="badge wl">Fabric</span></div>
+            <div class="mk-stats"><span><b>2.0M</b> 下载</span><span><b>15k</b> 关注</span><span>1 周前更新</span></div>
+          </div>
+        </div>
+        <p style="font-size:12.5px;color:var(--ink-3);margin-top:14px">共 6 个结果 · 数据来自 Modrinth，点任意一张卡进详情页选版本</p>
+      </div>
+
+      <!-- ═══ 视图 B：包详情 ═══ -->
+      <div id="mkDetail" style="display:none">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <button class="btn sm" id="mkBack" type="button"><svg class="pic"><use href="#i-chev-l"/></svg>回到市场</button>
+          <span style="font-size:12.5px;color:var(--ink-3)">整合包市场 / 机械动力 · Create Above and Beyond</span>
+        </div>
+
+        <div class="panel reveal">
+          <i class="corner"></i>
+          <div style="padding:16px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+            <svg class="mk-ico" viewBox="0 0 16 16" style="width:64px;height:64px"><use href="#i-cube"/></svg>
+            <div style="flex:1;min-width:240px">
+              <h2 style="font-size:20px;font-weight:700">机械动力 · Create Above and Beyond</h2>
+              <p style="font-size:12.5px;color:var(--ink-3);margin-top:6px">作者 simibubi · 项目 ID <span style="font-family:var(--f-term);font-size:14px">6OMYdNAO</span></p>
+              <div class="mk-tags" style="margin-top:10px">
+                <span class="badge">科技</span><span class="badge">冒险</span><span class="badge">自动化</span><span class="badge wl">Forge</span><span class="badge op">1.18.2</span>
+              </div>
+            </div>
+            <div class="mk-stats" style="flex-direction:column;gap:6px">
+              <span><b>2.4M</b> 总下载</span>
+              <span><b>18.2k</b> 关注</span>
+              <span>最近更新 3 天前</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="grid-template-columns:1fr 300px">
+          <div>
+            <div class="panel reveal" style="--rd:.06s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone"><svg class="pic" style="color:var(--cyan)"><use href="#i-info"/></svg><h2>简介</h2></div>
+              <div style="padding:14px 16px;font-size:13px;line-height:1.8;color:var(--ink-2)">
+                这个包围绕 Create 展开：从最基础的风车与水车起步，逐步搭出蒸汽动力、机械臂流水线与跨地图列车网络。
+                它把「造机器」本身设计成了主线任务，而不是把机器当成解锁下一层科技的工具。
+                <br><br>
+                <span style="color:var(--ink-3)">建议内存 6 GB 以上；第一次进服会有 2~3 分钟的世界生成时间，不要以为卡死了。</span>
+              </div>
+            </div>
+
+            <div class="panel reveal" style="--rd:.1s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-dl"/></svg>
+                <h2>挑一个版本</h2>
+                <div class="spacer" style="margin-left:auto"></div>
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">共 14 个版本</span>
+              </div>
+              <div class="vlist">
+                <div class="vrow on" style="grid-template-columns:120px 1fr 150px auto">
+                  <span class="ver">1.4.0</span>
+                  <span style="font-size:12.5px;color:var(--ink-3)">Forge 40.2.0 · 1.18.2</span>
+                  <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">412k 下载</span>
+                  <button class="btn btn-primary sm" type="button">预览安装</button>
+                </div>
+                <div class="vrow" style="grid-template-columns:120px 1fr 150px auto">
+                  <span class="ver">1.3.2</span>
+                  <span style="font-size:12.5px;color:var(--ink-3)">Forge 40.1.0 · 1.18.2</span>
+                  <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">268k 下载</span>
+                  <button class="btn sm" type="button">预览安装</button>
+                </div>
+                <div class="vrow" style="grid-template-columns:120px 1fr 150px auto">
+                  <span class="ver">1.2.1</span>
+                  <span style="font-size:12.5px;color:var(--ink-3)">Forge 40.1.0 · 1.18.2</span>
+                  <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">190k 下载</span>
+                  <button class="btn sm" type="button">预览安装</button>
+                </div>
+                <div class="vrow" style="grid-template-columns:120px 1fr 150px auto">
+                  <span class="ver">1.0.4</span>
+                  <span style="font-size:12.5px;color:var(--ink-3)">Forge 39.1.2 · 1.18.2</span>
+                  <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">88k 下载</span>
+                  <button class="btn sm" type="button">预览安装</button>
+                </div>
+              </div>
+              <div class="con-foot">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-info"/></svg>
+                点「预览安装」先出<code>计划清单</code>——新增/更新/删除多少文件，确认了才真下载
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-rail">
+            <div class="panel reveal" style="--rd:.08s;margin-bottom:0">
+              <i class="corner"></i>
+              <div style="padding:14px 16px">
+                <div class="rail-sec">
+                  <h4>兼容性</h4>
+                  <div class="tags">
+                    <span class="badge op">MC 1.18.2</span>
+                    <span class="badge wl">Forge</span>
+                    <span class="badge">服务端可装</span>
+                  </div>
+                </div>
+                <div class="rail-sec" style="margin-top:16px">
+                  <h4>分类</h4>
+                  <div class="tags">
+                    <span class="badge">科技</span><span class="badge">冒险</span><span class="badge">自动化</span><span class="badge">多人</span>
+                  </div>
+                </div>
+                <div class="rail-sec" style="margin-top:16px">
+                  <h4>体积</h4>
+                  <div class="pol-foot" style="margin-top:0;border-top:0;padding-top:0">
+                    <div class="row"><span class="k">模组数</span><span class="v">214</span></div>
+                    <div class="row"><span class="k">包大小</span><span class="v">512 MB</span></div>
+                    <div class="row"><span class="k">建议内存</span><span class="v">6 GB 以上</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="panel reveal" style="--rd:.12s;margin-bottom:0">
+              <i class="corner"></i>
+              <div class="con-head tex-stone"><svg class="pic" style="color:var(--copper)"><use href="#i-ban"/></svg><h2>装之前要知道</h2></div>
+              <div style="padding:14px 16px;font-size:12.5px;line-height:1.8;color:var(--ink-2)">
+                整合包会接管这个实例的 <span style="font-family:var(--f-term);font-size:14px;color:var(--cyan)">mods/</span> 与
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--cyan)">config/</span> 目录。
+                如果这个实例里已经有你自己装的模组，<span style="color:#ff9a90">先备份一次</span>，别直接盖。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict'
+  var list = document.getElementById('mkList')
+  var detail = document.getElementById('mkDetail')
+  Array.prototype.forEach.call(document.querySelectorAll('.mk-card'), function (c) {
+    c.addEventListener('click', function () {
+      list.style.display = 'none'
+      detail.style.display = ''
+      var m = document.querySelector('.main'); if (m) m.scrollTop = 0
+    })
+  })
+  var back = document.getElementById('mkBack')
+  if (back) back.addEventListener('click', function () {
+    detail.style.display = 'none'
+    list.style.display = ''
+    var m = document.querySelector('.main'); if (m) m.scrollTop = 0
+  })
+  Array.prototype.forEach.call(document.querySelectorAll('.vrow'), function (v) {
+    v.addEventListener('click', function (e) {
+      if (e.target.closest('button')) return
+      Array.prototype.forEach.call(v.parentNode.querySelectorAll('.vrow'), function (x) { x.classList.remove('on') })
+      v.classList.add('on')
+    })
+  })
+  Array.prototype.forEach.call(document.querySelectorAll('.filters'), function (g) {
+    g.addEventListener('click', function (e) {
+      var b = e.target.closest('.chipf'); if (!b) return
+      Array.prototype.forEach.call(g.querySelectorAll('.chipf'), function (x) { x.classList.remove('on') })
+      b.classList.add('on')
+    })
+  })
+})()
+</script>
+</body>
+</html>

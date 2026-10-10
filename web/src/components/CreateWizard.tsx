@@ -1,10 +1,11 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { IconBack, IconCheck, IconPlus, IconTypeBlock } from './Icons'
+import { ConHead, Icon } from './design'
 import { StepInput } from './StepInput'
 import { TYPE_LABEL, javaForVersion } from '../types'
 import { lacksJava, useLocalJava } from '../useLocalJava'
 import { ServerPicker, type Picked } from './ServerPicker'
+import { JavaPicker } from './JavaPicker'
 import { DownloadBar } from './DownloadBar'
 import { fmtSizeMaybe } from './ui'
 
@@ -12,6 +13,19 @@ type Props = {
   onDone: (newId?: string) => void
   onCancel: () => void
   onError: (m: string) => void
+}
+
+/** 类型卡的图标（照设计稿 wizard.html 的 .kind）：原版/Paper 用 jar，模组系用方块/工作台，代理端用命令块。 */
+const KIND_ICON: Record<string, string> = {
+  vanilla: 'jar',
+  paper: 'jar',
+  fabric: 'cube',
+  forge: 'table',
+  neoforge: 'table',
+  mohist: 'cmd',
+  arclight: 'cmd',
+  velocity: 'cmd',
+  bungeecord: 'cmd',
 }
 
 const STEPS = [
@@ -29,75 +43,40 @@ const STEPS = [
  */
 const URL_MC = new URLSearchParams(location.search).get('mc') ?? ''
 
-/** 每种服务端一句人话解释 —— 新手就卡在「这些名词都是啥」这一步 */
+/** 每种服务端一句人话解释 —— 新手就卡在「这些名词都是啥」这一步。
+ *  ⚠ 每句都要能塞进卡片的两行（`.kind .ds` 是 line-clamp:2，超了会截断加省略号）：
+ *  卡片宽 ~200px、描述区 ~171px，两行约 26~30 个汉字位。改文案先数这两行放不放得下。 */
 const TYPE_INFO: Record<string, { desc: string; chips: { t: string; tone?: 'g' | 'w' | 'd' }[] }> = {
   paper: {
-    desc: '性能优化过的原版，支持插件。开服首选，插件生态最全。',
+    desc: '性能优化过的原版，支持插件。开服首选，生态最全。',
     chips: [{ t: '推荐', tone: 'g' }, { t: '插件' }],
   },
-  vanilla: { desc: '官方服务端。纯净无改动，想要原汁原味或做红石机器选它。', chips: [{ t: '无插件' }] },
-  fabric: { desc: '轻量模组加载器。装模组首选，更新快，客户端同步方便。', chips: [{ t: '模组' }] },
+  vanilla: { desc: '官方服务端，纯净无改动。原汁原味、红石机器选它。', chips: [{ t: '无插件' }] },
+  fabric: { desc: '轻量模组加载器，装模组首选，更新快。', chips: [{ t: '模组' }] },
   forge: {
-    desc: '老牌模组加载器。大型整合包多基于它，兼容性最广、体积也最大。',
+    desc: '老牌模组加载器，大型整合包多基于它，兼容最广。',
     chips: [{ t: '模组' }, { t: '整合包' }],
   },
-  neoforge: { desc: 'Forge 分叉出来的现代化版本，新版本模组越来越多往这边走。', chips: [{ t: '模组' }] },
+  neoforge: { desc: 'Forge 分叉出来的现代化版本，新模组多往这边走。', chips: [{ t: '模组' }] },
+  // 混合端：模组和插件能同时装。desc 必须把「首次开服会再下几十 MB」写出来 ——
+  // 这两个端下下来的不是一个装完就能跑的小 jar，它们首次启动会自己把 Forge 的库
+  // 拉进实例目录（Arclight 那边是启动时现装），不给提示的话用户会以为卡死了。
+  mohist: {
+    desc: '混合端：模组和插件同时装。首启再装库，会慢一截。',
+    chips: [{ t: '模组 + 插件' }, { t: '需联网' }],
+  },
+  arclight: {
+    desc: '混合端，和上面一个路子。⚠ 走第三方加速代理下载。',
+    chips: [{ t: '模组 + 插件' }, { t: '第三方代理', tone: 'w' }],
+  },
   velocity: {
-    desc: '代理端。把多个服务器连成一个入口，玩家无感跨服切换。',
+    desc: '代理端：多个服务器连成一个入口，跨服无感。',
     chips: [{ t: '代理' }, { t: '进阶' }],
   },
   bungeecord: {
-    desc: '老一代代理端。仅在你已有 Bungee 架构时才需要，新项目建议上面那个。',
+    desc: '老一代代理端，新项目建议用上面那个。',
     chips: [{ t: '代理' }, { t: '已过时', tone: 'd' }],
   },
-}
-
-function Field({ label, desc, children }: { label: string; desc?: string; children: ReactNode }) {
-  return (
-    <label className="flex min-w-0 flex-col gap-2">
-      <span className="text-[13px] font-semibold text-ink-1">{label}</span>
-      {children}
-      {desc && <span className="text-[11.5px] leading-relaxed text-ink-3">{desc}</span>}
-    </label>
-  )
-}
-
-function Toggle({
-  on,
-  onChange,
-  title,
-  desc,
-}: {
-  on: boolean
-  onChange: (v: boolean) => void
-  title: string
-  desc: string
-}) {
-  return (
-    <div className="flex items-start gap-3 py-2.5">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-label={title}
-        onClick={() => onChange(!on)}
-        className={`tg-sw${on ? ' on' : ''}`}
-      />
-      <div>
-        <div className="text-[13px] font-semibold text-ink-1">{title}</div>
-        <p className="text-[11.5px] leading-relaxed text-ink-3">{desc}</p>
-      </div>
-    </div>
-  )
-}
-
-function StepBody({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section>
-      <h2 className="mb-4 border-b-[3px] border-black pb-2.5 text-[16px] font-bold text-ink-1">{title}</h2>
-      {children}
-    </section>
-  )
 }
 
 export function CreateWizard({ onDone, onCancel, onError }: Props) {
@@ -144,9 +123,13 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
     const t = new URLSearchParams(location.search).get('type') ?? ''
     return {
       name: '',
-      type: t in TYPE_LABEL ? t : 'paper',
+      // 不预选类型：必须先自己点一个（用户拍板）。URL 里显式点名了才认 ——
+      // 「下一步」已被 canNext[0] = Boolean(form.type) 挡住，不用再改逻辑。
+      type: t in TYPE_LABEL ? t : '',
       mcVersion: URL_MC || '1.21.4',
       jarPath: 'server.jar',
+      // 空串 = 自动挑一个够用的。做到「运行环境」那一步时用户可以改。
+      javaPath: '',
       maxMem: 4096,
       port: 25565,
       autoStart: true,
@@ -184,6 +167,7 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
         ...form,
         name: form.name.trim(),
         jarPath: form.jarPath.trim(),
+        javaPath: form.javaPath.trim(),
         minMem: Math.min(1024, form.maxMem),
       })
       if (!inst?.id) throw new Error('创建失败：后端没返回实例 id')
@@ -221,445 +205,547 @@ export function CreateWizard({ onDone, onCancel, onError }: Props) {
     }
   }
 
+
+  /** 下载失败后的重试。抽出来只为让 render 里少一坨内联 async。 */
+  const retryDownload = async () => {
+    setDlErr('')
+    try {
+      const t = await api.downloadServerJar(newId, {
+        type: form.type,
+        version: form.mcVersion,
+        build: picked?.build ?? 0,
+        tag: picked?.tag ?? '',
+        mirror: picked?.mirror ?? '',
+      })
+      setTaskId(t.id)
+      setPhase('downloading')
+    } catch (e) {
+      setDlErr(`还是不行：${(e as Error).message}`)
+      setPhase('failed')
+    }
+  }
+
   return (
-    <div className="scroll-thin flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-5 pb-10 md:px-[26px]">
-      <button type="button" onClick={onCancel} className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-ink-3 hover:text-accent">
-        <IconBack size={12} />
-        返回世界列表
-      </button>
-      <h1 className="mt-2.5 text-[22px] leading-tight font-bold text-ink-1">新建世界</h1>
-      <p className="mt-1.5 text-[12.5px] text-ink-3">
-        5 步搞定。每一步都说清「为什么要选这个」，不用先懂服务端的区别。
-      </p>
+    /* ⚠ 新建向导不走 PageFrame（它是 view=create 的独立分支），所以拿不到 .main 的样式。
+       底部必须自己留出健康条的高度 —— 否则最后那排「取消 / 上一步 / 下一步」会被 HUD 压住。
+       版式照 docs/design/pixel-refresh/wizard.html：版心 .wz-shell 不再封 1080px（超宽屏两侧
+       空太多），左右 gutter 与标准页 .content 一致 = 30px（--gutter）。
+       五个步骤全落在一只 .panel 里。 */
+    <div className="scroll-thin flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-[30px] pt-4 pb-[calc(var(--hud-h)+10px)]">
+      {/* max-width 的放宽在 design-overrides.css 的 .wz-shell（同层覆盖设计稿口径） */}
+      <div className="wz-shell">
+        <button type="button" onClick={onCancel} className="btn btn-ghost sm reveal self-start">
+          <Icon name="chev-l" size={12} />
+          返回世界列表
+        </button>
 
-      {/* 手机屏上 5 步全列会占掉整屏，压成一条进度块；宽屏才展开成完整步骤条 */}
-      <div className="pxb mt-5.5 mb-6 flex items-center gap-3 bg-panel px-4 py-3 sm:hidden">
-        <span className="flex shrink-0 gap-1">
-          {STEPS.map((s, i) => (
-            <i
-              key={s.t}
-              className={`block h-3.5 w-5 ${i < step ? 'bg-accent-deep' : i === step ? 'bg-accent' : 'bg-panel-2'}`}
-            />
-          ))}
-        </span>
-        <span className="min-w-0 truncate text-[13px] font-semibold text-ink-1">
-          {step + 1}. {STEPS[step].t}
-        </span>
-      </div>
+        <div className="sec-head reveal" style={{ marginTop: 14 }}>
+          <span className="idx">NEW</span>
+          <h2>建一台自己的服务器</h2>
+          <span className="sub">选类型 → 选版本 → 备运行环境 → 填基本信息 → 确认创建</span>
+        </div>
 
-      <div className="pxb mt-5.5 mb-7 hidden sm:flex sm:flex-row">
-        {STEPS.map((s, i) => {
-          const cls = i === step ? 'cur' : i < step ? 'done' : ''
-          return (
-            <button
-              key={s.t}
-              type="button"
-              onClick={() => i < step && setStep(i)}
-              disabled={i > step}
-              aria-current={i === step}
-              className={`step ${cls} flex-col items-start sm:flex-row sm:items-center ${i > step ? 'cursor-default' : ''}`}
-            >
-              <span className="step-n">{i < step ? <IconCheck size={11} /> : i + 1}</span>
-              <span className="step-t min-w-0 text-[13px] font-semibold">
-                <span className="block truncate">{s.t}</span>
-                <span className="block text-[11px] font-normal text-ink-3">{s.s}</span>
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {step === 0 && (
-        <StepBody title="选择服务端类型">
-          <p className="mb-3.5 -mt-2 text-[12.5px] text-ink-3">
-            不确定就选 Paper —— 90% 的人用这个
-          </p>
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-            {Object.keys(TYPE_LABEL).map((v) => {
-              const t = TYPE_INFO[v]
-              const on = form.type === v
-              // 后端说这个类型还没接自动下载 —— 那就别让它可选。
-              // 列出来（而不是藏起来）是为了让你知道「有这么个东西，只是现在走不通」。
-              // 源站还没问出来时（srcAvail 为空）一律按可选处理，别误伤。
-              const info = srcAvail[v]
-              const off = info ? !info.available : false
-              return (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => set('type', v)}
-                  disabled={off}
-                  aria-pressed={on}
-                  className={`type-card${on ? ' sel' : ''}`}
-                >
-                  {on && (
-                    <span className="absolute top-2.5 right-2.5 grid h-4 w-4 place-items-center bg-accent-deep text-[#0c1108]">
-                      <IconCheck size={10} />
-                    </span>
-                  )}
-                  <span className="flex items-center gap-2.5">
-                    <IconTypeBlock type={v} size={28} />
-                    <span className="min-w-0">
-                      <span className="block text-[14px] leading-tight font-bold text-ink-1">{TYPE_LABEL[v]}</span>
-                      <span className="block mono-meta">{v.toUpperCase()}</span>
-                    </span>
-                  </span>
-                  <span className="mt-2.5 block min-h-10 text-[12.5px] leading-relaxed text-ink-2">{t.desc}</span>
-                  <span className="mt-2.5 block">
-                    {off && <span className="chip chip-w">还不能自动下载</span>}
-                    {t.chips.map((c) => (
-                      <span key={c.t} className={`chip${c.tone ? ` chip-${c.tone}` : ''}`}>
-                        {c.t}
-                      </span>
-                    ))}
-                  </span>
-                  {off && (
-                    <span className="mt-2 block border-t-[3px] border-black pt-2 text-[11.5px] leading-relaxed text-[#e7dcb2]">
-                      {info?.note}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </StepBody>
-      )}
-
-      {step === 1 && (
-        <StepBody title="选择游戏版本与构建">
-          <ServerPicker
-            type={form.type}
-            value={picked}
-            preferVersion={URL_MC || undefined}
-            onPick={(p) => {
-              setPicked(p)
-              set('mcVersion', p.version)
-            }}
-          />
-          {picked && (
-            <p className="mt-4 text-[12.5px] leading-relaxed text-ink-2">
-              装模组的话建议往下看两三个版本 —— 模组作者追新版本普遍慢半拍。
-              只列正式版，快照和预发布版已经滤掉了。
-            </p>
-          )}
-        </StepBody>
-      )}
-
-      {step === 2 && (
-        <StepBody title="运行环境">
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <div className="px-card p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <IconTypeBlock type="paper" size={16} />
-                <b className="text-[13.5px] text-ink-1">Java 运行时</b>
-                <span className="chip chip-g ml-auto">自动挑</span>
-              </div>
-              <p className="text-[12.5px] leading-relaxed text-ink-2">
-                启动时扫一遍本机的 Java，挑一个版本够用的 —— 精确匹配优先，没有就往上取更高的。
-                你不用自己填路径。
-              </p>
-              <dl className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-[13px]">
-                <dt className="eyebrow">这个版本要</dt>
-                <dd>
-                  {lacksJava(java, javaMax) ? (
-                    <span className="chip chip-d">本机缺 Java {java}</span>
-                  ) : (
-                    <span className="chip chip-g">Java {java} 或更高</span>
-                  )}
-                </dd>
-                <dt className="eyebrow">数值来自</dt>
-                <dd className="text-[12.5px] text-ink-2">
-                  {picked?.javaFrom === 'mojang'
-                    ? 'Mojang 官方元数据（权威值）'
-                    : picked?.javaFrom === 'versionline'
-                      ? '按版本线推断（上游 API 不提供这个信息）'
-                      : '按版本号推断（没拿到权威值）'}
-                </dd>
-              </dl>
-            </div>
-
-            <div className="px-card p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <IconTypeBlock type="vanilla" size={16} />
-                <b className="text-[13.5px] text-ink-1">服务端文件</b>
-                <span className="chip chip-g ml-auto">自动下载</span>
-              </div>
-              <p className="text-[12.5px] leading-relaxed text-ink-2">
-                {form.type === 'forge'
-                  ? 'Forge 分两步走：先把安装器下下来，再在本机跑一遍它 —— 那一步会再下几十到一百多 MB 的库文件，'
-                    + '装完整个实例目录大概几百 MB（实测 1.20.4 是 160 MB、1.12.2 是 33 MB）。全程自动，'
-                  : '创建后直接从源站下到实例目录里：大文件走多线程，连接被掐断会自动重试、接着已有进度下；源站提供校验和的会校验一遍。'
-                    + '下完会自动把端口和标语写进 server.properties —— 也就是你在下一步填的那些值。'}
-                {form.type === 'forge' && '装完「服务端文件」会自动指向该启动的那个文件（有的是 jar，有的是启动参数文件），你不用自己认。'}
-              </p>
-              {picked && (
-                <dl className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-[13px]">
-                  <dt className="eyebrow">{form.type === 'forge' ? '先下载' : '将下载'}</dt>
-                  <dd className="mono-value break-all">{picked.name}</dd>
-                  <dt className="eyebrow">{form.type === 'forge' ? '安装器大小' : '大小'}</dt>
-                  <dd className="mono-value">{fmtSizeMaybe(picked.size)}</dd>
-                </dl>
-              )}
-            </div>
-          </div>
-
-          <div className="px-card mt-5 p-4">
-            <h3 className="mb-2 text-[13.5px] font-bold text-ink-1">关于构建号</h3>
-            <p className="text-[12.5px] leading-relaxed text-ink-2">
-              Paper 的构建号（build）是同一个游戏版本下的第几次打包，编号越大越新。
-              列表按从新到旧排，但<b className="text-ink-1">默认给你选的是最新的「稳定」构建</b>
-              —— Paper 对新版本会先发 BETA，直接上最新的可能踩到测试中的问题。
-              某个版本一个稳定构建都没有时，界面会明确告诉你。原版没有构建号，一个版本就一个包。
-            </p>
-          </div>
-        </StepBody>
-      )}
-
-      {step === 3 && (
-        <StepBody title="基本信息">
-          <div className="px-card p-4">
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-              <Field label="世界名称" desc="显示在列表和日志里的名字，随便取。">
-                <input
-                  className="px-input"
-                  value={form.name}
-                  onChange={(e) => set('name', e.target.value)}
-                  placeholder="生存服 · 长期档"
-                />
-              </Field>
-              <Field label="端口" desc="朋友连进来的地址就是 你的IP:端口。">
-                <StepInput
-                  label="端口"
-                  value={form.port}
-                  min={1}
-                  max={65535}
-                  onChange={(v) => set('port', Number(v))}
-                />
-              </Field>
-              <Field label="内存分配 (MB)" desc="原版 2 GB 够 5 个人玩；装 20 个插件建议给 4 GB。">
-                <StepInput
-                  label="内存分配"
-                  value={form.maxMem}
-                  step={512}
-                  min={512}
-                  onChange={(v) => set('maxMem', Number(v))}
-                />
-              </Field>
-            </div>
-
-            <div className="mt-4 border-t-[3px] border-black pt-2">
-              <Toggle
-                on={form.autoStart}
-                onChange={(v) => set('autoStart', v)}
-                title="开机自动启动"
-                desc="守护进程起来时自动把它拉起来，不用你手动点。"
-              />
-              <Toggle
-                on={form.autoRestart}
-                onChange={(v) => set('autoRestart', v)}
-                title="崩溃自动重启"
-                desc="进程异常退出时自动重开。崩之前最后 200 行日志会单独存档，方便查原因。"
-              />
-            </div>
-          </div>
-        </StepBody>
-      )}
-
-      {step === 4 && phase !== 'idle' && (
-        <StepBody
-          title={
-            phase === 'downloading'
-              ? form.type === 'forge'
-                ? '正在下载并安装 Forge'
-                : '正在准备服务端'
-              : form.type === 'forge'
-                ? 'Forge 没能装好'
-                : '服务端下载没成功'
-          }
-        >
-          <div className="px-card p-4">
-            <p className="mb-3.5 text-[12.5px] leading-relaxed text-ink-2">
-              世界已经建好了。这一步是在把服务端文件下到实例目录里 ——
-              {form.type === 'forge' && ' Forge 还要在下载完之后多跑一遍安装，进度条会显示到哪一步了；'}
-              下完了回概览页点启动就能开服。
-            </p>
-            {phase === 'downloading' && taskId && (
-              <DownloadBar taskId={taskId} onDone={() => onDone(newId)} />
-            )}
-            {phase === 'failed' && (
-              <>
-                <p className="border-l-[3px] border-danger bg-[#1c1314] px-4 py-2.5 text-[12.5px] leading-relaxed text-[#ffc2c2]">
-                  {dlErr}
-                </p>
-                <div className="mt-3.5 flex flex-wrap gap-2.5">
-                  <button
-                    type="button"
-                    className="btn btn-grass"
-                    onClick={async () => {
-                      setDlErr('')
-                      try {
-                        const t = await api.downloadServerJar(newId, {
-                          type: form.type,
-                          version: form.mcVersion,
-                          build: picked?.build ?? 0,
-                          tag: picked?.tag ?? '',
-                          mirror: picked?.mirror ?? '',
-                        })
-                        setTaskId(t.id)
-                        setPhase('downloading')
-                      } catch (e) {
-                        setDlErr(`还是不行：${(e as Error).message}`)
-                      }
-                    }}
-                  >
-                    重试下载
-                  </button>
-                  <button type="button" className="btn" onClick={() => onDone(newId)}>
-                    先不管，进世界
-                  </button>
-                </div>
-                <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
-                  点「先不管」也能进去 —— 之后在「配置」页的「服务端文件」里可以重新下载。
-                </p>
-              </>
-            )}
-          </div>
-        </StepBody>
-      )}
-
-      {step === 4 && phase === 'idle' && (
-        <StepBody title="确认创建">
-          <div className="px-card">
-            {[
-              ['服务端', `${TYPE_LABEL[form.type]} ${form.mcVersion}`],
-              // Forge 的 id 只是列表里的行号（它的版本号不是整数），显示成「#1」会让人以为那是构建号。
-              // 它有意义的身份是 tag，也就是 1.20.4-49.0.30 这种。
-              [
-                '构建',
-                picked
-                  ? form.type === 'forge'
-                    ? picked.tag || picked.name
-                    : picked.build > 0
-                      ? `#${picked.build}（${picked.name}）`
-                      : picked.name
-                  : '（还没选）',
-              ],
-              ['运行环境', `自动挑一个够用的 Java（这个版本需要 ${java}+）`],
-              ['世界名称', form.name.trim() || '（还没填）'],
-              ['监听端口', String(form.port)],
-              [
-                '服务端文件',
-                form.type === 'forge'
-                  ? `${form.jarPath.trim() || 'server.jar'} → 装完自动改成 Forge 的启动方式`
-                  : form.jarPath.trim() || '（还没填）',
-              ],
-              ['开机自启 / 崩溃重启', `${form.autoStart ? '开' : '关'} / ${form.autoRestart ? '开' : '关'}`],
-            ].map(([k, v]) => (
-              <div
-                key={k}
-                className="grid grid-cols-1 gap-1 border-b-[3px] border-black px-4 py-3 last:border-b-0 sm:grid-cols-[170px_1fr] sm:gap-3.5"
-              >
-                <span className="eyebrow">{k}</span>
-                <span className="text-[13.5px] break-words text-ink-1">{v}</span>
-              </div>
-            ))}
-          </div>
-
-          {needsEULA && (
-            <div className="px-card mt-4 p-4">
+        {/* 步骤条：只有「已经走过的步」可点回去，未来步禁用（照现有实现） */}
+        <div className="wz-steps reveal">
+          {STEPS.map((st, i) => {
+            const cls = i === step ? ' on' : i < step ? ' done wz-done' : ' future'
+            return (
               <button
+                key={st.t}
                 type="button"
-                role="checkbox"
-                aria-checked={agree}
-                onClick={() => setAgree((v) => !v)}
-                className="flex w-full items-start gap-3 bg-transparent p-0 text-left"
+                onClick={() => i < step && setStep(i)}
+                disabled={i > step}
+                aria-current={i === step}
+                className={`wz-step${cls}`}
               >
-                <span
-                  className="mt-[1px] grid h-5 w-5 shrink-0 place-items-center"
-                  style={{
-                    background: agree ? 'var(--color-accent-deep)' : '#0d100d',
-                    boxShadow: '0 -2px 0 0 #000, 0 2px 0 0 #000, -2px 0 0 0 #000, 2px 0 0 0 #000',
-                  }}
-                >
-                  {agree && <IconCheck size={12} />}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[13px] font-semibold text-ink-1">
-                    我已阅读并同意 Minecraft 最终用户许可协议
-                  </span>
-                  <span className="mt-1 block text-[11.5px] leading-relaxed text-ink-3">
-                    点一下左边那个方块就行 —— 勾了我们会替你写 eula.txt。
-                    不勾的话服务端第一次启动会直接退出，日志里只有一句英文，新手基本都会卡在这。
-                    {' '}
-                    <a
-                      href="https://aka.ms/MinecraftEULA"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-cyan hover:text-accent"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      看原文
-                    </a>
-                  </span>
+                <span className="no">{i < step ? <Icon name="check" size={11} /> : i + 1}</span>
+                <span className="tx">
+                  <b>{st.t}</b>
+                  <span>STEP {i + 1}</span>
                 </span>
               </button>
+            )
+          })}
+        </div>
+
+        <div className="panel reveal">
+          <i className="corner" />
+
+          {/* ① 类型：不预选，必须自己点一个 */}
+          {step === 0 && (
+            <div className="cfg-pane on">
+              <ConHead icon="cmd" title="选服务端" sub="不预选 —— 必须自己点一个" />
+              <div style={{ padding: '14px 16px' }}>
+                <div className="kinds">
+                  {Object.keys(TYPE_LABEL).map((v) => {
+                    const t = TYPE_INFO[v]
+                    const on = form.type === v
+                    // 后端说这个类型还没接自动下载 —— 那就别让它可选。
+                    // 列出来（而不是藏起来）是为了让你知道「有这么个东西，只是现在走不通」。
+                    // 源站还没问出来时（srcAvail 为空）一律按可选处理，别误伤。
+                    const info = srcAvail[v]
+                    const off = info ? !info.available : false
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => set('type', v)}
+                        disabled={off}
+                        aria-pressed={on}
+                        className={`kind${on ? ' on' : ''}${off ? ' off' : ''}`}
+                      >
+                        <Icon name={KIND_ICON[v] ?? 'cube'} size={30} className="ico" />
+                        <b className="nm">{TYPE_LABEL[v]}</b>
+                        {/* 描述单独一行、占满卡片宽度（连图标下面那格一起）。
+                            以前它是「图标 | 文字块」两列里的第二列，只剩 127px ——
+                            一句话要折三行，卡片高矮差到 108px（实测 202 / 310）。
+                            原来这里还有枚「还不能自动下载」小标签，一并去掉了：
+                            不可用卡显示的就是后端 note，开头那句「还没接……」已经说明同一件事，
+                            说两遍要多占一行、卡片就不齐了。 */}
+                        <span className="ds">{off ? info?.note || t.desc : t.desc}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="hintbox" style={{ marginTop: 14 }}>
+                  <Icon name="info" style={{ color: 'var(--cyan)' }} />
+                  「插件」「模组」不是一回事：Paper 系吃 <code>plugins</code>，Fabric/Forge 吃{' '}
+                  <code>mods</code>。选错了得重建，所以先想清楚。
+                </div>
+              </div>
             </div>
           )}
 
-          <p className="mt-3.5 text-[12.5px] leading-relaxed text-ink-2">
-            点下面的按钮会：建目录写配置 → 写 eula.txt →{' '}
-            {form.type === 'forge' ? (
-              <>
-                <b className="text-ink-1">下安装器并自动装好 Forge</b>（这一步比别的类型慢一截，因为装的过程还要下库文件）
-              </>
-            ) : (
-              <>
-                <b className="text-ink-1">把服务端下载进去</b>
-              </>
-            )}
-            。下完回概览页点「启动」就行。
-            启动前它会先体检一遍（jar 在不在、Java 够不够、端口占没占），有问题会把清单和修复按钮直接摆出来。
-          </p>
-        </StepBody>
-      )}
-
-      <div className="px-card mt-7 flex flex-wrap items-center gap-3 px-4 py-3.5">
-        <span className="text-[12.5px] text-ink-3">
-          第 {step + 1} / {STEPS.length} 步 · {STEPS[step].t}
-        </span>
-        <div className="ml-auto flex w-full gap-2.5 sm:w-auto">
-          <button type="button" className="btn btn-ghost" onClick={onCancel}>
-            取消
-          </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={step === 0}
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
-          >
-            上一步
-          </button>
-          {step < STEPS.length - 1 ? (
-            <button
-              type="button"
-              className="btn btn-grass"
-              disabled={!canNext}
-              onClick={() => setStep((s) => s + 1)}
-            >
-              下一步 · {STEPS[step + 1].t}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-grass"
-              disabled={busy || !canNext || phase !== 'idle'}
-              onClick={submit}
-            >
-              <IconPlus size={13} />
-              {busy ? '创建中…' : phase === 'downloading' ? '准备中…' : '创建这个世界'}
-            </button>
+          {/* ② 版本与构建：版本列表 + 构建列表（picked 决定能否下一步） */}
+          {step === 1 && (
+            <div className="cfg-pane on">
+              <ConHead icon="time" title="版本与构建" sub="没选构建之前，「下一步」一直是禁用的">
+                <div className="ml-auto" />
+                <span style={{ fontFamily: 'var(--f-term)', fontSize: 14, color: 'var(--ink-3)' }}>
+                  {TYPE_LABEL[form.type] || '服务端'}
+                </span>
+              </ConHead>
+              <ServerPicker
+                type={form.type}
+                value={picked}
+                preferVersion={URL_MC || undefined}
+                onPick={(p) => {
+                  setPicked(p)
+                  set('mcVersion', p.version)
+                }}
+              />
+            </div>
           )}
+
+          {/* ③ 运行环境：jarPath 非空才放行 */}
+          {step === 2 && (
+            <div className="cfg-pane on">
+              <ConHead icon="jar" title="运行环境" sub="Java 自动挑，服务端文件下载前还没落地" />
+              <div style={{ padding: '14px 16px' }}>
+                <div className="kv-list" style={{ marginBottom: 14 }}>
+                  <div className="kv2">
+                    <span className="k">这个版本需要</span>
+                    <span
+                      className="v"
+                      style={{ color: lacksJava(java, javaMax) ? 'var(--bad)' : 'var(--ok)' }}
+                    >
+                      Java {java}
+                      {lacksJava(java, javaMax) ? ' · 本机还没有' : ''}
+                    </span>
+                  </div>
+                  <div className="kv2">
+                    <span className="k">本机检测到</span>
+                    <span className="v">{(javaMax ?? 0) > 0 ? `最高 Java ${javaMax}` : '还没扫到 Java'}</span>
+                  </div>
+                </div>
+
+                <JavaPicker value={form.javaPath} onChange={(p) => set('javaPath', p)} needMajor={java} />
+
+                <div style={{ marginTop: 16 }}>
+                  <div className="eyebrow" style={{ marginBottom: 8 }}>
+                    服务端文件（启动文件）
+                  </div>
+                  <div className="field" style={{ paddingTop: 0 }}>
+                    <div>
+                      <div className="lb">jarPath</div>
+                      <div className="hint">
+                        默认就写{' '}
+                        <span style={{ fontFamily: 'var(--f-term)', fontSize: 14 }}>server.jar</span>
+                        ，下完自动落到实例目录
+                      </div>
+                    </div>
+                    <input
+                      className="inp"
+                      value={form.jarPath}
+                      onChange={(e) => set('jarPath', e.target.value)}
+                    />
+                  </div>
+                  <div className="pol-foot">
+                    <div className="row">
+                      <span className="k">下载源</span>
+                      <span className="v">自动（官方不通就换镜像）</span>
+                    </div>
+                    <div className="row">
+                      <span className="k">断点续传</span>
+                      <span className="v">连接被掐断会接着已有进度下</span>
+                    </div>
+                    {picked && (
+                      <div className="row">
+                        <span className="k">{form.type === 'forge' ? '先下载' : '将下载'}</span>
+                        <span className="v" style={{ wordBreak: 'break-all' }}>
+                          {picked.name}
+                        </span>
+                      </div>
+                    )}
+                    {picked && (
+                      <div className="row">
+                        <span className="k">{form.type === 'forge' ? '安装器大小' : '大小'}</span>
+                        <span className="v">{fmtSizeMaybe(picked.size)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <p style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10, lineHeight: 1.7 }}>
+                  {form.type === 'forge'
+                    ? 'Forge 分两步：先下安装器，再自动跑一遍装依赖（额外下几十到一百多 MB）。'
+                      + '装完「服务端文件」会自动指向该启动的文件，不用你认。'
+                    : '创建后直接从源站下到实例目录：多线程下载、断线自动续传；下完自动写好端口与标语。'}
+                  <br />
+                  「这个版本要 Java {java}」的数值来自
+                  {picked?.javaFrom === 'mojang'
+                    ? ' Mojang 官方元数据（权威值）'
+                    : picked?.javaFrom === 'versionline'
+                      ? ' 按版本线推断（上游 API 不提供这个信息）'
+                      : ' 按版本号推断（没拿到权威值）'}
+                  。
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ④ 基本信息：名称非空才放行 */}
+          {step === 3 && (
+            <div className="cfg-pane on">
+              <ConHead icon="book" title="基本信息" sub="这些之后都能在「配置」里改" />
+              <div style={{ padding: '6px 16px 16px' }}>
+                <div className="field">
+                  <div>
+                    <div className="lb">实例名</div>
+                    <div className="hint">显示在列表和日志里的名字，填了才能进下一步</div>
+                  </div>
+                  <input
+                    className="inp"
+                    value={form.name}
+                    onChange={(e) => set('name', e.target.value)}
+                    placeholder="生存服 · 长期档"
+                  />
+                </div>
+                <div className="field">
+                  <div>
+                    <div className="lb">端口</div>
+                    <div className="hint">朋友连进来的地址就是 IP:端口；下完会自动写进 server.properties</div>
+                  </div>
+                  <StepInput
+                    label="端口"
+                    value={form.port}
+                    min={1}
+                    max={65535}
+                    onChange={(v) => set('port', Number(v))}
+                  />
+                </div>
+                <div className="field">
+                  <div>
+                    <div className="lb">内存上限 (MB)</div>
+                    <div className="hint">默认 4096；最小内存自动取 min(1024, 上限)</div>
+                  </div>
+                  <StepInput
+                    label="内存分配"
+                    value={form.maxMem}
+                    step={512}
+                    min={512}
+                    onChange={(v) => set('maxMem', Number(v))}
+                  />
+                </div>
+                <div className="field">
+                  <div>
+                    <div className="lb">Java 路径</div>
+                    <div className="hint">留空 = 按 MC 版本自动挑（这个版本要 Java {java}+）</div>
+                  </div>
+                  <input
+                    className="inp"
+                    value={form.javaPath}
+                    onChange={(e) => set('javaPath', e.target.value)}
+                    placeholder="留空 = 自动挑最合适的"
+                  />
+                </div>
+
+                <div style={{ marginTop: 16, borderTop: '1px solid var(--line-1)', paddingTop: 4 }}>
+                  {[
+                    {
+                      on: form.autoStart,
+                      flip: () => set('autoStart', !form.autoStart),
+                      title: '开机自动启动',
+                      desc: '守护进程起来时自动把它拉起来，不用你手动点。',
+                    },
+                    {
+                      on: form.autoRestart,
+                      flip: () => set('autoRestart', !form.autoRestart),
+                      title: '崩溃自动重启',
+                      desc: '进程异常退出时自动重开。崩之前最后 200 行日志会单独存档，方便查原因。',
+                    },
+                  ].map((r) => (
+                    <div key={r.title} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0' }}>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={r.on}
+                        aria-label={r.title}
+                        onClick={r.flip}
+                        className={`tog${r.on ? ' on' : ''}`}
+                      >
+                        <span className="knob" />
+                      </button>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>{r.title}</div>
+                        <p style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.6 }}>{r.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ⑤ 确认创建 · idle */}
+          {step === 4 && phase === 'idle' && (
+            <div className="cfg-pane on">
+              <ConHead
+                icon="check"
+                iconColor="var(--ok)"
+                title="确认创建"
+                sub="最后一遍，勾了同意书才能点创建"
+              />
+              <div style={{ padding: '14px 16px' }}>
+                <div className="kv-list">
+                  {[
+                    /* ⚠ 兜底不能省：TYPE_LABEL[''] 是 undefined，深链带了个不在表里的 type
+                       （或类型还没选）时会把「服务端 undefined 1.21.4」直接印在确认页上。 */
+                    [
+                      '服务端',
+                      TYPE_LABEL[form.type]
+                        ? `${TYPE_LABEL[form.type]} ${form.mcVersion}`
+                        : `${form.mcVersion}（类型未选）`,
+                    ],
+                    // Forge 的 id 只是列表里的行号（它的版本号不是整数），显示成「#1」会让人以为那是构建号。
+                    // 它有意义的身份是 tag，也就是 1.20.4-49.0.30 这种。
+                    [
+                      '构建',
+                      picked
+                        ? form.type === 'forge'
+                          ? picked.tag || picked.name
+                          : picked.build > 0
+                            ? `#${picked.build}（${picked.name}）`
+                            : picked.name
+                        : '（还没选）',
+                    ],
+                    [
+                      '运行环境',
+                      form.javaPath.trim()
+                        ? `指定用 ${form.javaPath.trim()}`
+                        : `自动挑一个够用的 Java（这个版本需要 ${java}+）`,
+                    ],
+                    ['实例名', form.name.trim() || '（还没填）'],
+                    ['端口', String(form.port)],
+                    ['内存上限', `${form.maxMem} MB`],
+                    ['服务端文件', form.jarPath.trim() || '（还没填）'],
+                    ['开机自启 / 崩溃重启', `${form.autoStart ? '开' : '关'} / ${form.autoRestart ? '开' : '关'}`],
+                  ].map(([k, v]) => (
+                    <div className="kv2" key={k}>
+                      <span className="k">{k}</span>
+                      <span className="v" style={{ wordBreak: 'break-word' }}>
+                        {v}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {needsEULA ? (
+                  <div
+                    style={{
+                      marginTop: 16,
+                      padding: 14,
+                      background: 'rgba(242,193,78,.08)',
+                      borderLeft: '3px solid var(--warn)',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={agree}
+                      onClick={() => setAgree((v) => !v)}
+                      style={{
+                        display: 'flex',
+                        gap: 10,
+                        alignItems: 'flex-start',
+                        cursor: 'pointer',
+                        background: 'none',
+                        border: 0,
+                        padding: 0,
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span className={`chk${agree ? ' on' : ''}`} style={{ marginTop: 2 }} />
+                      <span style={{ fontSize: 12.5, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                        我同意 Minecraft 的 <b style={{ color: 'var(--ink-1)' }}>EULA</b>（
+                        <a
+                          href="https://aka.ms/MinecraftEULA"
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ fontFamily: 'var(--f-term)', fontSize: 14, color: 'var(--cyan)' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          aka.ms/MinecraftEULA
+                        </a>
+                        ）。同意后由面板代写 eula.txt —— 不让新手卡在「手工改错一行、服务端一句英文退出」上。
+                      </span>
+                    </button>
+                  </div>
+                ) : (
+                  <p style={{ marginTop: 16, fontSize: 12.5, color: 'var(--ink-3)' }}>
+                    代理端（Velocity / BungeeCord）没有 eula 这一步。
+                  </p>
+                )}
+
+                <div className="pol-foot">
+                  <div className="row">
+                    <span className="k">会写到哪里</span>
+                    <span className="v">{'实例目录 instances/<新 id>'}</span>
+                  </div>
+                  <div className="row">
+                    <span className="k">创建之后</span>
+                    <span className="v">
+                      {form.type === 'forge'
+                        ? '先下安装器再自动装好 Forge，进度在「下载与安装」里看'
+                        : '立刻开始下载服务端文件，进度在「下载与安装」里看'}
+                    </span>
+                  </div>
+                  <div className="row">
+                    <span className="k">启动之前</span>
+                    <span className="v">会先体检一遍（jar 在不在、Java 够不够、端口占没占）</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ⑤ 确认创建 · 下载中 / 下载失败（phase !== idle） */}
+          {step === 4 && phase !== 'idle' && (
+            <div className="cfg-pane on">
+              <ConHead
+                icon={phase === 'downloading' ? 'dl' : 'ban'}
+                iconColor={phase === 'downloading' ? 'var(--cyan)' : 'var(--bad)'}
+                title={
+                  phase === 'downloading'
+                    ? form.type === 'forge'
+                      ? '正在下载并安装 Forge'
+                      : '正在准备服务端'
+                    : form.type === 'forge'
+                      ? 'Forge 没能装好'
+                      : '服务端下载没成功'
+                }
+              >
+                <span className="badge wl" style={{ marginLeft: 4 }}>
+                  世界已经建好了
+                </span>
+                <div className="ml-auto" />
+                <span style={{ fontFamily: 'var(--f-term)', fontSize: 14, color: 'var(--ink-3)' }}>
+                  下载失败不算创建失败，回头能再下
+                </span>
+              </ConHead>
+              <div style={{ padding: '14px 16px' }}>
+                {phase === 'downloading' && taskId && (
+                  <DownloadBar taskId={taskId} onDone={() => onDone(newId)} />
+                )}
+                {phase === 'failed' && (
+                  <>
+                    <div className="nbox d">
+                      <div className="hd">
+                        <Icon name="ban" />
+                        {dlErr}
+                      </div>
+                      世界已经建好了，只是服务端文件没下来。点「重试下载」再来一次；也可以先不管 ——
+                      之后在「配置」页的「服务端文件」里能重新下载。
+                    </div>
+                    <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button type="button" className="btn btn-primary" onClick={() => void retryDownload()}>
+                        重试下载
+                      </button>
+                      <button type="button" className="btn" onClick={() => onDone(newId)}>
+                        先不管，进世界
+                      </button>
+                    </div>
+                  </>
+                )}
+                {phase === 'downloading' && (
+                  <div
+                    className="con-foot"
+                    style={{ marginTop: 14, borderTop: '1px solid var(--line-1)', padding: '12px 0 0', background: 'none' }}
+                  >
+                    <Icon name="check" style={{ color: 'var(--ok)' }} />
+                    {needsEULA ? 'eula.txt 已写好 · ' : ''}端口与标语会在下完后写进 <code>server.properties</code>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 底部操作条：第 N / 5 步 + 取消 / 上一步 / 下一步·下一阶名字 */}
+          <div className="wz-foot">
+            <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+              第{' '}
+              <b style={{ fontFamily: 'var(--f-pix)', color: 'var(--cyan)' }}>{step + 1}</b> / {STEPS.length} 步 ·{' '}
+              {STEPS[step].t}
+            </span>
+            <div className="ml-auto" />
+            <button type="button" className="btn btn-ghost" onClick={onCancel}>
+              取消
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={step === 0}
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+            >
+              上一步
+            </button>
+            {step < STEPS.length - 1 ? (
+              <button
+                type="button"
+                className="btn btn-start"
+                disabled={!canNext}
+                onClick={() => setStep((s) => s + 1)}
+              >
+                下一步 · {STEPS[step + 1].t}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-start"
+                disabled={busy || !canNext || phase !== 'idle'}
+                onClick={submit}
+              >
+                <Icon name="plus" size={13} />
+                {busy ? '创建中…' : phase === 'downloading' ? '准备中…' : '创建这个世界'}
+              </button>
+            )}
+          </div>
         </div>
+
+        <p className="hintbox reveal" style={{ marginTop: 14 }}>
+          <Icon name="info" style={{ color: 'var(--cyan)' }} />
+          「下一步」灰着 = 这一步还缺东西：按提示补齐就会亮，不弹错误、不会跳步。
+        </p>
       </div>
     </div>
   )

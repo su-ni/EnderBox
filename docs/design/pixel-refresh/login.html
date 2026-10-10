@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ServerBox · 登录 / 访问保护</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-grass" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="12" fill="#7a5230"/><rect x="1" y="6" width="14" height="2" fill="#6b4420"/><rect x="1" y="2" width="14" height="4" fill="#5da832"/><rect x="1" y="2" width="14" height="2" fill="#74c23f"/><rect x="2" y="8" width="3" height="2" fill="#603c1c"/><rect x="9" y="9" width="4" height="2" fill="#603c1c"/><rect x="6" y="12" width="3" height="2" fill="#603c1c"/></symbol>
+<symbol id="i-lock" viewBox="0 0 16 16"><rect x="5" y="2" width="6" height="2" fill="currentColor"/><rect x="4" y="4" width="2" height="3" fill="currentColor"/><rect x="10" y="4" width="2" height="3" fill="currentColor"/><rect x="3" y="7" width="10" height="7" fill="currentColor"/><rect x="7" y="9" width="2" height="3" fill="#131920"/></symbol>
+<symbol id="i-ban" viewBox="0 0 16 16"><rect x="5" y="1" width="6" height="2" fill="currentColor"/><rect x="5" y="13" width="6" height="2" fill="currentColor"/><rect x="3" y="3" width="2" height="2" fill="currentColor"/><rect x="1" y="5" width="2" height="6" fill="currentColor"/><rect x="13" y="5" width="2" height="6" fill="currentColor"/><rect x="11" y="3" width="2" height="2" fill="currentColor"/><rect x="3" y="11" width="2" height="2" fill="currentColor"/><rect x="11" y="11" width="2" height="2" fill="currentColor"/><rect x="5" y="5" width="2" height="2" fill="currentColor"/><rect x="7" y="7" width="2" height="2" fill="currentColor"/><rect x="9" y="9" width="2" height="2" fill="currentColor"/></symbol>
+<symbol id="i-info" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="1" fill="currentColor"/><rect x="2" y="13" width="12" height="1" fill="currentColor"/><rect x="1" y="3" width="1" height="10" fill="currentColor"/><rect x="14" y="3" width="1" height="10" fill="currentColor"/><rect x="7" y="4" width="2" height="2" fill="currentColor"/><rect x="7" y="8" width="2" height="4" fill="currentColor"/></symbol>
+<symbol id="i-check" viewBox="0 0 16 16"><rect x="2" y="7" width="2" height="3" fill="currentColor"/><rect x="4" y="9" width="2" height="3" fill="currentColor"/><rect x="6" y="7" width="2" height="3" fill="currentColor"/><rect x="8" y="5" width="2" height="3" fill="currentColor"/><rect x="10" y="3" width="2" height="3" fill="currentColor"/><rect x="12" y="1" width="2" height="3" fill="currentColor"/></symbol>
+<symbol id="i-jar" viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" fill="#c9742a"/><rect x="3" y="2" width="10" height="2" fill="#e08a3c"/><rect x="3" y="2" width="10" height="1" fill="#f0a556"/><rect x="5" y="6" width="6" height="5" fill="#8a4a13"/></symbol>
+</defs></svg>
+
+<div class="atmos" aria-hidden="true"><div class="grid"></div><div class="glow-a"></div><div class="glow-b"></div><div class="vignette"></div></div>
+
+<div class="draftbar">
+  <b>SERVERBOX · 登录 / 访问保护</b>
+  <div class="sw" style="display:flex;gap:4px"><i style="background:#131920"></i><i style="background:#33d5cf"></i><i style="background:#e08a3c"></i></div>
+  <span style="font-size:12px;color:var(--ink-3)">整页居中是全项目唯一允许居中的场景</span>
+  <div class="flownav" style="margin-left:auto">
+    <a href="index.html">面板</a><a href="wizard.html">新建向导</a><a href="market.html">整合包市场</a><a href="login.html" class="on">登录页</a><a href="spec.html">设计规范</a>
+  </div>
+</div>
+
+<div class="app">
+  <div class="strata"></div>
+  <main class="main" style="padding:0">
+    <div class="login-wrap">
+      <div style="width:100%;max-width:1120px">
+        <div class="sec-head" style="justify-content:center;margin-bottom:24px">
+          <span class="idx">GATE</span>
+          <h2 style="font-size:18px">访问保护 · 三种状态</h2>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start">
+
+          <!-- ① 默认态 -->
+          <div class="login-card" style="max-width:none">
+            <div class="login-brand">
+              <svg class="mk" viewBox="0 0 16 16"><use href="#i-grass"/></svg>
+              <div>
+                <h1 style="font-size:20px;line-height:1.2;font-weight:700">ServerBox</h1>
+                <p style="font-family:var(--f-pix);font-size:10.5px;letter-spacing:.1em;color:var(--ink-3);margin-top:3px">MC 服务器管理面板</p>
+              </div>
+            </div>
+            <div class="panel" style="margin-bottom:0">
+              <i class="corner"></i>
+              <div class="box">
+                <p class="say">这个面板开了访问保护，需要密码才能进。<span>密码是在「设置 → 访问安全」里设的。</span></p>
+                <input class="inp mt4" style="margin-top:14px;width:100%" type="password" value="••••••••" placeholder="面板密码">
+                <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px" type="button"><svg class="pic"><use href="#i-lock"/></svg>进入</button>
+              </div>
+            </div>
+            <p class="login-foot">忘了密码就去这台机器上直接打开面板（本机访问默认免密码），在「设置 → 访问安全」里重设。</p>
+            <div style="display:flex;gap:6px;justify-content:center;margin-top:10px"><span class="badge wl">默认态</span></div>
+          </div>
+
+          <!-- ② 验证中 -->
+          <div class="login-card" style="max-width:none">
+            <div class="login-brand">
+              <svg class="mk" viewBox="0 0 16 16"><use href="#i-grass"/></svg>
+              <div>
+                <h1 style="font-size:20px;line-height:1.2;font-weight:700">ServerBox</h1>
+                <p style="font-family:var(--f-pix);font-size:10.5px;letter-spacing:.1em;color:var(--ink-3);margin-top:3px">MC 服务器管理面板</p>
+              </div>
+            </div>
+            <div class="panel" style="margin-bottom:0">
+              <i class="corner"></i>
+              <div class="box">
+                <p class="say">这个面板开了访问保护，需要密码才能进。<span>密码是在「设置 → 访问安全」里设的。</span></p>
+                <input class="inp" style="margin-top:14px;width:100%" type="password" value="••••••••">
+                <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px" type="button" disabled>
+                  <span class="pulse-dot" style="width:7px;height:7px"></span>验证中…
+                </button>
+              </div>
+            </div>
+            <p class="login-foot">按钮在这一刻禁用并把文案换成「验证中…」—— 不给第二次点击的机会，避免连点发一串请求。</p>
+            <div style="display:flex;gap:6px;justify-content:center;margin-top:10px"><span class="badge">验证中</span></div>
+          </div>
+
+          <!-- ③ 密码错误 -->
+          <div class="login-card" style="max-width:none">
+            <div class="login-brand">
+              <svg class="mk" viewBox="0 0 16 16"><use href="#i-grass"/></svg>
+              <div>
+                <h1 style="font-size:20px;line-height:1.2;font-weight:700">ServerBox</h1>
+                <p style="font-family:var(--f-pix);font-size:10.5px;letter-spacing:.1em;color:var(--ink-3);margin-top:3px">MC 服务器管理面板</p>
+              </div>
+            </div>
+            <div class="panel" style="margin-bottom:0">
+              <i class="corner"></i>
+              <div class="box">
+                <p class="say">这个面板开了访问保护，需要密码才能进。</p>
+                <input class="inp" style="margin-top:14px;width:100%;border-right-color:var(--bad);border-bottom-color:var(--bad)" type="password" placeholder="面板密码">
+                <div class="login-err"><svg class="pic" style="width:13px;height:13px"><use href="#i-ban"/></svg>密码不对。就输错了这一条，别的什么都没发生。</div>
+                <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px" type="button"><svg class="pic"><use href="#i-lock"/></svg>再试一次</button>
+              </div>
+            </div>
+            <p class="login-foot">错误块用红色左边线 + 浅红底，<b style="color:var(--ink-2)">框体本身也一起变红</b>—— 光看文字容易被忽略。输入框会自动清空并重新聚焦。</p>
+            <div style="display:flex;gap:6px;justify-content:center;margin-top:10px"><span class="badge ban">密码错误</span></div>
+          </div>
+
+        </div>
+
+        <!-- 补充说明 -->
+        <div class="grid-2" style="margin-top:26px">
+          <div class="panel" style="margin-bottom:0">
+            <i class="corner"></i>
+            <div class="con-head tex-stone"><svg class="pic" style="color:var(--ok)"><use href="#i-check"/></svg><h2>本机访问默认免密码</h2></div>
+            <div style="padding:14px 16px;font-size:12.5px;line-height:1.8;color:var(--ink-2)">
+              在跑着守护进程的那台机器上打开面板，会直接进去 —— 省掉「自己家还要输密码」这一步。
+              这个开关在「设置 → 访问安全」里，叫<b style="color:var(--ink-1)">本机访问免登录</b>。
+              <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+                <span class="badge wl">开启访问保护</span>
+                <span class="badge wl">本机访问免登录</span>
+                <span class="badge">API 令牌</span>
+              </div>
+            </div>
+          </div>
+          <div class="panel" style="margin-bottom:0">
+            <i class="corner"></i>
+            <div class="con-head tex-stone"><svg class="pic" style="color:var(--copper)"><use href="#i-info"/></svg><h2>没开保护时</h2></div>
+            <div style="padding:14px 16px;font-size:12.5px;line-height:1.8;color:var(--ink-2)">
+              压根没有这一页 —— 直接进面板。但如果面板监听在非回环地址上（别人也能连到你的机器），
+              顶部会挂一条红色的全局警告，提示「你这个面板现在是裸奔的」。
+              <div style="margin-top:12px">
+                <div class="banner-danger" style="margin-bottom:0">
+                  <svg class="pic" style="color:var(--bad);width:18px;height:18px"><use href="#i-ban"/></svg>
+                  <div class="t">
+                    <h3>面板没有任何保护，且别人能访问到</h3>
+                    <p>监听地址不是 127.0.0.1。要么开启访问保护，要么把它改回只监听本机。</p>
+                  </div>
+                  <button class="btn sm" type="button">去设置</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

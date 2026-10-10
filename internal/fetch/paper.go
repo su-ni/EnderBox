@@ -49,7 +49,7 @@ func paperMCVersions(project string) ([]Version, error) {
 			if strings.Contains(v, "-") {
 				continue // -rc-1 / -pre2 / -SNAPSHOT
 			}
-			out = append(out, Version{ID: v, Family: family, Prerelease: false, Stable: true})
+			out = append(out, Version{ID: v, Family: family})
 		}
 	}
 	if len(out) == 0 {

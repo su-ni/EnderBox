@@ -1,0 +1,127 @@
+<!-- ServerBox 设计稿 · 单屏模块：plugins
+     从 index.html 里原样切出来（index.html 仍是总预览，未改动）。
+     搬进 React 时一个文件对应一屏；class 名与 index.html 保持一致。 -->
+<section class="page" data-page="plugins">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">04</span>
+            <h2>插件与模组</h2>
+            <span class="sub">Paper 这类读 plugins/，Forge / Fabric 这类读 mods/ —— 目录按服务端类型自动切换，不让你自己挑</span>
+            <div class="spacer"></div>
+            <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-dl"/></svg>获取模组</button>
+            <button class="btn btn-ghost sm" type="button" aria-label="刷新列表"><svg class="pic"><use href="#i-refresh"/></svg></button>
+          </div>
+
+          <!-- 依赖问题：只报「必需」的（可选前置是建议，不是「会起不来」）。 -->
+          <div class="banner-danger reveal" style="--rd:.1s">
+            <svg class="pic" style="color:var(--warn);width:20px;height:20px"><use href="#i-info"/></svg>
+            <div class="t">
+              <h3>有 2 个模组缺少必需前置</h3>
+              <p>缺必需前置的模组在服务端加载阶段就会被丢掉，压根不会进游戏。点「装前置」会先按你的 MC 版本挑好对应版本 —— 不会替你默认装最新版；如果那个前置其实已经在目录里、只是被禁用了，它会告诉你去把它启用。</p>
+            </div>
+            <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-dl"/></svg>装前置（2）</button>
+          </div>
+
+          <div class="panel reveal" style="--rd:.14s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--cyan)"><use href="#i-table"/></svg>
+              <h2>已安装</h2>
+              <span style="font-size:12.5px;color:var(--ink-3)">12 个 · 启用 9 个</span>
+              <input class="inp" style="max-width:240px;margin-left:8px" placeholder="名字 / 文件名 / modId">
+              <div class="spacer"></div>
+              <div class="filters">
+                <button class="chipf on" type="button">全部<span class="n">12</span></button>
+                <button class="chipf" type="button">已启用<span class="n">9</span></button>
+                <button class="chipf" type="button">已禁用<span class="n">1</span></button>
+                <button class="chipf" type="button">缺前置<span class="n">2</span></button>
+              </div>
+            </div>
+
+            <div class="rlist">
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">Sodium <span class="badge">FABRIC</span><span class="badge">1.21.4</span></div>
+                  <div class="rsub">大幅优化渲染，几乎不掉画质 · jellysquid3</div>
+                </div>
+                <div class="rmeta">sodium-fabric-1.21.4.jar · 1.2 MB</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow dep">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">Create <span class="badge">FORGE</span><span class="badge">1.20.1</span><span class="badge ban">缺前置</span></div>
+                  <div class="rsub">需要 <b style="color:var(--warn)">flywheel</b> 才能加载 —— 现在它在服务端启动阶段就被丢掉了</div>
+                </div>
+                <div class="rmeta">create-1.20.1-6.0.4.jar · 14.8 MB</div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button"><svg class="pic"><use href="#i-dl"/></svg>装前置</button>
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow dep">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">Jade <span class="badge">FORGE</span><span class="badge">1.20.1</span><span class="badge ban">缺前置</span></div>
+                  <div class="rsub">需要 <b style="color:var(--warn)">iceberg</b></div>
+                </div>
+                <div class="rmeta">jade-1.20.1-11.9.2.jar · 402 KB</div>
+                <div class="ract">
+                  <button class="btn btn-primary xs" type="button"><svg class="pic"><use href="#i-dl"/></svg>装前置</button>
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--emerald)"><use href="#i-cmd"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">ServerBoxCompanion <span class="badge">BUKKIT</span><span class="badge op">v0.2.0</span></div>
+                  <div class="rsub">面板的实时数据由它提供 · 我们自己写的插件</div>
+                </div>
+                <div class="rmeta">plugins/ServerBoxCompanion.jar · 46 KB</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow off">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px"><use href="#i-table"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">LegacyGuard <span class="badge">BUKKIT</span><span class="badge">已禁用</span></div>
+                  <div class="rsub">上次启动时它报了 Unsupported API version 1.13 —— 先禁用，别让它拖住整台服</div>
+                </div>
+                <div class="rmeta">LegacyGuard-1.13.jar · 88 KB</div>
+                <div class="ract">
+                  <span class="tog" role="switch" aria-checked="false"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+
+              <div class="rrow">
+                <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--ink-3)"><use href="#i-ban"/></svg></div>
+                <div class="rmain">
+                  <div class="rtitle">mystery-mod-7 <span class="badge">读不出信息</span></div>
+                  <div class="rsub">jar 里没有认识的元数据文件 —— 名字就是文件名，其余留空，不瞎猜</div>
+                </div>
+                <div class="rmeta">mystery-mod-7.jar · 2.1 MB</div>
+                <div class="ract">
+                  <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                  <button class="btn btn-ghost xs" type="button" aria-label="删除"><svg class="pic"><use href="#i-trash"/></svg></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="con-foot">
+              <svg class="pic" style="color:var(--ink-3)"><use href="#i-info"/></svg>
+              开关改的是文件后缀（<code>.jar</code> ↔ <code>.jar.disabled</code>），下次启动才生效；删除是不可逆的，唯一的后悔药在备份页。
+            </div>
+          </div>
+        </section>

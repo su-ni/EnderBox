@@ -1,0 +1,17 @@
+name: EnderBoxCompanion
+version: 0.2.0
+main: io.enderbox.companion.EnderBoxCompanion
+# ⚠ 故意用 1.13 而不是编译期那个版本。
+# api-version 写高了，老一点的服务端会直接拒绝加载这个插件（"Unsupported api-version"）。
+# 我们只用 Bukkit 里十几年没变过的那部分 API，写 1.13 能让它在 1.18～1.21 全都加载得上。
+api-version: 1.13
+author: EnderBox
+description: 纯观察者插件，把服务器里的实时玩家状态写成文件供 EnderBox 面板读取
+website: https://github.com/
+# 不注册任何命令 —— 它不该出现在玩家的 /help 里，也不该被玩家触发
+commands: {}
+# 同理，不监听任何事件：混合端上事件冲突没人会帮我们查
+permissions:
+  enderbox.companion.read:
+    description: 读取（插件内部使用，玩家无需）
+    default: false

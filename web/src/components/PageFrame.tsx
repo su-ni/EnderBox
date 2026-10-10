@@ -24,14 +24,25 @@ function Boom(): never {
  */
 export function PageFrame({
   title,
+  pad,
   children,
 }: {
   title?: string
+  /** 4px 侧衬（px-1）。给「内容贴边 + 有 .panel 转角标」的页面用：
+      .panel 的 ::before/::after 转角标故意探出面板外缘 2px（设计稿如此），
+      页面贴住 main 左右缘时会被 overflow 裁切（右角竖笔画只剩 1px，左右不对称）。
+      4px 侧衬给转角留出探出的余量，肉眼不可辨。
+      ⚠ 依赖 @layer 顺序：px-1 是 utilities，必须能盖过 design.css 的 .main padding 简写。 */
+  pad?: boolean
   children: ReactNode
 }) {
   return (
     <ErrorBoundary title={title}>
-      <main className="anim-fade scroll-thin flex min-h-0 min-w-0 flex-col overflow-y-auto px-4 pt-4 pb-6 md:px-[26px] md:pt-5">
+      {/* 滚动容器。类名 .main 来自设计稿样式表（design.css）：
+          flex:1 + overflow:hidden auto + padding-bottom 50px（给底部健康条让位）。
+          ⚠ anim-fade 保留：入场只做 opacity，绝不能挂 transform ——
+            滚动容器上一旦有 transform 就会生成 containing block，把内部 sticky 的层搞崩。 */}
+      <main className={`main anim-fade${pad ? ' px-1' : ''}`}>
         {CRASH ? <Boom /> : children}
       </main>
     </ErrorBoundary>

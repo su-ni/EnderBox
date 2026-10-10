@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { IconWarn } from './Icons'
+import { Icon } from './design'
 
 /**
  * 错误边界：任何一个面板抛异常，都不该让整页变成白屏。
@@ -28,7 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(err: Error, info: ErrorInfo) {
     // 必须打到控制台：headless 截图和真机排查都靠它。
     // 静默吞掉异常比直接崩溃更难查。
-    console.error('[ServerBox] 界面部件渲染失败', err, info.componentStack)
+    console.error('[EnderBox] 界面部件渲染失败', err, info.componentStack)
     this.setState({ detail: info.componentStack ?? '' })
   }
 
@@ -44,10 +44,11 @@ export class ErrorBoundary extends Component<Props, State> {
     const tech = (err.stack || err.message || String(err)) + (detail ? `\n\n组件栈：${detail}` : '')
 
     return (
-      <div className="px-card min-w-0 p-6">
+      <div className="panel min-w-0" style={{ padding: 24 }}>
+        <i className="corner" />
         <div className="flex items-center gap-2.5">
           <span className="text-warn">
-            <IconWarn size={15} />
+            <Icon name="ban" size={15} />
           </span>
           <h2 className="text-[16px] leading-tight font-bold text-ink-1">
             {this.props.title ? `「${this.props.title}」这一块没能显示出来` : '这一块没能显示出来'}
@@ -63,7 +64,7 @@ export class ErrorBoundary extends Component<Props, State> {
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2.5">
-          <button type="button" className="btn btn-grass" onClick={this.reset}>
+          <button type="button" className="btn btn-primary" onClick={this.reset}>
             再试一次
           </button>
           <button type="button" className="btn btn-ghost" onClick={() => location.reload()}>
@@ -73,7 +74,20 @@ export class ErrorBoundary extends Component<Props, State> {
 
         <details className="mt-4">
           <summary className="cursor-pointer text-[12.5px] text-ink-3">技术细节</summary>
-          <pre className="mt-2 max-h-[240px] overflow-auto border-l-[3px] border-danger bg-[#1c1314] px-3.5 py-2.5 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap text-[#ffc2c2]">{tech}</pre>
+          <pre
+            className="nbox d"
+            style={{
+              marginTop: 8,
+              maxHeight: 240,
+              overflow: 'auto',
+              fontFamily: 'var(--f-term)',
+              fontSize: 14,
+              lineHeight: 1.5,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {tech}
+          </pre>
         </details>
       </div>
     )

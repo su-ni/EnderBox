@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ServerBox · 模组详情 · 前置安装</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-grass" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="12" fill="#7a5230"/><rect x="1" y="6" width="14" height="2" fill="#6b4420"/><rect x="1" y="2" width="14" height="4" fill="#5da832"/><rect x="1" y="2" width="14" height="2" fill="#74c23f"/><rect x="2" y="8" width="3" height="2" fill="#603c1c"/><rect x="9" y="9" width="4" height="2" fill="#603c1c"/><rect x="6" y="12" width="3" height="2" fill="#603c1c"/></symbol>
+<symbol id="i-table" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" fill="#6b4420"/><rect x="1" y="1" width="14" height="3" fill="#8b5a2b"/><rect x="1" y="1" width="14" height="1" fill="#ab713d"/><rect x="7" y="1" width="1" height="3" fill="#3f2a12"/><rect x="1" y="6" width="14" height="1" fill="#3f2a12"/><rect x="7" y="6" width="1" height="9" fill="#3f2a12"/></symbol>
+<symbol id="i-cmd" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" fill="#8a4a13"/><rect x="2" y="2" width="12" height="12" fill="#e08a3c"/><rect x="2" y="2" width="12" height="2" fill="#f0a556"/><rect x="4" y="5" width="2" height="2" fill="#8a4a13"/><rect x="10" y="5" width="2" height="2" fill="#8a4a13"/><rect x="7" y="7" width="2" height="3" fill="#8a4a13"/></symbol>
+<symbol id="i-jar" viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" fill="#c9742a"/><rect x="3" y="2" width="10" height="2" fill="#e08a3c"/><rect x="3" y="2" width="10" height="1" fill="#f0a556"/><rect x="5" y="6" width="6" height="5" fill="#8a4a13"/></symbol>
+<symbol id="i-chev-l" viewBox="0 0 16 16"><rect x="9" y="4" width="2" height="8" fill="currentColor"/><rect x="7" y="5" width="2" height="6" fill="currentColor"/><rect x="5" y="6" width="2" height="4" fill="currentColor"/><rect x="3" y="7" width="2" height="2" fill="currentColor"/></symbol>
+<symbol id="i-chev-r" viewBox="0 0 16 16"><rect x="5" y="4" width="2" height="8" fill="currentColor"/><rect x="7" y="5" width="2" height="6" fill="currentColor"/><rect x="9" y="6" width="2" height="4" fill="currentColor"/><rect x="11" y="7" width="2" height="2" fill="currentColor"/></symbol>
+<symbol id="i-dl" viewBox="0 0 16 16"><rect x="7" y="1" width="2" height="8" fill="currentColor"/><rect x="5" y="7" width="2" height="2" fill="currentColor"/><rect x="9" y="7" width="2" height="2" fill="currentColor"/><rect x="7" y="9" width="2" height="2" fill="currentColor"/><rect x="2" y="13" width="12" height="2" fill="currentColor"/></symbol>
+<symbol id="i-info" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="1" fill="currentColor"/><rect x="2" y="13" width="12" height="1" fill="currentColor"/><rect x="1" y="3" width="1" height="10" fill="currentColor"/><rect x="14" y="3" width="1" height="10" fill="currentColor"/><rect x="7" y="4" width="2" height="2" fill="currentColor"/><rect x="7" y="8" width="2" height="4" fill="currentColor"/></symbol>
+<symbol id="i-search" viewBox="0 0 16 16"><rect x="3" y="2" width="7" height="1" fill="currentColor"/><rect x="3" y="9" width="7" height="1" fill="currentColor"/><rect x="2" y="3" width="1" height="6" fill="currentColor"/><rect x="10" y="3" width="1" height="6" fill="currentColor"/><rect x="3" y="3" width="1" height="1" fill="currentColor"/><rect x="9" y="3" width="1" height="1" fill="currentColor"/><rect x="3" y="8" width="1" height="1" fill="currentColor"/><rect x="9" y="8" width="1" height="1" fill="currentColor"/><rect x="11" y="11" width="4" height="2" fill="currentColor"/><rect x="10" y="10" width="2" height="2" fill="currentColor"/></symbol>
+<symbol id="i-check" viewBox="0 0 16 16"><rect x="2" y="7" width="2" height="3" fill="currentColor"/><rect x="4" y="9" width="2" height="3" fill="currentColor"/><rect x="6" y="7" width="2" height="3" fill="currentColor"/><rect x="8" y="5" width="2" height="3" fill="currentColor"/><rect x="10" y="3" width="2" height="3" fill="currentColor"/><rect x="12" y="1" width="2" height="3" fill="currentColor"/></symbol>
+<symbol id="i-ban" viewBox="0 0 16 16"><rect x="5" y="1" width="6" height="2" fill="currentColor"/><rect x="5" y="13" width="6" height="2" fill="currentColor"/><rect x="3" y="3" width="2" height="2" fill="currentColor"/><rect x="1" y="5" width="2" height="6" fill="currentColor"/><rect x="13" y="5" width="2" height="6" fill="currentColor"/><rect x="11" y="3" width="2" height="2" fill="currentColor"/><rect x="3" y="11" width="2" height="2" fill="currentColor"/><rect x="11" y="11" width="2" height="2" fill="currentColor"/><rect x="5" y="5" width="2" height="2" fill="currentColor"/><rect x="7" y="7" width="2" height="2" fill="currentColor"/><rect x="9" y="9" width="2" height="2" fill="currentColor"/></symbol>
+<symbol id="i-heart" viewBox="0 0 16 16"><rect x="3" y="2" width="4" height="2" fill="currentColor"/><rect x="9" y="2" width="4" height="2" fill="currentColor"/><rect x="2" y="4" width="12" height="3" fill="currentColor"/><rect x="4" y="7" width="8" height="3" fill="currentColor"/><rect x="6" y="10" width="4" height="2" fill="currentColor"/><rect x="7" y="12" width="2" height="1" fill="currentColor"/></symbol>
+</defs></svg>
+
+<div class="atmos" aria-hidden="true"><div class="grid"></div><div class="glow-a"></div><div class="glow-b"></div><div class="vignette"></div></div>
+
+<div class="draftbar">
+  <b>SERVERBOX · 模组详情 · 前置安装</b>
+  <div class="sw" style="display:flex;gap:4px"><i style="background:#131920"></i><i style="background:#33d5cf"></i><i style="background:#e08a3c"></i></div>
+  <span style="font-size:12px;color:var(--ink-3)">本体自己装 · 前置必须你点一下才排队</span>
+  <div class="flownav" style="margin-left:auto">
+    <a href="index.html">面板</a><a href="wizard.html">新建向导</a><a href="market.html">整合包市场</a><a href="mod.html" class="on">模组详情</a><a href="login.html">登录页</a><a href="spec.html">设计规范</a>
+  </div>
+</div>
+
+<div class="app">
+  <div class="strata"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 16 16"><use href="#i-table"/></svg></div>
+      <div><div class="nm">SERVERBOX</div><div class="sub">模组详情</div></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="flownav"><a href="index.html">回面板</a></div>
+  </header>
+
+  <main class="main" style="padding-bottom:74px">
+    <div class="content" style="max-width:1240px">
+
+      <!-- 返回（照 ProjectShell 的 backLabel） -->
+      <button class="btn btn-ghost sm reveal" style="--rd:.02s" id="mBack" type="button"><svg class="pic"><use href="#i-chev-l"/></svg>返回搜索结果</button>
+
+      <!-- 头部：eyebrow MOD -->
+      <div class="sec-head reveal" style="--rd:.04s;margin-top:14px">
+        <span class="idx">MOD</span>
+        <h2>Just Enough Items (JEI)</h2>
+        <span class="sub">作者 mezz · 物品配方查询 · 项目 ID <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-2)">u6dRKJwZ</span></span>
+      </div>
+
+      <div class="grid-2" style="grid-template-columns:1fr 300px">
+        <div>
+          <!-- VERSION 段：只列这台服务器能用的 -->
+          <div class="panel reveal" style="--rd:.06s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--cyan)"><use href="#i-dl"/></svg>
+              <div>
+                <div class="eyebrow" style="font-size:10px">VERSION</div>
+                <h2 style="margin-top:2px">挑一个版本</h2>
+              </div>
+              <span style="font-size:12.5px;color:var(--ink-3)">只列出你这台服务器能用的（加载器与 MC 版本都对得上），装了必定生效</span>
+            </div>
+
+            <!-- MC 版本筛选芯片 -->
+            <div class="toolbar" style="border-bottom:0">
+              <span class="eyebrow" style="margin-right:4px">MC 版本</span>
+              <div class="filters">
+                <button class="chipf on" type="button">全部</button>
+                <button class="chipf" type="button">1.21.4</button>
+                <button class="chipf" type="button">1.21.1</button>
+                <button class="chipf" type="button">1.20.4</button>
+                <button class="chipf" type="button">1.20.1</button>
+              </div>
+              <div class="spacer" style="margin-left:auto"></div>
+              <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">24 个可用版本</span>
+            </div>
+
+            <!-- 版本行：每行带 release 标记 + 有前置 N -->
+            <div class="vlist">
+              <div class="vrow" style="grid-template-columns:150px 1fr auto auto">
+                <span class="ver">19.21.0.247</span>
+                <span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                  <span class="chip s g">正式版</span>
+                  <span style="font-size:12.5px;color:var(--ink-3)">NeoForge 21.1.72 · 1.21.4</span>
+                </span>
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">1.2M 下载</span>
+                <button class="btn btn-primary sm" type="button">安装</button>
+              </div>
+
+              <div class="vrow" style="grid-template-columns:150px 1fr auto auto">
+                <span class="ver">15.20.0.106</span>
+                <span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                  <span class="chip s g">正式版</span>
+                  <span class="chip s w">有前置 2</span>
+                  <span style="font-size:12.5px;color:var(--ink-3)">Forge 47.2.0 · 1.20.1</span>
+                </span>
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">980k 下载</span>
+                <button class="btn btn-primary sm" type="button">安装</button>
+              </div>
+              <!-- 有前置的那个版本：展开一条「这个版本要先装：」 -->
+              <div style="padding:10px 14px 12px 14px;background:rgba(242,193,78,.06);border-top:1px solid var(--line-1)">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <svg class="pic" style="color:var(--warn);flex:none"><use href="#i-info"/></svg>
+                  <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">这个版本要先装：</span>
+                  <button class="badge w" style="cursor:pointer;border-color:rgba(242,193,78,.55);color:var(--warn);background:rgba(242,193,78,.1)" type="button">Architectury API</button>
+                  <button class="badge w" style="cursor:pointer;border-color:rgba(242,193,78,.55);color:var(--warn);background:rgba(242,193,78,.1)" type="button">Bookshelf</button>
+                  <button class="btn btn-primary xs" style="margin-left:auto" id="openDeps" type="button">装前置 · 2 项</button>
+                </div>
+                <p style="font-size:12px;color:var(--ink-3);margin-top:7px;line-height:1.7">
+                  前置不会顺手静默装 —— 你点了「装前置」才进队列。点上面的名字可以跳到那个模组的详情。
+                </p>
+              </div>
+
+              <div class="vrow" style="grid-template-columns:150px 1fr auto auto">
+                <span class="ver">15.19.5.90</span>
+                <span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                  <span class="chip s">测试版</span>
+                  <span style="font-size:12.5px;color:var(--ink-3)">Forge 47.1.0 · 1.20.1</span>
+                </span>
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">412k 下载</span>
+                <button class="btn sm" type="button">安装</button>
+              </div>
+            </div>
+
+            <div class="con-foot">
+              <svg class="pic" style="color:var(--ink-3)"><use href="#i-info"/></svg>
+              装了必定生效 —— 不匹配的版本压根不会出现在这张表里
+            </div>
+          </div>
+
+          <!-- 空态示意（换个加载器时） -->
+          <div class="panel reveal" style="--rd:.1s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone"><svg class="pic" style="color:var(--warn)"><use href="#i-ban"/></svg><h2>没有可用版本时</h2></div>
+            <div style="padding:16px;font-size:13px;color:var(--ink-2)">
+              这个模组没有匹配当前加载器 / MC 版本的构建。换个版本，或者去别的站找找。
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧 rail：兼容性 / 分类 / 外链 / 详情 -->
+        <div class="detail-rail">
+          <div class="panel reveal" style="--rd:.08s;margin-bottom:0">
+            <i class="corner"></i>
+            <div style="padding:14px 16px">
+              <div class="rail-sec">
+                <h4>兼容性</h4>
+                <p class="eyebrow" style="font-size:10px;letter-spacing:.06em">加载器</p>
+                <div class="tags" style="margin-top:6px">
+                  <span class="badge wl">Fabric</span><span class="badge wl">Forge</span><span class="badge wl">NeoForge</span>
+                </div>
+                <p class="eyebrow" style="font-size:10px;letter-spacing:.06em;margin-top:12px">这台服务器能用的 MC</p>
+                <div class="tags" style="margin-top:6px">
+                  <span class="badge">1.21.4</span><span class="badge">1.21.1</span><span class="badge">1.20.4</span><span class="badge">1.20.1</span><span class="badge">1.19.4</span>
+                </div>
+                <p class="eyebrow" style="font-size:10px;letter-spacing:.06em;margin-top:12px">服务端支持</p>
+                <p style="font-size:12.5px;color:var(--ink-2);margin-top:5px">必需（客户端与服务端都要装）</p>
+              </div>
+              <div class="rail-sec" style="margin-top:16px">
+                <h4>分类</h4>
+                <div class="tags"><span class="badge">实用</span><span class="badge">信息</span><span class="badge">界面</span></div>
+              </div>
+              <div class="rail-sec" style="margin-top:16px">
+                <h4>外链</h4>
+                <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+                  <button class="btn btn-ghost xs" type="button">在源站上打开原页</button>
+                  <button class="btn btn-ghost xs" type="button">去 MC百科 查</button>
+                </div>
+              </div>
+              <div class="rail-sec" style="margin-top:16px">
+                <h4>详情</h4>
+                <div class="pol-foot" style="margin-top:0;border-top:0;padding-top:0">
+                  <div class="row"><span class="k">许可</span><span class="v">MIT</span></div>
+                  <div class="row"><span class="k">发布</span><span class="v">3 天前</span></div>
+                  <div class="row"><span class="k">下载</span><span class="v">58.2M</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ 装前置队列（弹窗 · 920 双列）══════ -->
+      <div class="sec-head reveal" style="--rd:.14s;margin-top:26px">
+        <span class="idx">DEPS</span>
+        <h2>装前置 · 共 2 项待处理</h2>
+        <span class="sub">两种来源：市场里点「装前置」带着 projectId；已装模组的依赖只有 modId，得先在市场里认项目</span>
+      </div>
+
+      <div class="reveal" style="max-width:960px">
+        <div class="dlg" style="max-width:none">
+          <div class="dlg-head">
+            <svg class="pic" style="color:var(--copper)"><use href="#i-table"/></svg>
+            <h2>装前置 · 共 2 项待处理</h2>
+            <div class="spacer" style="margin-left:auto"></div>
+            <button class="btn btn-ghost xs" type="button">关闭</button>
+          </div>
+          <div class="dlg-body">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+              <span class="badge wl">可安装 1 项</span>
+              <span class="mono-meta" style="font-size:12.5px;color:var(--ink-3)">每张卡装的是它当前选中的那一版，不是后台随手挑的最新版。</span>
+              <div class="spacer" style="margin-left:auto"></div>
+              <button class="btn btn-start sm" type="button">一键装选中的 1 项</button>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+              <!-- 卡 1：有 projectId，直接可选版本 -->
+              <div class="panel" style="margin-bottom:0">
+                <i class="corner"></i>
+                <div class="con-head tex-stone">
+                  <svg class="pic" style="color:var(--ok)"><use href="#i-check"/></svg>
+                  <h2 style="font-size:13.5px">Architectury API</h2>
+                  <div class="spacer" style="margin-left:auto"></div>
+                  <span class="badge wl">已确认项目</span>
+                </div>
+                <div style="padding:12px 14px">
+                  <p style="font-size:12.5px;color:var(--ink-3);line-height:1.7">来自市场点「装前置」，项目已知，直接在下面挑版本。</p>
+                  <div class="vlist" style="margin-top:10px;border:1px solid var(--line-1)">
+                    <div class="vrow on" style="grid-template-columns:1fr auto"><span class="ver">9.2.14</span><span class="fmeta">Forge · 1.20.1</span></div>
+                    <div class="vrow" style="grid-template-columns:1fr auto"><span class="ver">9.1.12</span><span class="fmeta">Forge · 1.20.1</span></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+                    <span style="font-size:12.5px;color:var(--ink-3)">将安装：<b style="color:var(--ink-1);font-family:var(--f-term);font-size:14px">9.2.14</b></span>
+                    <div class="spacer" style="margin-left:auto"></div>
+                    <button class="btn btn-primary sm" type="button">装这个</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 卡 2：只有 modId，先确认项目 -->
+              <div class="panel" style="margin-bottom:0">
+                <i class="corner"></i>
+                <div class="con-head tex-stone">
+                  <svg class="pic" style="color:var(--warn)"><use href="#i-search"/></svg>
+                  <h2 style="font-size:13.5px">bookshelf</h2>
+                  <div class="spacer" style="margin-left:auto"></div>
+                  <span class="badge w">待确认项目</span>
+                </div>
+                <div style="padding:12px 14px">
+                  <p style="font-size:12.5px;color:var(--ink-2);line-height:1.7">
+                    这个前置的 ID 是 <b style="font-family:var(--f-term);font-size:14px;color:var(--ink-1)">bookshelf</b>
+                    —— 那是模组自己写的内部名，不是市场里的项目。下面按名字在市场里找了一遍，
+                    <b style="color:var(--ink-1)">确认是哪个之后</b>再挑版本：
+                  </p>
+                  <div class="vlist" style="margin-top:10px;border:1px solid var(--line-1)">
+                    <div class="vrow" style="grid-template-columns:1fr auto"><span class="ver" style="font-family:var(--f-body);font-size:13px">Bookshelf</span><span class="fmeta">1.20.1 · 12.4M</span></div>
+                    <div class="vrow" style="grid-template-columns:1fr auto"><span class="ver" style="font-family:var(--f-body);font-size:13px">Bookshelf Lib</span><span class="fmeta">1.19.2 · 210k</span></div>
+                  </div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:10px">没确认项目的卡不能被一键装（还没有可选版本），但也留着 —— 不然你连它缺什么都不知道。</p>
+                  <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+                    <span style="font-size:12.5px;color:var(--ink-3)">将安装：<b style="color:var(--ink-3);font-family:var(--f-term);font-size:14px">—</b></span>
+                    <div class="spacer" style="margin-left:auto"></div>
+                    <button class="btn sm" type="button" disabled>装这个</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="dlg-foot">
+            <div class="spacer" style="margin-left:auto"></div>
+            <button class="btn btn-ghost" type="button">稍后再说</button>
+            <button class="btn btn-start" type="button">全部装完</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <div class="hud tex-dirt">
+    <div class="hp">
+      <span class="lb">健康</span>
+      <div class="hearts">
+        <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+        <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+        <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+        <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+        <svg class="heart" style="color:var(--bad)"><use href="#i-heart"/></svg>
+        <svg class="heart" style="color:#2a333d"><use href="#i-heart"/></svg>
+      </div>
+      <span style="font-family:var(--f-term);font-size:15px;color:var(--ink-2)">5/6</span>
+    </div>
+    <div class="xpzone">
+      <div class="lvbox"><span class="lv">19.9</span></div>
+      <div class="xpbar"><div class="fill" style="width:64%"></div></div>
+      <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.08em;color:var(--ink-3)">活跃度 · TPS</span>
+    </div>
+    <div class="f3"><span>模组详情</span><span class="blink">● LIVE</span></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict'
+  var back = document.getElementById('mBack')
+  if (back) back.addEventListener('click', function () { location.href = 'market.html' })
+  Array.prototype.forEach.call(document.querySelectorAll('.filters'), function (g) {
+    g.addEventListener('click', function (e) {
+      var b = e.target.closest('.chipf'); if (!b) return
+      Array.prototype.forEach.call(g.querySelectorAll('.chipf'), function (x) { x.classList.remove('on') })
+      b.classList.add('on')
+    })
+  })
+  Array.prototype.forEach.call(document.querySelectorAll('.vrow'), function (v) {
+    v.addEventListener('click', function (e) {
+      if (e.target.closest('button')) return
+      Array.prototype.forEach.call(v.parentNode.querySelectorAll('.vrow'), function (x) { x.classList.remove('on') })
+      v.classList.add('on')
+    })
+  })
+  /* 「装前置」把队列滚到视野里（真机上是开弹层） */
+  var od = document.getElementById('openDeps')
+  if (od) od.addEventListener('click', function () {
+    var el = document.querySelector('.dlg')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+})()
+</script>
+</body>
+</html>

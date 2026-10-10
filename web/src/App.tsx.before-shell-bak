@@ -1,0 +1,1050 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { api, PreflightBlocked, type AuthStatus, type Preflight } from './api'
+import { BackupPanel } from './components/BackupPanel'
+import { ConfigPanel } from './components/ConfigPanel'
+import { ConnectionBanner } from './components/ConnectionBanner'
+import { CrashPanel } from './components/CrashPanel'
+import { FileManager } from './components/FileManager'
+import { CreateWizard } from './components/CreateWizard'
+import { Bubbles, DownloadPanel } from './components/DownloadCenter'
+import { useDownloadFeed, type Toast } from './useDownloadFeed'
+import { ModpackDetail } from './components/ModpackDetail'
+import { ModpackMarket } from './components/ModpackMarket'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { PageFrame } from './components/PageFrame'
+import { ConfirmDialog, Skeleton, ToggleRow } from './components/ui'
+import {
+  IconArchive,
+  IconBlock,
+  IconFolder,
+  IconGear,
+  IconInfo,
+  IconKill,
+  IconMenu,
+  IconPlay,
+  IconPlus,
+  IconRefresh,
+  IconSave,
+  IconStop,
+  IconTrash,
+  IconTypeBlock,
+  IconUsers,
+} from './components/Icons'
+import { LoginScreen } from './components/LoginScreen'
+import { LogConsole } from './components/LogConsole'
+import { HudBar } from './components/HudBar'
+import { MetricBand } from './components/MetricBand'
+import { ModpackPanel } from './components/ModpackPanel'
+import { PlayersPanel } from './components/PlayersPanel'
+import { PluginsPanel } from './components/PluginsPanel'
+import { PreflightPanel } from './components/PreflightPanel'
+import { SettingsPanel } from './components/SettingsPanel'
+import { TasksPanel } from './components/TasksPanel'
+import { WorldList } from './components/WorldList'
+import { STATUS_COLOR, STATUS_LABEL, serverLabel, formatUptime, type Instance, type Metrics } from './types'
+// 截图/调试开关：带 ?nosse=1 时不建立 SSE 长连接，否则 headless 截图会被长连接卡死
+const PARAMS = new URLSearchParams(location.search)
+const NOSSE = PARAMS.has('nosse')
+// 支持直接打开新建向导 / 直接进某一页（刷新不丢位置，也方便截图核对）
+const START_CREATE = PARAMS.get('view') === 'create'
+const START_MARKET = PARAMS.get('view') === 'market'
+// 直接以抽屉打开状态启动：手机上抽屉是交互态，截图工具点不了，只能靠参数
+const START_DRAWER = PARAMS.has('drawer')
+// 直接以「下载与安装」台账打开态启动。和 ?drawer=1 同一个套路：这是个藏在一次点击后的界面，
+// 无头浏览器点不了按钮，想核对它长什么样只能从 URL 进。
+const START_DL = PARAMS.has('dl')
+// 对话框同理 —— 无头浏览器点不了「删除」按钮，想核对弹窗长什么样只能从 URL 进。
+// 和 ?drawer=1 / ?restore=1 是同一个套路。?dialog=delete&files=1 能连勾选态一起截。
+const START_DIALOG = PARAMS.get('dialog') ?? ''
+
+const PAGES = [
+  { k: 'home', label: '概览' },
+  { k: 'players', label: '玩家' },
+  { k: 'config', label: '配置' },
+  { k: 'plugins', label: '插件与模组' },
+  { k: 'modpack', label: '整合包' },
+  { k: 'files', label: '文件' },
+  { k: 'backup', label: '备份与还原' },
+  { k: 'tasks', label: '计划任务' },
+  { k: 'settings', label: '设置' },
+] as const
+type Page = (typeof PAGES)[number]['k']
+
+function initialPage(): Page {
+  const p = PARAMS.get('page')
+  return PAGES.some((x) => x.k === p) ? (p as Page) : 'home'
+}
+
+const POLL_MS = 3000
+const HISTORY = 60
+
+export default function App() {
+  const [instances, setInstances] = useState<Instance[]>([])
+  const [activeId, setActiveId] = useState('')
+  const [logs, setLogs] = useState<string[]>([])
+  const [metrics, setMetrics] = useState<Metrics | null>(null)
+  const [histCpu, setHistCpu] = useState<number[]>([])
+  const [histMem, setHistMem] = useState<number[]>([])
+  const [online, setOnline] = useState(false)
+  /* 有没有问过第一遍。没这个标记的话，页面刚打开那一瞬间会先闪一下「连不上」——
+     首屏就报错是最伤信任的形态。 */
+  const [probed, setProbed] = useState(false)
+  /* 上一次「确认断开」没有。判据不能直接用 online —— 它的初值是 false，
+     首次成功加载会被误判成「从断开恢复」，于是刚打开面板就弹一句
+     「已重新连上守护进程」（根本没断过）。必须用「问过 + 没连上」。 */
+  const prevDown = useRef(false)
+  // 'market' = 整合包市场。它和 'create' 是同级的两条「开新服」入口：
+// 一个是自己配类型/版本，一个是直接从市场挑整合包。两者都不属于任何已有实例。
+  // 'market' = 整合包市场（列表），**'pack' = 某个包的详情页**。
+  // 市场这一屏只负责「搜得到、筛得准」，「选版本 / 预览 / 安装」都在详情那一页 ——
+  // 以前它们就地摊在列表下面，用户点一个包之后根本不知道变化发生在哪里。
+  // ⚠ START_MARKET 与 START_PACK 的先后：深链 ?view=market&pk=x 会同时满足两者，
+  // 必须让 pk 赢，否则深链落回列表页，看着像「链接失效」。
+  const [view, setView] = useState<'board' | 'create' | 'market' | 'pack'>(
+    START_CREATE ? 'create' : PARAMS.get('pk') ? 'pack' : START_MARKET ? 'market' : 'board',
+  )
+  // 详情页看的是哪个包（项目 id 或 slug）。从市场点进来时由列表填，
+  // 深链时直接由 URL 的 ?pk= 给 —— 这一页因此能被分享和刷新，不是某种内部状态。
+  const [packId, setPackId] = useState(() => PARAMS.get('pk') ?? '')
+  const [page, setPage] = useState<Page>(initialPage)
+  // 「文件」页当前目录。存在这里而不是组件内部：从模组页点「打开文件夹」
+  // 要能直接定位进去，而不是先落到根目录再让用户自己找。
+  const [filesPath, setFilesPath] = useState(PARAMS.get('path') ?? '')
+  const [drawer, setDrawer] = useState(START_DRAWER)
+  /**
+   * 气泡通知。**是一列不是一条**：下载进度和「世界建好了」这类提示会同时发生，
+   * 单条字符串的写法会让后一条把前一条顶掉 —— 用户就再也不知道刚才那条说了什么。
+   */
+  const [toasts, setToasts] = useState<Toast[]>([])
+  // 打开「下载与安装」台账（侧栏入口 / ?dl=1 深链）
+  const [dlOpen, setDlOpen] = useState(START_DL)
+  // null = 还没问出来；问出来之后才知道要不要弹登录界面。
+  // 不能默认「已登录」—— 那样开着保护的部署会先闪一下完整界面再被踢回登录页。
+  const [auth, setAuth] = useState<AuthStatus | null>(null)
+  // 启动前体检：只在实例停下时才刷，跑起来的实例查它没意义（还白拉几次 JVM 探测）
+  const [preflight, setPreflight] = useState<Preflight | null>(null)
+  const [fixing, setFixing] = useState('')
+  const [starting, setStarting] = useState(false)
+  // 删除确认框。用应用内对话框而不是 window.confirm —— 后者没地方放
+  // 「同时删除世界文件」这个选项，而用户明确抱怨过这一点。
+  const [deleteOpen, setDeleteOpen] = useState(START_DIALOG === 'delete')
+  const [deleteFiles, setDeleteFiles] = useState(START_DIALOG === 'delete' && PARAMS.has('files'))
+  const [killOpen, setKillOpen] = useState(START_DIALOG === 'kill')
+
+  const refresh = useCallback(async () => {
+    try {
+      const data = await api.listInstances()
+      const list = data ?? []
+      setInstances(list)
+      setOnline(true)
+      setActiveId((prev) => (list.some((i) => i.id === prev) ? prev : (list[0]?.id ?? '')))
+    } catch {
+      setOnline(false)
+    } finally {
+      setProbed(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    refresh()
+    const t = setInterval(refresh, POLL_MS)
+    return () => clearInterval(t)
+  }, [refresh])
+
+  // 断→通的时候说一声。只报「坏了」不报「好了」，用户会一直以为还断着，
+  // 然后继续点一堆注定失败的按钮。
+  useEffect(() => {
+    const down = probed && !online
+    const wasDown = prevDown.current
+    prevDown.current = down
+    if (wasDown && !down) setToast('已重新连上守护进程')
+  }, [online, probed])
+
+  // 指标轮询：只采当前选中的实例；峰值在客户端攒，后端不存历史
+  useEffect(() => {
+    setMetrics(null)
+    setHistCpu([])
+    setHistMem([])
+    if (!activeId) return
+
+    let alive = true
+    const tick = async () => {
+      try {
+        const m = await api.metrics(activeId)
+        if (!alive) return
+        setMetrics(m)
+        setHistCpu((h) => [...h, m.cpu].slice(-HISTORY))
+        setHistMem((h) => [...h, m.memUsed].slice(-HISTORY))
+      } catch {
+        /* 单次采样失败不打扰用户，下个周期重试 */
+      }
+    }
+    tick()
+    const t = setInterval(tick, POLL_MS)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [activeId])
+
+  // 日志流
+  useEffect(() => {
+    if (!activeId) return
+    setLogs([])
+    if (NOSSE) {
+      api.logHistory(activeId).then(setLogs).catch(() => {})
+      return
+    }
+    const es = new EventSource(`/api/instances/${activeId}/logs`)
+    es.onmessage = (e) => {
+      const line = JSON.parse(e.data) as string
+      setLogs((prev) => (prev.length > 3000 ? [...prev.slice(-2000), line] : [...prev, line]))
+    }
+    return () => es.close()
+  }, [activeId])
+
+  const checkAuth = useCallback(async () => {
+    try {
+      setAuth(await api.authStatus())
+    } catch {
+      // 问不到状态（守护进程没起来之类）就不要拦着 —— 后面每个请求自己会报错，
+      // 在这里假装「需要登录」只会让人以为密码打错了。
+      setAuth(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
+
+  // 会话过期时 api 层会广播一下，这里重新问一遍状态，界面自然切回登录页
+  useEffect(() => {
+    const h = () => checkAuth()
+    window.addEventListener('sbx-need-auth', h)
+    return () => window.removeEventListener('sbx-need-auth', h)
+  }, [checkAuth])
+
+  /**
+   * 弹一条气泡通知。
+   *
+   * 保留 `setToast(字符串)` 这个签名：调用点有二十多处，为了「支持多条」让每处都改一遍
+   * 纯属自找麻烦 —— 该变的是**承载它的东西**（一列 vs 一条），不是每个调用方。
+   * 自动消失交给这里，不给每个调用点配上「几秒后清掉」。
+   */
+  const toastSeq = useRef(0)
+  const setToast = useCallback((msg: string) => {
+    if (!msg) return
+    const id = ++toastSeq.current
+    // 只留最近 4 条：一次刷出来的通知太多会把右下角糊满，反而看不到进度气泡。
+    setToasts((t) => [...t.slice(-3), { id, text: msg }])
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000)
+  }, [])
+  const dismissToast = useCallback((id: number) => {
+    setToasts((t) => t.filter((x) => x.id !== id))
+  }, [])
+
+  const active = instances.find((i) => i.id === activeId)
+  const activeStatus = active?.status
+
+  const runPreflight = useCallback(async () => {
+    if (!activeId) return
+    try {
+      setPreflight(await api.preflight(activeId))
+    } catch {
+      setPreflight(null)
+    }
+  }, [activeId])
+
+  // 只在实例处于「停着」的状态下体检。跑着的时候既没意义，又白拉几次 java -version 探测。
+  // 依赖里放 status 而不是整个 active：轮询每 3 秒换一个新对象，放进去会变成每 3 秒体检一次。
+  useEffect(() => {
+    setPreflight(null)
+    if (!activeId) return
+    if (activeStatus === 'stopped' || activeStatus === 'crashed') runPreflight()
+  }, [activeId, activeStatus, runPreflight])
+
+  /* 下载/安装结束的信号。用它触发一次复查 —— 「一键补齐服务端文件」下完之后，
+     那条「缺少服务端文件」得自己消失，不能等用户再点一下「重新检查」。 */
+  const [settleTick, setSettleTick] = useState(0)
+  const onDownloadsSettled = useCallback(() => {
+    refresh()
+    setSettleTick((n) => n + 1)
+  }, [refresh])
+
+  // 后台在跑什么（下载任务 + 整合包作业）。**挂在最外层**：这些任务跑在后端，
+  // 生命周期跟页面上哪个组件活着无关 —— 放在某一页里，切走就再也看不到进度了。
+  const feed = useDownloadFeed(instances)
+  const runningTasks = feed.items.filter((i) => i.running).length
+  // 有东西结束就去刷新实例列表 + 重跑体检。用 effect 而不是在轮询回调里调 ——
+  // 轮询那边的 setState 会触发重渲染，直接在回调里动 refresh 容易打成环。
+  useEffect(() => {
+    if (feed.settledTick === 0) return
+    onDownloadsSettled()
+  }, [feed.settledTick, onDownloadsSettled])
+
+  useEffect(() => {
+    if (settleTick === 0) return
+    if (activeId && (activeStatus === 'stopped' || activeStatus === 'crashed')) runPreflight()
+    // activeStatus 故意不放进依赖：它每 3 秒轮询就可能换一次，放进去会变成持续体检
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settleTick])
+
+  const applyFix = async (code: string) => {
+    setFixing(code)
+    try {
+      const r = await api.applyFix(activeId, code)
+      setPreflight(r.preflight)
+      if (r.task) {
+        // 下载是后台任务：文件还没落地，这一刻的体检当然还是不过。
+        // 所以既不能说「修好了」，也不能说「还有别的要先解决」—— 那是另外一回事。
+        setToast('正在下载服务端文件，进度在右下角的气泡里；下完会自动再体检一次')
+      } else {
+        setToast(r.preflight.ok ? '修好了，可以开服了' : '这一步处理完了，还有别的要先解决')
+      }
+    } catch (e) {
+      setToast((e as Error).message)
+    } finally {
+      setFixing('')
+    }
+  }
+
+  const goto = (p: Page) => {
+    setPage(p)
+    const u = new URL(location.href)
+    if (p === 'home') u.searchParams.delete('page')
+    else u.searchParams.set('page', p)
+    // 目录只属于「文件」页，别的页带着它没有意义；回到「文件」页时补上上次的位置
+    if (p === 'files' && filesPath) u.searchParams.set('path', filesPath)
+    else u.searchParams.delete('path')
+    u.searchParams.delete('view')
+    history.replaceState(null, '', u)
+  }
+
+  /** 从别处跳进「文件」页并定位到某个目录（模组页的「打开文件夹」用的就是它） */
+  const openFiles = useCallback((p: string) => {
+    setFilesPath(p)
+    setPage('files')
+    const u = new URL(location.href)
+    u.searchParams.set('page', 'files')
+    if (p) u.searchParams.set('path', p)
+    else u.searchParams.delete('path')
+    u.searchParams.delete('view')
+    history.replaceState(null, '', u)
+  }, [])
+
+  /** 在「文件」页里换目录：状态和地址栏一起更新 —— 刷新、分享都能回到同一个位置 */
+  const changeFilesPath = useCallback((p: string) => {
+    setFilesPath(p)
+    const u = new URL(location.href)
+    if (p) u.searchParams.set('path', p)
+    else u.searchParams.delete('path')
+    history.replaceState(null, '', u)
+  }, [])
+
+  const running = active?.status === 'running'
+
+  // 「能不能连文件一起删」和「用户勾没勾」是两件事，必须分开算。
+  // 合成一个的话，运行中打开对话框就会看到「勾选框禁用、却显示成开」的鬼状态，
+  // 确认键还写着「删除并清空文件」—— 明明删不掉，界面却在答应你。
+  // （实例跑着时不能删文件：存档正被 JVM 按自己的节奏写。）
+  const canWipeFiles = !!active && !running && active.status !== 'starting'
+
+  const act = async (verb: 'start' | 'stop' | 'kill') => {
+    if (!activeId) return
+    if (verb === 'start') {
+      // 点「启动」先体检：有问题就把清单摆出来，别让用户对着一段 Java 英文报错发呆。
+      // 后端也会在 start 里再查一次（那是权威），这里只为提前一步、少一次失败往返。
+      setStarting(true)
+      try {
+        const r = await api.preflight(activeId)
+        setPreflight(r)
+        if (!r.ok) {
+          setStarting(false)
+          return
+        }
+      } catch {
+        /* 体检本身失败不拦着启动，让后端去报真正的错 */
+      }
+      setStarting(false)
+    }
+    try {
+      await api.action(activeId, verb)
+      refresh()
+      if (verb === 'start') runPreflight()
+    } catch (e) {
+      // 后端在 start 里挡住了：把报告直接铺到界面上
+      if (e instanceof PreflightBlocked) setPreflight(e.report)
+      setToast((e as Error).message)
+    }
+  }
+
+  const send = async (cmd: string) => {
+    if (!activeId) return
+    try {
+      await api.sendCommand(activeId, cmd)
+    } catch (e) {
+      setToast((e as Error).message)
+    }
+  }
+
+  const doRemove = async () => {
+    if (!active) return
+    const name = active.name
+    const wipe = deleteFiles && canWipeFiles
+    try {
+      await api.removeInstance(active.id, wipe)
+      setDeleteOpen(false)
+      setActiveId('')
+      setLogs([])
+      // 说清楚到底删了什么。用户最怕的是「我以为只删了配置」或者「我以为文件也没了」，
+      // 而这两种理解都会让他做出错误的下一步。
+      setToast(
+        wipe ? `「${name}」已删除，磁盘上的目录也一并清空了` : `「${name}」已从列表移除，目录仍保留在磁盘上`,
+      )
+      refresh()
+    } catch (e) {
+      setToast((e as Error).message)
+    }
+  }
+
+  const peakCpu = histCpu.length ? Math.max(...histCpu) : 0
+  const peakMem = histMem.length ? Math.max(...histMem) : 0
+
+  // 侧栏单独包边界：世界列表崩了不该把整个面板带走 ——
+  // 它是「切到别处去」的最后一条退路。
+  const side = (extra?: { onClose: () => void }) => (
+    <ErrorBoundary title="世界列表">
+      <WorldList
+        instances={instances}
+        activeId={activeId}
+        downloads={runningTasks}
+        onDownloads={() => {
+          setDlOpen(true)
+          setDrawer(false)
+        }}
+        onSelect={(id) => {
+          setActiveId(id)
+          setView('board')
+          setDrawer(false)
+        }}
+        onNew={() => {
+          setView('create')
+          setDrawer(false)
+        }}
+        onMarket={() => {
+          setView('market')
+          setDrawer(false)
+        }}
+        onImported={(id) => {
+          setActiveId(id)
+          setView('board')
+          setDrawer(false)
+          refresh()
+          setToast('已把这个目录纳管进来 —— 点「启动」就能开服')
+        }}
+        {...extra}
+      />
+    </ErrorBoundary>
+  )
+
+  // 开了访问保护又没通过验证 → 只给登录界面。
+  // 放在这里是刻意的：整个面板的任何数据都不该在未验证时被请求出去。
+  if (auth?.requireAuth && !auth.authenticated) {
+    return (
+      <LoginScreen
+        hint={auth.isLoopback ? '' : '本机访问默认免密码，密码对不上就去那台机器上打开面板重设'}
+        onDone={checkAuth}
+      />
+    )
+  }
+
+  return (
+    <div className="app">
+      {/* 地表色带：设计稿压在顶栏上方的那 5px 草/土层横条 */}
+      <div className="strata" />
+
+      {/* 顶栏：品牌 + 连接状态 + 两个全局动作。结构照设计稿。
+          移动端的「世界」按钮是 .only-mobile（≤1180px 才出现）。 */}
+      <header className="topbar">
+        <button
+          type="button"
+          className="btn btn-ghost icon only-mobile"
+          onClick={() => setDrawer(true)}
+          aria-label="打开世界列表"
+        >
+          <IconMenu size={13} />
+        </button>
+        <div className="brand">
+          <div className="mark">
+            <IconBlock size={16} />
+          </div>
+          <div>
+            <div className="nm">SERVERBOX</div>
+            <div className="sub">MC 服务器管理面板</div>
+          </div>
+        </div>
+        <div className="spacer" />
+        <div className="conn">
+          <span className="pulse-dot" />
+          {online ? '守护进程已连接' : '未连接'}
+        </div>
+        <button type="button" className="btn btn-ghost sm" onClick={refresh}>
+          <IconRefresh size={12} />
+          刷新
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary sm"
+          onClick={() => {
+            setView('create')
+            setDrawer(false)
+          }}
+        >
+          <IconPlus size={12} />
+          新建世界
+        </button>
+      </header>
+
+      <ConnectionBanner down={probed && !online} onRetry={refresh} />
+
+      {/* 下载/安装的进度气泡与台账，都跟页面无关，必须挂在最外层 ——
+          这些任务跑在后端，放进某一页的话，切走就再也找不回来了。
+          气泡只留**进行中**的：跑完的留在台账里，否则它们会永远挂在右下角消不掉。 */}
+      <Bubbles
+        // 台账开着时不画气泡：同一个进度在两处各显示一遍，
+        // 而且气泡是 z-50、抽屉是 z-auto，它们会**叠在抽屉上面**，看着像抽屉坏了。
+        // 文字通知不受影响 —— 那是另一回事，随时应该说。
+        items={dlOpen ? [] : feed.items}
+        toasts={toasts}
+        onDismiss={dismissToast}
+        onOpenInstance={(id) => {
+          setActiveId(id)
+          setView('board')
+        }}
+        onCancel={(it) => {
+          feed.cancel(it).then(
+            () => setToast(`已取消：${it.label}`),
+            (e: Error) => setToast(e.message),
+          )
+        }}
+      />
+      <DownloadPanel
+        open={dlOpen}
+        items={feed.items}
+        onClose={() => setDlOpen(false)}
+        onOpenInstance={(id) => {
+          setDlOpen(false)
+          setActiveId(id)
+          setView('board')
+        }}
+        onCancel={(it) => {
+          feed.cancel(it).then(
+            () => setToast(`已取消：${it.label}`),
+            (e: Error) => setToast(e.message),
+          )
+        }}
+      />
+
+      {/* 底部健康条：常驻贯穿所有页面（指标带只在概览页、一滚就没）。
+          它是 fixed 定位，位置放这儿只是归类；主区靠 pb-[var(--hud-h)] 给它让位。 */}
+      {active && (
+        <HudBar
+          metrics={metrics}
+          report={preflight}
+          port={active.port}
+          name={active.name}
+          status={active.status}
+        />
+      )}
+
+      <div className="shell">
+      {/* 桌面侧栏：常驻（≥1181px）。类名 .only-desktop 在 design-overrides.css 里定义 ——
+          设计稿只有 .only-mobile，没有反向的类。 */}
+      <div className="only-desktop">{side()}</div>
+
+      {/* 移动抽屉：侧栏在手机上会吃掉半屏，收进抽屉里 */}
+      {drawer && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/70 md:hidden"
+            onClick={() => setDrawer(false)}
+            aria-hidden="true"
+          />
+          <div className="fixed inset-y-0 left-0 z-50 flex w-[264px] max-w-[84vw] border-r-[3px] border-black md:hidden">
+            {side({ onClose: () => setDrawer(false) })}
+          </div>
+        </>
+      )}
+
+      {view === 'create' ? (
+        <ErrorBoundary title="新建向导" onReset={() => setView('board')}>
+          <CreateWizard
+            onDone={(newId) => {
+              setView('board')
+              if (newId) setActiveId(newId)
+              refresh()
+              setToast('世界建好了 —— 把服务端 jar 放进实例目录，然后点「启动」')
+            }}
+            onCancel={() => setView('board')}
+            onError={setToast}
+          />
+        </ErrorBoundary>
+      ) : view === 'market' ? (
+        // 整合包市场。不套 ErrorBoundary —— PageFrame 里已经有一个了，套两层的话
+        // 内层崩了外层接不到，用户看到的是「整合包市场」这块空白而不是可恢复的错误块。
+        <ModpackMarket
+          onOpenPack={(id) => {
+            setPackId(id)
+            setView('pack')
+            // 把 ?pk= 写回 URL：刷新能停在同一个包上，链接也能发给别人。
+            // 不写的话刷新会掉回列表 —— 刚看过一半的包找不回来，等于刚翻书就被抽走。
+            const u = new URL(location.href)
+            u.searchParams.set('view', 'market')
+            u.searchParams.set('pk', id)
+            // 新点的包一律从「介绍」进：上一次看的那个包停在「下载」页，不该带到这一个上。
+            u.searchParams.delete('ptab')
+            history.replaceState(null, '', u)
+          }}
+          onCancel={() => setView('board')}
+        />
+      ) : view === 'pack' ? (
+        // 某个包的详情页。它自己也带 PageFrame（含错误边界），同理不额外套一层。
+        <ModpackDetail
+          // key 带上 project：换包就整块重挂载。详情页那一屏的状态（选中版本、预览结果、
+          // 安装作业）全是「属于某个包」的，靠组件内部去逐一清理迟早漏掉一个。
+          key={packId}
+          project={packId}
+          onBack={() => {
+            setView('market')
+            // 顺手把 ?pk= 摘掉：留在 URL 里的话刷新会莫名回到详情页，
+            // 而用户此刻的意图明明是「我在看列表」。
+            const u = new URL(location.href)
+            u.searchParams.delete('pk')
+            // 详情页的页内分页参数也要一起摘掉 —— 留着的话下次点进另一个包会直接落在
+            // 「下载」页上，而用户的动作是「从列表挑一个新的」，不是「去下载」。
+            u.searchParams.delete('ptab')
+            u.searchParams.set('view', 'market')
+            history.replaceState(null, '', u)
+          }}
+          onOpenInstance={(id) => {
+            setActiveId(id)
+            setView('board')
+          }}
+          // 实例受理那一刻就刷新列表：左边立刻能看见这个世界，而不是等装完才出现
+          onInstanceCreated={refresh}
+          onToast={setToast}
+        />
+      ) : (
+        <PageFrame key={page} title={active?.name}>
+          {/*
+            导航栏：移动端汉堡 + 页面 tab。
+            「当前世界的身份」也放在这一条里 —— 它是贯穿所有页面的信息，
+            放在内容区顶部的话一滚就看不见了。
+          */}
+          {/*
+            第一排＝「我在操作谁」+ 页面 tab，两个都在最上面一行。
+            以前身份信息被挤到 tab 下面单独一行，离顶上差了一大截 ——
+            它是贯穿所有页面的信息，就得跟 tab 平起平坐、贴着顶。
+          */}
+          <div className="mb-3 border-b-[3px] border-black pb-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm md:hidden"
+                onClick={() => setDrawer(true)}
+                aria-label="打开世界列表"
+              >
+                <IconMenu size={13} />
+                世界
+              </button>
+
+              {active && (
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <IconTypeBlock type={active.type} size={16} />
+                  <span className="min-w-0 truncate text-[13.5px] font-bold text-ink-1">
+                    {active.name}
+                  </span>
+                  <span className="inline-flex shrink-0 items-center gap-1.5 text-[12px] text-ink-2">
+                    <span
+                      className="block h-2 w-2"
+                      style={{ background: STATUS_COLOR[active.status] }}
+                    />
+                    {STATUS_LABEL[active.status]}
+                  </span>
+                  <span className="mono-value shrink-0">
+                    {serverLabel(active).toUpperCase()} {active.mcVersion}
+                  </span>
+                </div>
+              )}
+
+              {/* 生命周期操作放身份头右侧（设计稿如此）。它回答的是「对这个世界做什么」，
+                  和页签（看哪一页）不是一类东西 —— 混在同一行里最容易误点「删除」。 */}
+              {active && (
+                <div className="world-actions">
+                  {running || active.status === 'starting' ? (
+                    <>
+                      <button type="button" className="btn btn-sm" onClick={() => act('stop')}>
+                        <IconStop size={12} />
+                        停止
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        onClick={() => setKillOpen(true)}
+                      >
+                        <IconKill size={12} />
+                        强制结束
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-grass btn-sm"
+                      disabled={active.status === 'stopping' || starting}
+                      onClick={() => act('start')}
+                    >
+                      <IconPlay size={13} />
+                      {active.status === 'stopping' ? '停止中…' : starting ? '检查中…' : '启动'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setDeleteFiles(false)
+                      setDeleteOpen(true)
+                    }}
+                  >
+                    <IconTrash size={12} />
+                    删除
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 世界身份徽记行：端口 / 内存 / PID / 已运行。
+                设计稿把这几项收在标题下面一行 —— 扫一眼就知道「这台服什么配置、跑了多久」，
+                不用翻到别处。取不到的（停止态没有 PID 和时长）显示「—」，不编。 */}
+            {active && (
+              <div className="world-meta">
+                <span className="kv">
+                  端口 <b>{active.port}</b>
+                </span>
+                <span className="kv">
+                  内存 <b>{active.maxMem} MB</b>
+                </span>
+                <span className="kv">
+                  PID <b>{metrics?.pid ? metrics.pid : '—'}</b>
+                </span>
+                <span className="kv">
+                  已运行 <b>{running && metrics ? formatUptime(metrics.uptimeSec) : '—'}</b>
+                </span>
+              </div>
+            )}
+
+            {/* 路径长，单独一行；鼠标悬停看全称，不撑破版心 */}
+            {active && (
+              <p className="mono-meta mt-1 truncate" title={active.dir}>
+                {active.dir}
+              </p>
+            )}
+
+            {/* 页签单独一行。设计稿就是两行头：上一行「我在操作谁」，下一行「看哪一页」。
+                以前跟世界名挤在同一行，名字一长就把页签顶走，用户找不到导航。 */}
+            <div className="mt-3 flex min-w-0 flex-wrap gap-2">
+              {PAGES.map((p) => {
+                const on = page === p.k
+                return (
+                  <button
+                    key={p.k}
+                    type="button"
+                    aria-current={on}
+                    onClick={() => goto(p.k)}
+                    className={`nav-pill${on ? ' on' : ''}`}
+                  >
+                    {p.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {page === 'settings' && <SettingsPanel instances={instances} onToast={setToast} />}
+
+          {/* 还没问过第一遍时是第三种状态：既不是「没有世界」也不是「连不上」。
+              以前这里直接按 online=false 渲染成「连不上守护进程」—— 首屏就谎报故障。 */}
+          {page !== 'settings' && !active && !probed && (
+            <div className="px-card flex flex-1 flex-col justify-center gap-3 p-8">
+              <h1 className="text-[20px] font-bold text-ink-1">正在连接守护进程…</h1>
+              <div className="max-w-[320px]">
+                <Skeleton h={10} />
+              </div>
+            </div>
+          )}
+
+          {page !== 'settings' && !active && probed && (
+            <div className="px-card flex flex-1 flex-col justify-center gap-3 p-8">
+              <h1 className="text-[20px] font-bold text-ink-1">
+                {online ? '还没有世界' : '连不上守护进程'}
+              </h1>
+              <p className="max-w-[62ch] text-[13.5px] leading-relaxed text-ink-2">
+                {online
+                  ? '先在左边（手机上点「世界」）建一个，5 步就有了一台自己的服务器。'
+                  : '后端没起来。确认 serverbox.exe 在跑，或者看看它是不是换了端口。'}
+              </p>
+              <div className="flex items-center gap-2 text-[12px] text-ink-3">
+                <span className="block h-2 w-2" style={{ background: online ? '#6fbf44' : '#e8564a' }} />
+                {online ? '守护进程已连接' : '未连接'}
+              </div>
+            </div>
+          )}
+
+          {active && page !== 'settings' && (
+            <>
+              {page === 'home' && active.error && (
+                <div className="mt-4 border-l-[3px] border-danger bg-[#1c1314] px-3.5 py-2.5">
+                  <p className="font-mono text-[11.5px] leading-relaxed text-[#ffc2c2]">{active.error}</p>
+                </div>
+              )}
+
+              {/* 崩溃诊断：崩了先说清楚「为什么崩、怎么办」，比一行退出信息有用得多。
+                  只认 crashed 态 —— 正常停下来的实例不该看到这张卡。 */}
+              {page === 'home' && active.status === 'crashed' && (
+                <CrashPanel instance={active} fixing={fixing} onFix={applyFix} onToast={setToast} />
+              )}
+
+              {page === 'home' && (
+                <>
+                  {/* 体检报告放在指标带之前：它决定你能不能开服，比读数更该先看到 */}
+                  {!running && preflight && (
+                    <PreflightPanel
+                      report={preflight}
+                      fixing={fixing}
+                      onFix={applyFix}
+                      onRecheck={runPreflight}
+                    />
+                  )}
+
+                  <div className="mt-5">
+                    <MetricBand
+                      metrics={metrics}
+                      peakCpu={peakCpu}
+                      peakMem={peakMem}
+                      histCpu={histCpu}
+                      histMem={histMem}
+                    />
+                  </div>
+
+                  {/* 控制台 + 右侧「服务器档案 / 快捷操作」—— 照设计稿的两栏排布。
+                      以前是「控制台全宽 + 底下横一条信息+按钮」，右半屏整块空着。
+                      档案字段全部取自后端真实字段，没有的显示「—」，不编数据。 */}
+                  <div className="mt-5 grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[1.6fr_1fr]">
+                    <LogConsole
+                      instance={active}
+                      logs={logs}
+                      running={running}
+                      live={!NOSSE}
+                      onSend={send}
+                      onClear={() => setLogs([])}
+                    />
+
+                    <div className="flex min-w-0 flex-col gap-4">
+                      <section className="px-card p-[14px]">
+                        <h3 className="mb-2 flex items-center gap-2 text-[13px] font-bold text-ink-1">
+                          <span className="text-cyan">
+                            <IconInfo size={13} />
+                          </span>
+                          服务器档案
+                        </h3>
+                        <div>
+                          {[
+                            ['服务端', active.jarPath.split(/[\\/]/).pop()],
+                            ['类型', serverLabel(active)],
+                            ['世界目录', active.dir],
+                            ['内存上限', (active.maxMem / 1024).toFixed(1) + ' GB'],
+                            ['端口', String(active.port)],
+                            ['进程', metrics?.pid ? String(metrics.pid) : '—'],
+                            [
+                              '守护策略',
+                              (active.autoStart ? '开机自启' : '不自动启动') +
+                                ' · ' +
+                                (active.autoRestart ? '崩溃重启' : '崩溃不重启'),
+                            ],
+                          ].map(([k, v]) => (
+                            <div className="srow" key={k}>
+                              <span className="srow-k">{k}</span>
+                              <span className="srow-v mono-meta break-all">{v}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+
+                      <section className="px-card p-[14px]">
+                        <h3 className="mb-2.5 flex items-center gap-2 text-[13px] font-bold text-ink-1">
+                          <span className="text-warn">
+                            <IconGear size={13} />
+                          </span>
+                          快捷操作
+                        </h3>
+                        {/* 设计稿把操作分两处：身份头放生命周期（起停删），这里放**功能类**。
+                            四个都对着真实能力：save-all 走控制台、备份走 backups 接口、
+                            玩家列表与打开文件夹是页内跳转。 */}
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            disabled={!running}
+                            title={running ? '让服务端把世界写盘' : '服务器没在跑，没有可保存的世界'}
+                            onClick={() => {
+                              void send('save-all')
+                              setToast('已把 save-all 发给服务端')
+                            }}
+                          >
+                            <IconSave size={12} />
+                            保存世界
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            onClick={() => {
+                              void api
+                                .backupCreate(active.id, '手动备份')
+                                .then(
+                                  () => setToast('备份已开始，进度看右下角'),
+                                  (e: Error) => setToast(e.message),
+                                )
+                            }}
+                          >
+                            <IconArchive size={12} />
+                            立即备份
+                          </button>
+                          <button type="button" className="btn btn-sm" onClick={() => goto('players')}>
+                            <IconUsers size={12} />
+                            玩家列表
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            onClick={() => openFiles(active.dir)}
+                          >
+                            <IconFolder size={12} />
+                            打开文件夹
+                          </button>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {page === 'players' && (
+                <div className="mt-5">
+                  <PlayersPanel instance={active} onToast={setToast} />
+                </div>
+              )}
+
+              {page === 'config' && (
+                <div className="mt-5">
+                  <ConfigPanel instance={active} onToast={setToast} onSaved={refresh} />
+                </div>
+              )}
+
+              {page === 'plugins' && (
+                <div className="mt-5">
+                  <PluginsPanel instance={active} onToast={setToast} onOpenFiles={openFiles} />
+                </div>
+              )}
+
+              {page === 'modpack' && (
+                <div className="mt-5">
+                  <ModpackPanel instance={active} onToast={setToast} />
+                </div>
+              )}
+
+              {page === 'files' && (
+                <div className="mt-5">
+                  <FileManager
+                    instance={active}
+                    path={filesPath}
+                    onPath={changeFilesPath}
+                    onToast={setToast}
+                  />
+                </div>
+              )}
+
+              {page === 'backup' && (
+                <div className="mt-5">
+                  <BackupPanel instance={active} onToast={setToast} />
+                </div>
+              )}
+
+              {page === 'tasks' && (
+                <div className="mt-5">
+                  <TasksPanel instance={active} onToast={setToast} />
+                </div>
+              )}
+            </>
+          )}
+        </PageFrame>
+      )}
+
+      {/* 删除确认：给「同时删除世界文件」一个明确的位置。
+          以前这只有一句「配置会被移除、目录保留」的提示，用户没得选 —— 于是问
+          「为什么删除不能选择删除世界文件」。 */}
+      {deleteOpen && active && (
+        <ConfirmDialog
+          title={`删除「${active.name}」`}
+          danger
+          width={540}
+          confirmLabel={deleteFiles && canWipeFiles ? '删除并清空文件' : '删除'}
+          onCancel={() => setDeleteOpen(false)}
+          onConfirm={doRemove}
+          body={
+            <>
+              配置一定会被移除。磁盘上的实例目录
+              <b className="text-ink-1">默认保留</b> —— 存档、插件都还在，日后还能自己找回来。
+            </>
+          }
+        >
+          <div className="mt-3 border-t border-line pt-1">
+            <ToggleRow
+              on={deleteFiles && canWipeFiles}
+              onChange={setDeleteFiles}
+              disabled={!canWipeFiles}
+              title="同时删除磁盘上的世界文件"
+              desc={
+                canWipeFiles
+                  ? `会清空 ${active.dir} 里的全部内容：world 存档、插件、服务端文件。删掉之后找不回来。`
+                  : '实例正在运行，先把服务端停掉，才能连文件一起删。'
+              }
+            />
+          </div>
+        </ConfirmDialog>
+      )}
+
+      {killOpen && active && (
+        <ConfirmDialog
+          title={`强制结束「${active.name}」`}
+          danger
+          confirmLabel="强制结束"
+          onCancel={() => setKillOpen(false)}
+          onConfirm={() => {
+            setKillOpen(false)
+            act('kill')
+          }}
+          body={
+            <>
+              强制结束是直接杀进程，服务端<b className="text-ink-1">来不及把地图写回磁盘</b>。
+              正在建造的建筑、刚放进箱子的物品可能丢失，存档也有损坏的风险。
+              <br />
+              <br />
+              正常做法是点「停止」——它会先让服务端自己存盘，也就十几秒的事。
+            </>
+          }
+        />
+      )}
+
+      </div>
+    </div>
+  )
+}

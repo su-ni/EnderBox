@@ -1,0 +1,176 @@
+<!-- ServerBox 设计稿 · 单屏模块：players
+     从 index.html 里原样切出来（index.html 仍是总预览，未改动）。
+     搬进 React 时一个文件对应一屏；class 名与 index.html 保持一致。 -->
+<section class="page" data-page="players">
+          <div class="sec-head reveal" style="--rd:.1s">
+            <span class="idx">02</span>
+            <h2>玩家</h2>
+            <span class="sub">共 6 人 · 3 人在线 · 勾选后可批量操作</span>
+            <div class="spacer"></div>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-ul"/></svg>导入名单</button>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-dl"/></svg>导出</button>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>刷新</button>
+            <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-plus"/></svg>添加玩家</button>
+          </div>
+
+          <div class="panel reveal" style="--rd:.14s">
+            <i class="corner"></i>
+
+            <!-- 批量操作条：勾选后出现 -->
+            <div class="batchbar" id="batchbar">
+              <span>已选 <b id="batchN">0</b> 项</span>
+              <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-check"/></svg>批量加白名单</button>
+              <button class="btn sm" type="button"><svg class="pic"><use href="#i-kick"/></svg>批量踢出</button>
+              <button class="btn btn-danger sm" type="button"><svg class="pic"><use href="#i-ban"/></svg>批量封禁</button>
+              <div class="spacer" style="margin-left:auto"></div>
+              <button class="btn btn-ghost xs" id="batchClear" type="button">取消选择</button>
+            </div>
+
+            <div class="toolbar">
+              <div class="filters">
+                <button class="chipf on" type="button">全部<span class="n">6</span></button>
+                <button class="chipf" type="button">在线<span class="n">3</span></button>
+                <button class="chipf" type="button">白名单<span class="n">4</span></button>
+                <button class="chipf" type="button">管理员<span class="n">2</span></button>
+                <button class="chipf" type="button">封禁<span class="n">1</span></button>
+              </div>
+              <div class="spacer" style="margin-left:auto"></div>
+              <div style="display:flex;align-items:center;gap:8px;min-width:200px">
+                <svg class="pic" style="color:var(--ink-3)"><use href="#i-search"/></svg>
+                <input class="inp" style="padding:6px 9px" placeholder="搜名字或 UUID">
+              </div>
+            </div>
+
+            <!-- 可排序表头 -->
+            <div class="phead">
+              <span class="chk" id="chkAll" title="全选"></span>
+              <span></span>
+              <button type="button" data-sort="name" class="desc">玩家 <i class="ar"></i></button>
+              <button type="button" data-sort="status">状态 <i class="ar"></i></button>
+              <button type="button" data-sort="time">游戏时长 <i class="ar"></i></button>
+              <span></span>
+            </div>
+
+            <div class="plist" id="plist">
+              <div class="prow" data-name="红石大师" data-status="1" data-time="64">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(30deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">红石大师</span><span class="badge op"><svg class="pic" style="width:10px;height:10px;display:inline-block;vertical-align:-1px"><use href="#i-crown"/></svg> OP 4</span><span class="badge wl">白名单</span><span class="sub">world · 160, 65, 325</span></div>
+                <div class="pstat"><span class="dot on"></span>在线 · 27 ms</div>
+                <div class="pcoords">游戏 64 分</div>
+                <div class="pact">
+                  <button class="btn xs" title="白名单"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs" title="设为 OP"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs" title="踢出"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs" title="封禁"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">位置</div><div class="v">world 160, 65, 325</div></div>
+                <div class="cell"><div class="k">首次加入</div><div class="v">2026-03-14</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">128 小时 40 分</div></div>
+                <div class="cell"><div class="k">最后在线</div><div class="v">刚刚</div></div>
+              </div>
+
+              <div class="prow" data-name="小小米" data-status="1" data-time="32">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(200deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">小小米</span><span class="badge op"><svg class="pic" style="width:10px;height:10px;display:inline-block;vertical-align:-1px"><use href="#i-crown"/></svg> OP 4</span><span class="badge wl">白名单</span><span class="sub">world · 108, 66, -325</span></div>
+                <div class="pstat"><span class="dot on"></span>在线 · 64 ms</div>
+                <div class="pcoords">游戏 32 分</div>
+                <div class="pact">
+                  <button class="btn xs"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">位置</div><div class="v">world 108, 66, -325</div></div>
+                <div class="cell"><div class="k">首次加入</div><div class="v">2026-05-02</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">42 小时 12 分</div></div>
+                <div class="cell"><div class="k">最后在线</div><div class="v">刚刚</div></div>
+              </div>
+
+              <div class="prow" data-name="Su_Ni" data-status="1" data-time="18">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(300deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">Su_Ni</span><span class="badge wl">白名单</span><span class="sub">world · 203, 66, -338</span></div>
+                <div class="pstat"><span class="dot on"></span>在线 · 105 ms</div>
+                <div class="pcoords">游戏 18 分</div>
+                <div class="pact">
+                  <button class="btn xs"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">位置</div><div class="v">world 203, 66, -338</div></div>
+                <div class="cell"><div class="k">首次加入</div><div class="v">2026-07-19</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">9 小时 05 分</div></div>
+                <div class="cell"><div class="k">最后在线</div><div class="v">刚刚</div></div>
+              </div>
+
+              <div class="prow" data-name="稳稳的鱼" data-status="0" data-time="0">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(120deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">稳稳的鱼</span><span class="badge ban">已封禁</span><span class="sub">2026-09-20 起 · 永久封禁</span></div>
+                <div class="pstat"><span class="dot"></span>离线 · 上次 world</div>
+                <div class="pcoords">—</div>
+                <div class="pact">
+                  <button class="btn xs"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">封禁原因</div><div class="v">破坏他人建筑（已举报）</div></div>
+                <div class="cell"><div class="k">封禁时间</div><div class="v">2026-09-20 18:02</div></div>
+                <div class="cell"><div class="k">操作人</div><div class="v">控制台</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">6 小时 20 分</div></div>
+              </div>
+
+              <div class="prow" data-name="老玩家" data-status="0" data-time="0">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(60deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">老玩家</span><span class="badge wl">白名单</span><span class="sub">离线模式 · UUID 手工生成</span></div>
+                <div class="pstat"><span class="dot"></span>离线 · 上次 world</div>
+                <div class="pcoords">—</div>
+                <div class="pact">
+                  <button class="btn xs"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">位置</div><div class="v">world 278, 68, -363</div></div>
+                <div class="cell"><div class="k">首次加入</div><div class="v">2025-11-30</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">310 小时</div></div>
+                <div class="cell"><div class="k">最后在线</div><div class="v">3 天前</div></div>
+              </div>
+
+              <div class="prow" data-name="新来的" data-status="0" data-time="0">
+                <span class="chk"></span>
+                <svg class="pav" viewBox="0 0 16 16" style="filter:hue-rotate(250deg)"><use href="#i-head"/></svg>
+                <div class="pname"><span class="n">新来的</span><span class="sub">尚未加入白名单</span></div>
+                <div class="pstat"><span class="dot"></span>离线</div>
+                <div class="pcoords">—</div>
+                <div class="pact">
+                  <button class="btn xs"><svg class="pic"><use href="#i-check"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-crown"/></svg></button>
+                  <button class="btn xs"><svg class="pic"><use href="#i-kick"/></svg></button>
+                  <button class="btn btn-danger xs"><svg class="pic"><use href="#i-ban"/></svg></button>
+                </div>
+              </div>
+              <div class="pdetail">
+                <div class="cell"><div class="k">UUID</div><div class="v">待服务端首次记录</div></div>
+                <div class="cell"><div class="k">首次加入</div><div class="v">—</div></div>
+                <div class="cell"><div class="k">累计时长</div><div class="v">—</div></div>
+                <div class="cell"><div class="k">最后在线</div><div class="v">—</div></div>
+              </div>
+            </div>
+          </div>
+        </section>

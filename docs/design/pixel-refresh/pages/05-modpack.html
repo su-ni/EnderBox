@@ -1,0 +1,146 @@
+<!-- ServerBox 设计稿 · 单屏模块：modpack
+     从 index.html 里原样切出来（index.html 仍是总预览，未改动）。
+     搬进 React 时一个文件对应一屏；class 名与 index.html 保持一致。 -->
+<section class="page" data-page="modpack">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">05</span>
+            <h2>整合包</h2>
+            <span class="sub">升级会删文件，所以先把<b style="color:var(--ink-1)">代价清单</b>列出来，你点了确认才动</span>
+            <div class="spacer"></div>
+            <button class="btn sm" type="button" title="重新读取这个实例的整合包信息"><svg class="pic"><use href="#i-refresh"/></svg>刷新</button>
+          </div>
+
+          <!-- ① 装的是哪个包。字段全部来自后端，缺的显示 —，不编值 -->
+          <div class="panel reveal" style="--rd:.12s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--cyan)"><use href="#i-cube"/></svg>
+              <h2>整合包升级</h2>
+              <span class="badge wl">机械动力 · Create Above and Beyond</span>
+            </div>
+            <div style="padding:2px 16px 12px">
+              <div class="srow"><span class="k">当前版本</span><span class="v">1.3.2</span></div>
+              <div class="srow"><span class="k">Minecraft</span><span class="v">1.18.2</span></div>
+              <div class="srow"><span class="k">加载器</span><span class="v">Forge 40.2.4</span></div>
+              <div class="srow"><span class="k">模组数</span><span class="v">214 个</span></div>
+              <div class="srow"><span class="k">覆盖文件数</span><span class="v">36 个</span></div>
+              <div class="srow"><span class="k">安装时间</span><span class="v">2026-09-28 21:04</span></div>
+              <div class="srow"><span class="k">上次升级</span><span class="v">从没升过</span></div>
+            </div>
+          </div>
+
+          <!-- ② 升级到什么版本：版本列表接口还没做，只能手填版本号 / id；本地 .mrpack 是二选一 -->
+          <div class="panel reveal" style="--rd:.16s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--copper)"><use href="#i-refresh"/></svg>
+              <h2>升级到新版本</h2>
+            </div>
+            <div style="padding:4px 16px 16px">
+              <div class="field">
+                <div><div class="lb">要升级到的版本（Modrinth 版本号或版本 id）</div><div class="hint">版本列表接口还没做，先手填 Modrinth 上的版本号或版本 id。点了「预览升级」只会算、不会真的改任何文件。</div></div>
+                <input class="inp" placeholder="例如 2.4 或 6OMYdNAO">
+              </div>
+              <div class="field">
+                <div><div class="lb">或用本地 .mrpack 文件</div><div class="hint">和上面的版本二选一。两个都填会被拦下并提示（服务端同一条规则）</div></div>
+                <input class="inp" placeholder="填 .mrpack 文件的完整路径">
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
+                <button class="btn btn-primary" type="button"><svg class="pic"><use href="#i-search"/></svg>预览升级</button>
+                <span class="badge wl">只算不装 · 清单先摊开给你看</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ③ 预览结果 + 进度。顺序就是用户做决定的顺序：拦死 → 版本跳跃 → 要删的文件 →
+                 你改过没动的 → 新增/变更 → 计数 → 按钮。破坏性的一律排在按钮之前。 -->
+          <div class="panel reveal" style="--rd:.2s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--cyan)"><use href="#i-file"/></svg>
+              <h2>计划清单</h2>
+              <span class="badge wl">升级到 2.0.0</span>
+              <div class="spacer"></div>
+              <button class="btn xs" type="button">换个版本</button>
+            </div>
+            <div style="padding:14px 16px">
+              <p style="font-size:12.5px;color:var(--ink-3);margin-bottom:12px">将升级到 <b style="font-family:var(--f-term);font-size:14px;color:var(--ink-1)">2.0.0</b>（MC 1.20.1 · Forge 47.4.10）</p>
+
+              <div class="nbox w">
+                <div class="hd"><svg class="pic"><use href="#i-ban"/></svg>版本跳跃：MC 从 1.18.2 跳到 1.20.1</div>
+                存档、世界生成、模组都要跟着换一轮，等于换了一台服。<b>先做一次完整备份</b>再开始；升完也别急着删旧存档。
+              </div>
+
+              <div class="nbox d">
+                <div class="hd"><svg class="pic"><use href="#i-ban"/></svg>升级会删除这些文件（6）</div>
+                <div class="li"><span class="mono">mods/create-1.18.2.jar</span> —— 新版本换了文件名，旧的那份要拿走</div>
+                <div class="li"><span class="mono">config/create-server.toml</span> —— 旧版才有这个键，新版挪到别处了</div>
+                <div class="li" style="color:var(--ink-3)">其余 4 个也是同一类（<span class="mono">mods/flywheel-0.6.8.jar</span> 等）。只删整合包原本装进去的那些 —— 你自己在 mods/ 里加的东西不会被碰。</div>
+              </div>
+
+              <div class="nbox">
+                <div class="hd" style="color:var(--ink-2)">你改过、我们没动的文件（1）</div>
+                <div class="li"><span class="mono">config/jei/jei-client.toml</span> —— 你自己改过，保留你的那份，不覆盖</div>
+              </div>
+
+              <div class="plan" style="margin-top:14px">
+                <div class="prow2"><span class="k add">新增</span><span class="v">create-2.0.0.jar · flywheel-0.6.10.jar · 等 42 个</span><span class="n">42 个</span></div>
+                <div class="prow2"><span class="k upd">变更</span><span class="v">jei-1.20.1.jar · quark-4.0.jar · 等 18 个</span><span class="n">18 个</span></div>
+                <div class="prow2"><span class="k del">删除</span><span class="v">create-1.18.2.jar · 旧的 config/create 目录 · 等 6 个</span><span class="n">6 个</span></div>
+              </div>
+
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px">
+                <span class="chip s g">新增 42</span>
+                <span class="chip s w">变更 18</span>
+                <span class="chip s d">删除 6</span>
+                <span class="chip s">保留 148</span>
+                <span class="chip s">跳过 1</span>
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">预计下载 312 MB</span>
+              </div>
+
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line-1)">
+                <button class="btn btn-primary" type="button"><svg class="pic"><use href="#i-ul"/></svg>我已备份，开始升级</button>
+                <span style="font-size:12px;color:var(--ink-3)">会先下载再落文件，预计 312 MB。</span>
+              </div>
+
+              <!-- 点下去之后：动词换成「升级中」，并点名阶段 —— 服务端文件那一段文件数一直是 0，
+                   不点名阶段用户只会对着一个不动的进度条等十几分钟。 -->
+              <div class="nbox" style="margin-top:14px;border-left-color:var(--cyan);background:#131b1a">
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline">
+                  <span style="font-size:13px;font-weight:600;color:var(--ink-1)">升级中</span>
+                  <span class="chip s">正在升级模组</span>
+                  <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">41 / 66 个文件</span>
+                  <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3);margin-left:auto">正在处理 mods/flywheel-0.6.10.jar</span>
+                </div>
+                <div class="prog" style="margin-top:10px"><div class="fill" style="width:62%"></div><div class="lb2">62%</div></div>
+                <p style="font-size:12px;color:var(--ink-2);margin-top:8px">已下载 312 MB / 480 MB。升级在后台进行，切到别的页面回来还能看到进度。</p>
+                <div style="margin-top:10px"><button class="btn sm" type="button"><svg class="pic"><use href="#i-ban"/></svg>取消升级</button></div>
+              </div>
+            </div>
+            <div class="con-foot">
+              <svg class="pic" style="color:var(--warn)"><use href="#i-ban"/></svg>
+              删除项在你点「开始升级」之前一个都不会动 —— 想反悔就关掉这个面板，什么都没发生
+            </div>
+          </div>
+
+          <!-- ④ 另一种情形（大多数实例的默认所见）：这个实例不是整合包装的 -->
+          <div class="panel reveal" style="--rd:.24s">
+            <i class="corner"></i>
+            <div class="con-head tex-stone">
+              <svg class="pic" style="color:var(--ink-3)"><use href="#i-cube"/></svg>
+              <h2>没装过整合包时</h2>
+              <div class="spacer"></div>
+              <span style="font-size:12.5px;color:var(--ink-3)">另一种状态</span>
+            </div>
+            <div style="padding:12px 16px 16px">
+              <p style="font-size:12.5px;color:var(--ink-3)">这个实例不是由整合包安装的</p>
+              <div class="field" style="margin-top:8px">
+                <div><div class="lb">从本地 .mrpack 安装</div><div class="hint">预览只算不装，会先列出要新增哪些文件，确认了再开始</div></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                  <input class="inp" placeholder="例如 F:\packs\我的整合包.mrpack" style="flex:1;min-width:220px">
+                  <button class="btn" type="button"><svg class="pic"><use href="#i-ul"/></svg>预览安装</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>

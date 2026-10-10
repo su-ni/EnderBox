@@ -1,0 +1,318 @@
+<!-- ServerBox 设计稿 · 单屏模块：settings
+     从 index.html 里原样切出来（index.html 仍是总预览，未改动）。
+     搬进 React 时一个文件对应一屏；class 名与 index.html 保持一致。 -->
+<section class="page" data-page="settings">
+          <div class="sec-head reveal" style="--rd:.08s">
+            <span class="idx">09</span>
+            <h2>设置</h2>
+            <span class="sub">这里改的是面板自己，不是某一个世界 —— 针对单个世界的往左上角的「配置」去</span>
+          </div>
+
+          <div class="cfg-wrap">
+            <div class="panel reveal" style="--rd:.1s">
+              <i class="corner"></i>
+              <!-- ⚠ 这五组必须与 SettingsPanel.tsx 的 TABS 完全一致（顺序、文案都一样）：
+                   访问安全 / Java 运行时 / 下载源 / 守护与启动 / 关于。
+                   真实面板打开时默认停在「Java 运行时」（TABS 里 TABS[1]）；设计稿为了让
+                   五组内容都能被翻到，默认停在第一组「访问安全」。 -->
+              <div class="cfg-nav" id="setNav">
+                <button class="on" data-pane="access" type="button"><svg class="pic"><use href="#i-crown"/></svg>访问安全</button>
+                <button data-pane="java" type="button"><svg class="pic"><use href="#i-cpu"/></svg>Java 运行时</button>
+                <button data-pane="source" type="button"><svg class="pic"><use href="#i-dl"/></svg>下载源</button>
+                <button data-pane="daemon" type="button"><svg class="pic"><use href="#i-lever"/></svg>守护与启动</button>
+                <button data-pane="about" type="button"><svg class="pic"><use href="#i-info"/></svg>关于</button>
+              </div>
+            </div>
+
+            <div class="panel reveal" style="--rd:.14s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-crown"/></svg>
+                <h2 id="setTitle">访问安全</h2>
+                <span style="font-size:12.5px;color:var(--ink-3)" id="setSub">谁可以打开这个面板</span>
+              </div>
+
+              <!-- ═══ 01 访问安全（AccessPanel.tsx）═══ -->
+              <div class="cfg-pane on" data-pane="access">
+                <div style="padding:14px 16px 18px">
+                  <!-- 只有「暴露在局域网 且 没开保护」才算危险 -->
+                  <div class="nbox d">
+                    <div class="hd"><svg class="pic"><use href="#i-ban"/></svg>现在局域网里任何人都能打开这个面板</div>
+                    守护进程监听在 <span class="mono">:23333</span>（所有网卡），而访问保护没开。同一个 Wi-Fi 下的任何设备都能启停你的服务器、删你的存档。下面设一个密码并开启保护就行。
+                  </div>
+
+                  <div style="margin-top:18px">
+                    <div style="display:flex;align-items:flex-start;gap:16px">
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:13px;font-weight:600">开启访问保护</div>
+                        <p style="font-size:12px;color:var(--ink-3);margin-top:4px">开启后，非本机访问需要密码或 API 令牌。</p>
+                      </div>
+                      <span class="tog" role="switch" aria-checked="false"><span class="knob"></span></span>
+                    </div>
+                    <p style="font-size:12px;color:var(--warn);margin-top:8px">还没有密码也没有令牌，开不了保护 —— 先把下面密码设上。</p>
+                    <div style="display:flex;align-items:flex-start;gap:16px;margin-top:14px">
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:13px;font-weight:600">本机访问免登录</div>
+                        <p style="font-size:12px;color:var(--ink-3);margin-top:4px">在这台机器上打开面板不用输密码。关掉的话自己每次也要登。</p>
+                      </div>
+                      <span class="tog on" role="switch" aria-checked="true"><span class="knob"></span></span>
+                    </div>
+                  </div>
+
+                  <div class="fgrid" style="margin-top:18px">
+                    <div class="field col">
+                      <div><div class="lb">登录有效期（小时）</div><div class="hint">过期后需要重新登录</div></div>
+                      <input class="inp" style="font-family:var(--f-term);font-size:14px" value="12">
+                    </div>
+                    <div class="field col">
+                      <div><div class="lb">监听地址</div><div class="hint">:23333 表示所有网卡都监听（手机能连）；127.0.0.1:23333 表示只本机能连</div></div>
+                      <input class="inp" style="font-family:var(--f-term);font-size:14px" value=":23333">
+                    </div>
+                  </div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:10px">
+                    当前实际绑定 <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-2)">0.0.0.0:23333</span>
+                    <span style="color:var(--warn)"> · 改过了，重启守护进程才生效</span>
+                  </p>
+
+                  <!-- 02 面板密码 -->
+                  <div style="margin-top:24px;border-top:1px solid var(--line-1);padding-top:18px">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                      <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">02</span>
+                      <h3 style="font-size:14px;font-weight:600">面板密码</h3>
+                      <span style="font-size:12.5px;color:var(--ink-3)">已设置 · 2026-09-20 10:12</span>
+                      <div class="spacer"></div>
+                      <span class="chip s g">已保护</span>
+                    </div>
+                    <div class="fgrid" style="margin-top:14px">
+                      <div class="field col">
+                        <div><div class="lb">当前密码</div><div class="hint">改密码必须先给旧的</div></div>
+                        <input class="inp" type="password" value="password">
+                      </div>
+                      <div class="field col">
+                        <div><div class="lb">新密码</div><div class="hint">至少 6 位</div></div>
+                        <input class="inp" type="password" value="password">
+                      </div>
+                      <div class="field col">
+                        <div><div class="lb">再输一遍</div></div>
+                        <input class="inp" type="password" value="password">
+                      </div>
+                    </div>
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px">
+                      <button class="btn btn-primary" type="button">改密码</button>
+                      <button class="btn btn-danger" type="button">清除密码</button>
+                      <span style="font-size:12px;color:var(--ink-3)">改完密码所有已登录的设备都会被踢下线</span>
+                    </div>
+                  </div>
+
+                  <!-- 03 API 令牌 -->
+                  <div style="margin-top:24px;border-top:1px solid var(--line-1);padding-top:18px">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                      <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">03</span>
+                      <h3 style="font-size:14px;font-weight:600">API 令牌</h3>
+                      <span style="font-size:12.5px;color:var(--ink-3)">给脚本 / 外部工具用，不用把密码写进脚本里</span>
+                      <div class="spacer"></div>
+                      <button class="btn btn-ghost sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>刷新</button>
+                    </div>
+
+                    <!-- 明文只在刚生成后出现一次；关掉就再也看不到 -->
+                    <div class="nbox" style="margin-top:14px;border-left-color:var(--ok);background:rgba(87,211,100,.06)">
+                      <div class="hd" style="color:var(--ink-1)"><svg class="pic" style="color:var(--ok)"><use href="#i-check"/></svg>令牌已生成 —— 关掉这一页就再也看不到了</div>
+                      <div class="mono" style="color:var(--ok);font-size:13px">sbx_9f4c1a27d0e83b56a1c47f209e5d8b31</div>
+                      <p style="font-size:12px;color:var(--ink-2);margin-top:8px">用法：请求头带 <span class="mono" style="color:var(--cyan)">Authorization: Bearer &lt;令牌&gt;</span>，或者给 EventSource 这类设不了头的场景走 <span class="mono" style="color:var(--cyan)">?token=&lt;令牌&gt;</span>。我们只存它的哈希，明文拿不回来。</p>
+                      <button class="btn sm" style="margin-top:12px" type="button">我知道了，收起来</button>
+                    </div>
+
+                    <div class="rlist" style="margin-top:14px">
+                      <div class="rrow" style="grid-template-columns:32px minmax(0,1fr) auto">
+                        <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-crown"/></svg></div>
+                        <div class="rmain">
+                          <div class="rtitle">手机上的脚本</div>
+                          <div class="rsub mono" style="font-size:13px">sbx_9f4c1a… · 建于 2026-09-22 08:40 · 最后用 2 小时前</div>
+                        </div>
+                        <div class="ract"><button class="btn btn-ghost xs" type="button" aria-label="删除令牌 手机上的脚本"><svg class="pic"><use href="#i-trash"/></svg></button></div>
+                      </div>
+                      <div class="rrow" style="grid-template-columns:32px minmax(0,1fr) auto">
+                        <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--cyan)"><use href="#i-crown"/></svg></div>
+                        <div class="rmain">
+                          <div class="rtitle">群里的机器人</div>
+                          <div class="rsub mono" style="font-size:13px">sbx_1b7e04… · 建于 2026-10-01 19:12 · 还没用过</div>
+                        </div>
+                        <div class="ract"><button class="btn btn-ghost xs" type="button" aria-label="删除令牌 群里的机器人"><svg class="pic"><use href="#i-trash"/></svg></button></div>
+                      </div>
+                    </div>
+
+                    <div class="field" style="margin-top:16px">
+                      <div><div class="lb">新建令牌</div><div class="hint">取个好认的名字，比如「手机上的脚本」</div></div>
+                      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                        <input class="inp" style="flex:1;min-width:200px" placeholder="用途备注">
+                        <button class="btn" type="button">生成令牌</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ 02 Java 运行时（JavaTab）═══ -->
+              <div class="cfg-pane" data-pane="java">
+                <div style="padding:14px 16px 18px">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">02</span>
+                    <h3 style="font-size:14px;font-weight:600">Java 运行时</h3>
+                    <span style="font-size:12.5px;color:var(--ink-3)">检测到 2 个</span>
+                    <div class="spacer"></div>
+                    <button class="btn btn-ghost sm" type="button"><svg class="pic"><use href="#i-refresh"/></svg>重新扫描</button>
+                  </div>
+
+                  <div class="rlist" style="margin-top:14px">
+                    <div class="rrow" style="grid-template-columns:32px minmax(0,1fr) auto">
+                      <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-cpu"/></svg></div>
+                      <div class="rmain">
+                        <div class="rtitle">Java 21 <span class="mono" style="font-size:13px;color:var(--ink-3)">21.0.9</span> <span class="chip s g">默认</span></div>
+                        <div class="rsub mono" style="font-size:13px">Eclipse Temurin · 本程序托管 · 64 位 · C:\Users\Administrator\.serverbox\java\temurin-21\bin\java.exe</div>
+                      </div>
+                      <div class="ract"></div>
+                    </div>
+                    <div class="rrow" style="grid-template-columns:32px minmax(0,1fr) auto">
+                      <div class="ricon"><svg class="pic" style="width:18px;height:18px;color:var(--copper)"><use href="#i-cpu"/></svg></div>
+                      <div class="rmain">
+                        <div class="rtitle">Java 17 <span class="mono" style="font-size:13px;color:var(--ink-3)">17.0.12</span></div>
+                        <div class="rsub mono" style="font-size:13px">Eclipse Adoptium · 系统扫描 · 64 位 · C:\Program Files\Eclipse Adoptium\jdk-17.0.12\bin\java.exe</div>
+                      </div>
+                      <div class="ract"></div>
+                    </div>
+                  </div>
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:12px">一个 Java 都没找到时：「ServerBox 自己不 bundled Java —— 先去装一个（推荐 Eclipse Temurin），装完点「重新扫描」。」</p>
+
+                  <div style="margin-top:24px;border-top:1px solid var(--line-1);padding-top:18px">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                      <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">02·B</span>
+                      <h3 style="font-size:14px;font-weight:600">各世界需要哪个 Java</h3>
+                      <span style="font-size:12.5px;color:var(--ink-3)">按 MC 版本推算</span>
+                    </div>
+                    <div class="rlist" style="margin-top:14px">
+                      <div class="rrow" style="grid-template-columns:minmax(0,1fr) auto auto">
+                        <div class="rmain">
+                          <div class="rtitle">生存服 · 长期档</div>
+                          <div class="rsub mono" style="font-size:13px">PAPER 1.21.1</div>
+                        </div>
+                        <div class="rmeta">Java 21</div>
+                        <div class="ract"><span class="chip s g">已满足</span></div>
+                      </div>
+                      <div class="rrow" style="grid-template-columns:minmax(0,1fr) auto auto">
+                        <div class="rmain">
+                          <div class="rtitle">模组服</div>
+                          <div class="rsub mono" style="font-size:13px">FORGE 1.16.5</div>
+                        </div>
+                        <div class="rmeta">Java 8</div>
+                        <div class="ract"><span class="chip s d">缺</span></div>
+                      </div>
+                    </div>
+                    <p style="font-size:12.5px;line-height:1.8;color:var(--ink-2);margin-top:12px">
+                      1.16 及更早要 Java 8 · 1.17～1.20.4 要 Java 17 · 1.20.5 及更新要 Java 21。高阶 Java 一般能跑低版本服务端，反过来不行。
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ 03 下载源（SourcePanel）═══ -->
+              <div class="cfg-pane" data-pane="source">
+                <div style="padding:14px 16px 18px">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">03</span>
+                    <h3 style="font-size:14px;font-weight:600">下载源与市场</h3>
+                    <span style="font-size:12.5px;color:var(--ink-3)">默认走哪个源、从哪搜模组</span>
+                  </div>
+
+                  <div style="max-width:480px;margin-top:16px">
+                    <div class="field col">
+                      <div><div class="lb">默认下载源</div><div class="hint">服务端 jar 从哪下。列表来自后端实测能用的那些</div></div>
+                      <span class="sel" style="width:100%">官方源（Mojang） <svg class="pic" style="width:10px;height:10px"><use href="#i-chev-r"/></svg></span>
+                    </div>
+                    <div class="field col" style="margin-top:16px">
+                      <div><div class="lb">模组市场地址</div><div class="hint">「插件与模组」页的在线搜索走这个地址</div></div>
+                      <input class="inp" style="font-family:var(--f-term);font-size:14px" value="https://api.modrinth.com/v2">
+                    </div>
+                  </div>
+                  <p style="font-size:12.5px;line-height:1.7;color:var(--ink-2);margin-top:12px;max-width:70ch">
+                    默认是 Modrinth 官方 API —— 国内直连经常超时，换成能访问的镜像 / 反代就行（要填到 <span class="mono" style="color:var(--ink-1)">/v2</span> 这一层）。留空表示用官方地址。
+                  </p>
+
+                  <div class="rlist" style="margin-top:16px">
+                    <div class="rrow" style="grid-template-columns:minmax(0,1fr) auto">
+                      <div class="rmain">
+                        <div class="rtitle">官方源（Mojang）</div>
+                        <div class="rsub">适用：原版 / Paper / Fabric / Forge</div>
+                      </div>
+                      <div class="ract"></div>
+                    </div>
+                    <div class="rrow" style="grid-template-columns:minmax(0,1fr) auto">
+                      <div class="rmain">
+                        <div class="rtitle">BMCLAPI</div>
+                        <div class="rsub">适用：原版</div>
+                      </div>
+                      <div class="ract"><span class="chip s w">部分类型不可用</span></div>
+                    </div>
+                  </div>
+
+                  <p style="font-size:12px;color:var(--ink-3);margin-top:12px">条目与「适用」范围都来自后端（/api/mirrors），上面只是版式示例。</p>
+
+                  <div class="nbox" style="margin-top:16px">
+                    <div class="hd"><span class="badge ban">还没接</span>换镜像不是挂上就有用</div>
+                    没被镜像的路径会直接 404，选了反而更糟。所以只列出实测能用的，并且标明它覆盖哪些服务端类型。Paper 目前没有可用的国内镜像，走官方直连反而更快。
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ 04 守护与启动 ═══ -->
+              <div class="cfg-pane" data-pane="daemon">
+                <div style="padding:14px 16px 18px">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">04</span>
+                    <h3 style="font-size:14px;font-weight:600">守护与启动</h3>
+                    <span style="font-size:12.5px;color:var(--ink-3)">这一页只管全局行为</span>
+                  </div>
+
+                  <div class="nbox" style="margin-top:16px;border-left-color:var(--cyan);background:rgba(51,213,207,.06)">
+                    <div class="hd" style="color:var(--ink-1)">单个世界的开关在「配置」页</div>
+                    某个世界要不要开机自启、崩了要不要自动重启，是每个世界各自的事，放在那个世界的「配置」页里 —— 一页管一个世界的全部设置，比在这里列一堆世界更容易看懂。
+                  </div>
+
+                  <div class="nbox" style="margin-top:12px">
+                    <div class="hd"><span class="badge ban">还没接</span>真正的全局行为还没收进来</div>
+                    守护进程自己要不要注册成系统服务、崩溃重启的间隔与次数上限、退出时是否连带关掉所有服务器。这些要等 Windows 服务那层做完再统一收进来。
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ 05 关于（AboutTab）═══ -->
+              <div class="cfg-pane" data-pane="about">
+                <div style="padding:14px 16px 18px">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <span style="font-family:var(--f-pix);font-size:11px;letter-spacing:.06em;color:var(--ink-3)">05</span>
+                    <h3 style="font-size:14px;font-weight:600">关于</h3>
+                    <span style="font-size:12.5px;color:var(--ink-3)">运行时信息直接来自守护进程</span>
+                  </div>
+
+                  <div class="fgrid" style="margin-top:16px">
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">ServerBox 版本</div><div class="v">v0.1.0+dev</div></div>
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">Go 版本</div><div class="v">go1.27.1</div></div>
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">运行平台</div><div class="v">windows / amd64</div></div>
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">进程号</div><div class="v">98372</div></div>
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">已运行</div><div class="v">6 时 42 分（自 2026-10-07 11:00:00）</div></div>
+                    <div class="srow" style="display:block"><div class="k" style="width:auto">数据目录</div><div class="v">F:\tmp\sboxdata</div></div>
+                  </div>
+
+                  <div class="nbox" style="margin-top:18px;border-left-color:var(--cyan);background:rgba(51,213,207,.06)">
+                    <div class="hd" style="color:var(--ink-1)">ServerBox 是什么</div>
+                    一个给「家里有台闲置电脑」的人用的 Minecraft 开服器。不是客户端启动器（那是 PCL / HMCL 的活），也不是给运维用的面板 —— 目标就一个：30 秒把服开起来，然后忘了它。
+                  </div>
+                </div>
+              </div>
+
+              <div class="unsaved">
+                <span class="dotw"></span>
+                <span style="font-size:12.5px;color:var(--ink-1)">大部分项<b style="font-family:var(--f-pix);color:var(--copper)">失焦即存</b>；密码、令牌这类要按按钮的除外</span>
+              </div>
+            </div>
+          </div>
+        </section>

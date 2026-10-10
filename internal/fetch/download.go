@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -49,6 +50,11 @@ type Task struct {
 	StartedAt time.Time  `json:"startedAt"`
 	EndedAt   *time.Time `json:"endedAt,omitempty"`
 
+	// Label 没有归属实例时（下载 JDK 就是这种）界面上显示的名字。
+	// 留空时前端退回显示文件名 —— 但一个 OpenJDK21U-jdk_x64_…zip
+	// 摆在那里，用户看不出这是在给 Java 21 做准备。
+	Label string `json:"label,omitempty"`
+
 	// Phase 当前处于哪一段：download（在下文件）还是 install（在下完之后的安装步骤）。
 	// 前端要分开显示 —— 安装那段没有「已下载多少字节」这回事，
 	// 继续画字节数只会让人以为卡住了。只有 Forge 会走到 install。
@@ -59,6 +65,17 @@ type Task struct {
 	Threads int `json:"threads"`
 
 	cancel context.CancelFunc
+
+	// hidden 这条任务只是「走一遍下载链路」的载体，**不出现在任务条里**。
+	//
+	// 用途只有一个：整合包（`FetchStandalone`）。一个包动辄几十上百个模组，
+	// 每个都往任务条上挂一条，用户真正要找的那条就被淹了 —— 而任务条的设计前提
+	// 本来就是「一条任务 ＝ 一个服务端 jar」。
+	//
+	// 之所以要借任务这个壳、而不是绕开整条链路，是因为分片 / 续传 / 重试 / 校验
+	// 这四件事全都挂在任务 id 上（链路里 19 处 m.set(id,…)）。绕开就等于抄一份出来，
+	// 迟早跟主路分叉。所以这里只是「让已有的链路不占任务条」，链路本身一行不改。
+	hidden bool
 }
 
 // Manager 下载任务表
@@ -78,12 +95,19 @@ type Manager struct {
 //
 // 分片：门槛定在 2 MB。再小的文件切了不划算 —— 多开连接本身有开销
 // （TLS 握手、每个分片各走一次镜像的 302 跳转），省下的时间还不够抵消。
-// 上限 4 条：家用宽带的瓶颈在出口带宽，线程再多只是互相抢；
-// 而且镜像有限流（BMCLAPI 实测 60 秒内只准 10 次请求），分片太碎会自己把自己限死。
+//
+// 上限 8 条（2026-10-06 实测从 4 提到 8）：瓶颈**不是**出口带宽，是源站对单连接的限速。
+// 同一个 30MB 的 .mrpack，同一台机器，只改连接数：
+//
+//	1 条连接  96 KB/s      4 条  345 KB/s（3.6×）      8 条  695 KB/s（7.2×）
+//
+// 几乎线性 —— 所以「几十 MB 要拉半小时」不是链路差，是连接太少了。
+// ⚠ 别再加了：BMCLAPI 有限流（实测 60 秒内只准 10 次请求），分片越碎越容易自己把自己限死；
+// 而且这是公益镜像，多开连接等于替所有人抢带宽。8 是「明显提速」和「别当攻击」之间的位置。
 const (
 	dlAttempts  = 4
 	segMinSize  = 2 << 20
-	segMaxParts = 4
+	segMaxParts = 8
 	segMinChunk = 1 << 20 // 每片至少 1 MB，避免切出一堆碎片
 )
 
@@ -115,12 +139,19 @@ func (m *Manager) Get(id string) (*Task, bool) {
 	return &cp, true
 }
 
-// List 某个实例的全部任务，新的在前
+// List 某个实例的全部任务，新的在前。
+// 隐藏任务（整合包那种「借链路下载」的）不在这里返回 —— 见 Task.hidden。
 func (m *Manager) List(instanceID string) []*Task {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	var out []*Task
+	// ⚠ 必须是**空切片**不是 nil：它会被直接塞进 JSON 响应的 items 字段，
+	// nil 切片序列化成 `null`，前端读 `.items.length` 当场炸。
+	// 这里修而不是在 handler 里补 `?? []` —— 补在调用方意味着每个调用方都要记得补。
+	out := []*Task{}
 	for _, t := range m.tasks {
+		if t.hidden {
+			continue
+		}
 		if instanceID == "" || t.Instance == instanceID {
 			cp := *t
 			out = append(out, &cp)
@@ -130,15 +161,38 @@ func (m *Manager) List(instanceID string) []*Task {
 	return out
 }
 
+// Cancel 取消一个下载。**只对还在跑的任务返回 true**。
+//
+// ⚠ 以前这里只判「cancel 函数还在不在」，而那个函数在任务结束后也不会被置空 ——
+// 于是对**已经下完**的任务同样回 true，前端就弹「已取消下载」，
+// 可文件其实已经装好了。这句话比不提示更糟：用户以为没装，再去装一遍。
 func (m *Manager) Cancel(id string) bool {
 	m.mu.Lock()
 	t, ok := m.tasks[id]
+	running := ok && t.State == StateRunning
 	m.mu.Unlock()
-	if ok && t.cancel != nil {
-		t.cancel()
-		return true
+	if !ok || !running {
+		return false
 	}
-	return false
+	if t.cancel != nil {
+		t.cancel()
+	}
+	return true
+}
+
+// Dismiss 从任务表里删掉一条**已结束**的记录（用户手动清账本）。
+//
+// ⚠ 还在跑的一律拒绝：把运行中的任务从表里删掉，界面就失去了对它的唯一引用 ——
+// 用户再也没法取消它，它却还在后台往磁盘写。想清掉先 Cancel，等它进终态再来删。
+func (m *Manager) Dismiss(id string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	t, ok := m.tasks[id]
+	if !ok || t.State == StateRunning {
+		return false
+	}
+	delete(m.tasks, id)
+	return true
 }
 
 // prune 清掉 30 分钟前结束的任务，避免任务表无限长
@@ -162,8 +216,10 @@ func (m *Manager) set(id string, fn func(*Task)) {
 // Options 一次下载的参数
 type Options struct {
 	InstanceID string
-	Build      Build
-	DestPath   string // 最终落盘路径（通常是 <实例目录>/server.jar）
+	// Label 没有归属实例时界面上显示的名字（下载 JDK 用）。有实例时前端优先显示实例名。
+	Label    string
+	Build    Build
+	DestPath string // 最终落盘路径（通常是 <实例目录>/server.jar）
 
 	// OnDone 落盘成功后回调。让调用方在这里补后续动作（写 eula、写 server.properties、
 	// 往实例控制台写一行日志）——下载器本身不该知道实例和属性的存在。
@@ -198,6 +254,7 @@ func (m *Manager) Start(opts Options) (*Task, error) {
 	t := &Task{
 		ID:        fmt.Sprintf("dl%d", time.Now().UnixNano()),
 		Instance:  opts.InstanceID,
+		Label:     opts.Label,
 		File:      filepath.Base(opts.DestPath),
 		Step:      "排队中",
 		Total:     opts.Build.Size,
@@ -233,47 +290,26 @@ func (m *Manager) run(ctx context.Context, id string, opts Options) {
 
 	part := opts.DestPath + ".part"
 
+	// 目标目录必须在下第一个字节之前建好。
+	// 多线程下载会往同一目录写 .part.N 分片，目录不存在时报的是「无法写入分片文件」；
+	// 而落盘阶段的 MkdirAll 太晚 —— 那时分片早就写失败了。
+	// 服务端 jar 因为实例目录本来就存在，一直没暴露这个问题；JDK 下到 runtimes/.download
+	// 这种全新目录时才炸出来（实测）。
+	if err := os.MkdirAll(filepath.Dir(opts.DestPath), 0o755); err != nil {
+		m.fail(id, err)
+		return
+	}
+
 	// ── 下载（带自动重试）──
 	if err := m.fetchToPart(ctx, id, opts, part); err != nil {
 		m.fail(id, err)
 		return
 	}
 
-	// ── 校验 ──
-	// 校验和改成「下完之后通读一遍算」而不是「边下边算」，是因为现在会重试、
-	// 会分片：分片是乱序落盘的，边下边算的 hash 顺序必然是错的；重试则会让
-	// 「已经算进去的那一段」和「文件里实际还在的那一段」对不上（hash 状态没法回滚）。
-	// 通读一遍多花的是本地磁盘时间（50 MB 也就零点几秒），换来的是逻辑上不可能算错。
-	m.set(id, func(t *Task) { t.Step = "校验中" })
-	if opts.Build.SHA != "" {
-		got, err := hashFile(part, opts.Build.SHAKind)
-		if err != nil {
-			m.fail(id, fmt.Errorf("读取下载文件失败：%w", err))
-			return
-		}
-		if !strings.EqualFold(got, opts.Build.SHA) {
-			removePart(part)
-			m.fail(id, fmt.Errorf(
-				"文件校验不通过，已删除。期望 %s…，实际 %s…（多半是下载过程中被截断，重试一次通常就好）",
-				clip(opts.Build.SHA, 12), clip(got, 12)))
-			return
-		}
-		m.set(id, func(t *Task) { t.Verified = true })
-	}
-
-	var written int64
-	if st, err := os.Stat(part); err == nil {
-		written = st.Size()
-	}
-
-	// ── 落盘：rename 是原子的，避免出现「半个 jar 被当成完整的」──
-	if err := os.MkdirAll(filepath.Dir(opts.DestPath), 0o755); err != nil {
+	// ── 校验 + 落盘 ──
+	written, err := m.verifyAndPlace(id, opts, part)
+	if err != nil {
 		m.fail(id, err)
-		return
-	}
-	_ = os.Remove(opts.DestPath) // Windows 上 rename 不能覆盖已存在的文件
-	if err := os.Rename(part, opts.DestPath); err != nil {
-		m.fail(id, fmt.Errorf("落盘失败：%w", err))
 		return
 	}
 
@@ -325,11 +361,63 @@ func (m *Manager) run(ctx context.Context, id string, opts Options) {
 	})
 }
 
+// verifyAndPlace 下载完之后的两件事：校验、原子落盘。返回真正落盘的字节数。
+//
+// 抽成独立方法是为了让「借链路下载但不占任务条」（FetchStandalone）用**同一份**逻辑。
+// 校验这件事只能有一份实现 —— 抄一份出来，一边改了另一边没改，就会出现
+// 「主线校验/支线不校验」这种最难查的不一致。
+//
+// 校验和是「下完之后通读一遍算」而不是「边下边算」：因为会重试、会分片 ——
+// 分片是乱序落盘的，边下边算的 hash 顺序必然是错的；重试则会让「已经算进去的那一段」
+// 和「文件里实际还在的那一段」对不上（hash 状态没法回滚）。
+// 通读一遍多花的是本地磁盘时间（50 MB 也就零点几秒），换来的是逻辑上不可能算错。
+func (m *Manager) verifyAndPlace(id string, opts Options, part string) (int64, error) {
+	m.set(id, func(t *Task) { t.Step = "校验中" })
+	if opts.Build.SHA != "" {
+		got, err := hashFile(part, opts.Build.SHAKind)
+		if err != nil {
+			return 0, fmt.Errorf("读取下载文件失败：%w", err)
+		}
+		if !strings.EqualFold(got, opts.Build.SHA) {
+			removePart(part)
+			return 0, fmt.Errorf(
+				"文件校验不通过，已删除。期望 %s…，实际 %s…（多半是下载过程中被截断，重试一次通常就好）",
+				clip(opts.Build.SHA, 12), clip(got, 12))
+		}
+		m.set(id, func(t *Task) { t.Verified = true })
+	}
+
+	var written int64
+	if st, err := os.Stat(part); err == nil {
+		written = st.Size()
+	}
+
+	// ── 落盘：rename 是原子的，避免出现「半个 jar 被当成完整的」──
+	// 目标目录已在下载开始前 MkdirAll 过，这里不再重复。
+	_ = os.Remove(opts.DestPath) // Windows 上 rename 不能覆盖已存在的文件
+	if err := os.Rename(part, opts.DestPath); err != nil {
+		return 0, fmt.Errorf("落盘失败：%w", err)
+	}
+	return written, nil
+}
+
 // fetchToPart 反复尝试把文件下到 part，直到成功或用完重试次数。
 //
 // 只重试**连接类**故障：4xx（地址错了、版本被撤了）重试一百次也没用，
 // 只会让用户多等几十秒才看到同一句错。
-func (m *Manager) fetchToPart(ctx context.Context, id string, opts Options, part string) error {
+//
+// ⚠ 取消 = **连半截文件一起清掉**（2026-10-10 用户拍板「取消即删」；原口径是留着续传）。
+// 清理挂在这里而不是调用方的错误分支：取消有两个出口（下载中取消 / 重试等待中取消），
+// 一处 defer 全兜住，将来加第三个出口也不会漏。
+// ⚠⚠ 只清「失败 + 已取消」这一种；**普通网络失败照旧保留 .part** —— 那种场景续传是主诉求。
+// 为什么不在 Cancel() 里直接删：那一刻下载协程还在往文件里写，Windows 上会撞「文件被占用」；
+// 走到这里时写协程已退出、句柄全关，删除才是稳的。
+func (m *Manager) fetchToPart(ctx context.Context, id string, opts Options, part string) (err error) {
+	defer func() {
+		if err != nil && ctx.Err() != nil {
+			removePart(part)
+		}
+	}()
 	var lastErr error
 	for attempt := 1; attempt <= dlAttempts; attempt++ {
 		if attempt > 1 {
@@ -341,18 +429,18 @@ func (m *Manager) fetchToPart(ctx context.Context, id string, opts Options, part
 				return fmt.Errorf("已取消")
 			}
 		}
-		err := m.downloadOnce(ctx, id, opts, part)
-		if err == nil {
+		derr := m.downloadOnce(ctx, id, opts, part)
+		if derr == nil {
 			return nil
 		}
 		if ctx.Err() != nil {
 			return fmt.Errorf("已取消")
 		}
 		var pe *permError
-		if errors.As(err, &pe) {
-			return err
+		if errors.As(derr, &pe) {
+			return derr
 		}
-		lastErr = err
+		lastErr = derr
 	}
 	return fmt.Errorf("%w（已自动重试 %d 次仍失败；可以先重试，或者在「下载源」里换一个镜像）",
 		lastErr, dlAttempts-1)
@@ -619,6 +707,13 @@ func (m *Manager) downloadSegmented(ctx context.Context, id string, opts Options
 	}
 
 	var wmu sync.Mutex
+	// 速率按两次 report 之间的增量算 —— 和单连接那条路（downloadStream）同一个口径。
+	// 以前这里只报 Done/Percent：8 个连接在猛跑，界面上速度恒为 0，
+	// 「多线程」的意义反而看不见了（用户当初抱怨慢，速度正是他最想看的东西）。
+	var lastAt time.Time
+	var lastDone int64
+	var lastRate int64
+	var idle int // 连续几个采样窗口一个字节都没到
 	report := func() {
 		wmu.Lock()
 		var sum int64
@@ -626,8 +721,28 @@ func (m *Manager) downloadSegmented(ctx context.Context, id string, opts Options
 			sum += s
 		}
 		wmu.Unlock()
+		now := time.Now()
+		var rate int64
+		if !lastAt.IsZero() {
+			if dt := now.Sub(lastAt).Seconds(); dt > 0 {
+				rate = int64(float64(sum-lastDone) / dt)
+			}
+		}
+		// ⚠ 200ms 窗口里一个字节都没到（源站卡顿 / 网络空窗）时**别立刻刷成 0**：
+		// 那是采样窗口的假象，不是真的停了，直接归零会让界面上的速度忽有忽无。
+		// 连续 5 个窗口（约 1 秒）都没动静才认输显示 0。
+		if sum == lastDone {
+			idle++
+			if idle <= 5 {
+				rate = lastRate
+			}
+		} else {
+			idle = 0
+		}
+		lastAt, lastDone, lastRate = now, sum, rate
 		m.set(id, func(t *Task) {
 			t.Done = sum
+			t.Rate = rate
 			if t.Total > 0 {
 				t.Percent = float64(sum) / float64(t.Total) * 100
 			}
@@ -860,7 +975,11 @@ func hostOfResp(resp *http.Response) string {
 	return ""
 }
 
-// hashFile 通读文件算校验和。kind 是 sha1 / sha256（默认 sha256）。
+// hashFile 通读文件算校验和。kind 是 sha1 / sha256 / sha512（空与不认识的按 sha256 算）。
+//
+// ⚠ sha512 不是锦上添花：Modrinth 索引里的模组哈希清一色是 sha512（可能带个 sha1 兜底），
+// 整合包升级把种类原样传下来，这里不认的话校验全按 sha256 算 ——
+// 结果是**每一个模组都过不了校验**，用户看到的是 129 个「下载失败」。
 func hashFile(path, kind string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -868,9 +987,12 @@ func hashFile(path, kind string) (string, error) {
 	}
 	defer f.Close()
 	var h hash.Hash
-	if strings.EqualFold(kind, "sha1") {
+	switch {
+	case strings.EqualFold(kind, "sha1"):
 		h = sha1.New()
-	} else {
+	case strings.EqualFold(kind, "sha512"):
+		h = sha512.New()
+	default:
 		h = sha256.New()
 	}
 	if _, err := io.Copy(h, f); err != nil {

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type FetchBuild, type FetchSource, type GameVersion } from '../api'
 import { javaShortage, lacksJava, useLocalJava } from '../useLocalJava'
-import { IconRefresh } from './Icons'
+import { Icon } from './design'
 import { fmtSizeMaybe, fmtTime } from './ui'
 
 /**
@@ -95,6 +95,11 @@ export function ServerPicker({
   const [version, setVersion] = useState(value?.version ?? '')
   const [loading, setLoading] = useState('')
   const [err, setErr] = useState('')
+  // 版本搜索：一个类型动辄几十个版本（实测 Paper 55 个），滚着找太费劲。
+  const [query, setQuery] = useState('')
+  // 左列版本列表。用来把「当前选中」的那个滚进视野 —— 深链带 mc= 或配置页带
+  // 实例当前版本进来时，选中的版本可能排在几十个版本之后，停在顶部等于看不见它选了什么。
+  const vlistRef = useRef<HTMLDivElement>(null)
 
   // 本机有哪些 Java。选构建时就要比对，别让人白下 50MB 才发现起不来。
   const { max: javaMax, maxRef: javaMaxRef } = useLocalJava()
@@ -197,6 +202,17 @@ export function ServerPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version, type, mirror])
 
+  // 让选中的版本项在左列里可见。用 block:'nearest'：元素已经可见时它什么都不做，
+  // 不会把整页也带着滚一下。依赖 versions 是因为列表渲染出来之后才找得到那个元素。
+  useEffect(() => {
+    vlistRef.current?.querySelector('.vrow.on')?.scrollIntoView({ block: 'nearest' })
+  }, [version, versions, query])
+
+  // 版本搜索的过滤结果。只筛左栏的版本列表 —— 右栏构建是按选中版本拉的、最多 20 条，
+  // 再叠一层搜索只会让「搜了版本号结果构建栏空掉」这种困惑出现。
+  const q = query.trim().toLowerCase()
+  const shownVersions = q ? (versions ?? []).filter((v) => v.id.toLowerCase().includes(q)) : (versions ?? [])
+
   // 本机缺这个构建要的 Java 吗。javaMax 为 null（还没问到）时不提示
   const javaMissing = (major: number) => lacksJava(major, javaMax)
   const pickedMissing = value !== null && javaMissing(value.javaMajor)
@@ -208,14 +224,13 @@ export function ServerPicker({
 
   if (unsupported) {
     return (
-      <div className="border-l-[3px] border-warn bg-[#1a1812] px-4 py-3">
-        <p className="text-[13px] font-semibold text-[#e7dcb2]">
+      <div className="nbox w" style={{ margin: '14px 16px' }}>
+        <div className="hd">
+          <Icon name="info" />
           {src ? `${src.label} 还不能自动下载` : '这个服务端类型还不能自动下载'}
-        </p>
-        <p className="mt-1 text-[12.5px] leading-relaxed text-[#e7dcb2]">
-          {src?.note || '这个类型后端不认，可能是参数传错了。'}
-        </p>
-        <p className="mt-2 text-[12px] leading-relaxed text-ink-3">
+        </div>
+        <p>{src?.note || '这个类型后端不认，可能是参数传错了。'}</p>
+        <p style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>
           {allSrc.some((s) => s.available)
             ? `现在能自动下载的有 ${allSrc.filter((s) => s.available).map((s) => s.label).join('、')}。`
             : ''}
@@ -229,9 +244,23 @@ export function ServerPicker({
     <div>
       {/* 下载源：只有多于一个选项时才出这一行，单个选项摆出来是噪音 */}
       {src && src.mirrors.length > 1 && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="field-label mb-0">下载源</span>
-          <select className="px-input" value={mirror} onChange={(e) => setMirror(e.target.value)}>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: '10px 12px',
+            padding: '12px 16px',
+            borderBottom: '1px solid var(--line-1)',
+          }}
+        >
+          <span className="eyebrow">下载源</span>
+          <select
+            className="inp"
+            style={{ width: 'auto', minWidth: 160 }}
+            value={mirror}
+            onChange={(e) => setMirror(e.target.value)}
+          >
             {src.mirrors.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.label}
@@ -243,152 +272,225 @@ export function ServerPicker({
       )}
 
       {err && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-l-[3px] border-danger bg-[#1c1314] px-4 py-2.5">
-          <p className="min-w-0 flex-1 text-[12.5px] leading-relaxed text-[#ffc2c2]">{err}</p>
-          <button type="button" className="btn btn-sm shrink-0" onClick={() => loadVersions()}>
-            <IconRefresh size={12} />
-            重试
-          </button>
+        <div className="nbox d" style={{ margin: '14px 16px' }}>
+          <div className="hd">
+            <Icon name="ban" />
+            版本列表没拿到
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+            <p style={{ minWidth: 0, flex: 1 }}>{err}</p>
+            <button type="button" className="btn sm" onClick={() => loadVersions()}>
+              <Icon name="refresh" size={12} />
+              重试
+            </button>
+          </div>
         </div>
       )}
 
-      {/* ── 版本 ── */}
-      <p className="field-label">
-        游戏版本
-        {versions && (
-          <span className="mono-meta ml-3 font-normal">
+      {/* ── 版本 × 构建：左选版本、右选构建 ──
+          照设计稿 wizard.html 第②步：grid 1fr 320px，右列一条左分隔线。
+          原来是「版本一面 chip 墙 + 构建在下面另一块」，切个版本得在上下两处来回找。 */}
+      {versions === null ? (
+        <div style={{ padding: '14px 16px' }}>
+          <p className="mono-meta">正在向源站要版本列表…</p>
+        </div>
+      ) : versions.length === 0 ? (
+        <div style={{ padding: '14px 16px' }}>
+          <p style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>没拿到版本列表，点上面的重试。</p>
+        </div>
+      ) : (
+        <>
+          {/* .svgrid/.svcol：两列等高、列表吸底 —— 右列（提醒块 + 构建列表）有多高，
+              左列就跟着多高。以前两列各自封顶，右列加载完变高、左列停在半路，
+              底下空一大块（2026-10-09 用户截图）。样式在 design-overrides.css 里。 */}
+          <div className={`svgrid${compact ? ' compact' : ''}`}>
+            {/* 左列：版本竖排 */}
+            <div className="svcol">
+              {/* 搜版本：一个类型动辄几十个版本（Paper 55 个），滚着找太费劲 */}
+              <div style={{ padding: '12px 14px 10px' }}>
+                <div className="search" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ flex: 'none', color: 'var(--ink-3)' }}>
+                    <Icon name="search" size={13} />
+                  </span>
+                  <input
+                    type="search"
+                    id="sbx-version-search"
+                    name="version-search"
+                    aria-label="搜索游戏版本"
+                    style={{ minWidth: 0, flex: 1, background: 'none', border: 0, outline: 0 }}
+                    className="mono-value"
+                    placeholder="搜游戏版本，例如 1.20 或 1.21.4"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                  <span className="mono-meta" style={{ flex: 'none' }}>
+                    {q ? `${shownVersions.length} / ${versions.length}` : `${versions.length} 个版本`}
+                  </span>
+                </div>
+              </div>
+
+              {/* 左列版本列表：靠 .svcol > .vpick 的 flex:1 吸到底 —— 右列（提醒块 + 构建）
+                  有多高它就多高，两列底边永远齐平。77 个版本（Forge）全平铺是 2943px，
+                  盒子本身内滚，不会把整步撑开。 */}
+              <div className="vlist vpick" ref={vlistRef}>
+                {shownVersions.length === 0 ? (
+                  <p style={{ padding: '12px 14px', fontSize: 12, lineHeight: 1.7, color: 'var(--ink-3)' }}>
+                    没有匹配「{query.trim()}」的版本，清掉搜索框再看看。
+                  </p>
+                ) : (
+                  shownVersions.map((v, i) => {
+                    const on = version === v.id
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setVersion(v.id)}
+                        className={`vrow${on ? ' on' : ''}`}
+                        style={{ gridTemplateColumns: '130px 1fr auto' }}
+                      >
+                        <span className="ver">{v.id}</span>
+                        <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+                          {v.family && v.family !== v.id ? `版本族 ${v.family}` : ''}
+                        </span>
+                        {on ? (
+                          <span style={{ fontFamily: 'var(--f-term)', fontSize: 14, color: 'var(--cyan)' }}>
+                            已选
+                          </span>
+                        ) : i === 0 ? (
+                          <span style={{ fontFamily: 'var(--f-term)', fontSize: 14, color: 'var(--ok)' }}>
+                            最新
+                          </span>
+                        ) : null}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* 右列：构建列表 */}
+            <div className="svcol" style={{ padding: '14px 16px', borderLeft: '1px solid var(--line-1)' }}>
+              <div className="eyebrow" style={{ marginBottom: 10 }}>
+                BUILD · {version || '先选版本'}
+                {builds ? ` · ${builds.length} 个` : ''}
+              </div>
+
+              {/* 提醒块排在构建列表上方 —— 它们决定「要不要在这个版本上装」 */}
+              {pickedMissing && (
+                <div className="nbox d" style={{ marginBottom: 10 }}>
+                  <b>{javaShortage(value?.javaMajor ?? 0, javaMax)}</b>
+                  ，下下来也起不来。先把 Java {value?.javaMajor} 装好（「运行环境」那步就能下载，
+                  或设置页的「Java 运行时」里点「重新扫描」），或者换一个低一些的版本。
+                </div>
+              )}
+              {builds && builds.length > 0 && !builds.some(isStable) && (
+                <div className="nbox w" style={{ marginBottom: 10 }}>
+                  <div className="hd">
+                    <Icon name="info" />
+                    {version} 目前一个稳定构建都没有
+                  </div>
+                  列出来的全是 BETA / ALPHA（Paper 对新版本是先出测试版、稳定了才标记）。
+                  想稳一点就换一个老一些的版本，比如 1.21.4 这种已经全量稳定的。
+                </div>
+              )}
+              {type === 'forge' && (
+                <div className="nbox live" style={{ marginBottom: 10 }}>
+                  Forge 跟别家不一样：下的是<b>安装器</b>，下完还要在本机跑一遍才算装好。全程自动，
+                  不用你管。
+                </div>
+              )}
+              {type === 'vanilla' && (
+                <p style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 10, lineHeight: 1.7 }}>
+                  原版没有构建号，一个游戏版本只有一个包。
+                </p>
+              )}
+              {type === 'fabric' && (
+                <p style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 10, lineHeight: 1.7 }}>
+                  Fabric 固定用最新的稳定 Loader，没得挑。
+                </p>
+              )}
+
+              {/* 构建列表盒：加载中 / 空态也留在这个盒子里（.svcol > .vpick 有 min-height）。
+                  以前这两个状态是一段裸文字、没有盒子 —— 取到构建的那一刻右列突然长高
+                  240px，整个面板跟着弹一下。 */}
+              <div className="vlist vpick" style={{ border: '1px solid var(--line-1)' }}>
+                {!version || loading === 'builds' ? (
+                  <p style={{ padding: '12px 14px', fontSize: 12.5, color: 'var(--ink-3)' }}>
+                    正在取 {version || ''} 的构建…
+                  </p>
+                ) : builds === null || builds.length === 0 ? (
+                  <p style={{ padding: '12px 14px', fontSize: 12.5, color: 'var(--ink-2)' }}>
+                    这个版本没有可下载的构建。
+                  </p>
+                ) : (
+                  builds.map((b) => {
+                    const on = value?.build === b.id && value?.version === version
+                    return (
+                      <button
+                        key={b.id || b.name}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          onPick({
+                            version,
+                            build: b.id,
+                            tag: b.tag,
+                            javaMajor: b.javaMajor,
+                            javaFrom: b.javaFrom,
+                            size: b.size,
+                            name: b.name,
+                            mirror,
+                          })
+                        }
+                        className={`vrow${on ? ' on' : ''}`}
+                        style={{ gridTemplateColumns: '1fr auto' }}
+                      >
+                        <span style={{ minWidth: 0 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span className="ver" style={{ fontFamily: 'var(--f-body)', fontSize: 13 }}>
+                              {b.label || (b.id > 0 ? `#${b.id}` : '官方')}
+                            </span>
+                            {b.channel && (
+                              <span className={`chip s ${isStable(b) ? 'g' : 'w'}`}>
+                                {channelLabel(b.channel)}
+                              </span>
+                            )}
+                            {javaMissing(b.javaMajor) && <span className="chip s d">跑不起来</span>}
+                          </span>
+                          <span className="mono-meta" style={{ display: 'block', marginTop: 2 }}>
+                            需要 Java {b.javaMajor || '?'} · {fmtSizeMaybe(b.size)}
+                          </span>
+                        </span>
+                        <span className="fmeta" style={{ flex: 'none' }}>
+                          {b.time ? fmtTime(b.time) : ''}
+                        </span>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+              {/* 列表下面的通用说明：只有真拿到列表时才显示 */}
+              {!loading && builds && builds.length > 0 && (
+                <p style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 10, lineHeight: 1.7 }}>
+                  一般取最新 build。老 build 只在「新版把某个插件搞坏了」时才需要回退。
+                </p>
+              )}
+              {!loading && builds && builds.length >= 20 && (
+                <p className="mono-meta" style={{ marginTop: 8 }}>
+                  {type === 'forge'
+                    ? '只列出 20 个。整合包锁了更老的 Forge 版本的话，去源站下那个版本的安装器，放进实例目录再跑一遍就行。'
+                    : '只列出最近 20 个构建。更老的版本用的人少，需要的话直接去源站下再手动放进实例目录。'}
+                </p>
+              )}
+            </div>
+          </div>
+          <p className="mono-meta" style={{ padding: '10px 16px 14px' }}>
             {type === 'forge'
               ? `${versions.length} 个版本 · 取自 Forge 官方的推荐表`
               : `${versions.length} 个正式版 · 已滤掉快照与预发布`}
-          </span>
-        )}
-      </p>
-      {versions === null ? (
-        <p className="text-[12.5px] text-ink-3">正在向源站要版本列表…</p>
-      ) : versions.length === 0 ? (
-        <p className="text-[12.5px] text-ink-2">没拿到版本列表，点上面的重试。</p>
-      ) : (
-        <>
-          <div
-            className={`mt-1 flex flex-wrap gap-2 overflow-y-auto ${compact ? 'max-h-[112px]' : 'max-h-[144px]'}`}
-          >
-            {versions.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                aria-pressed={version === v.id}
-                onClick={() => setVersion(v.id)}
-                className={`ver-chip${version === v.id ? ' sel' : ''}`}
-              >
-                {v.id}
-              </button>
-            ))}
-          </div>
-          {versions.length > 12 && (
-            <p className="mono-meta mt-1.5">
-              框里能滚 —— 一共 {versions.length} 个，从新到旧排
-            </p>
-          )}
-        </>
-      )}
-
-      {/* ── 构建 ── */}
-      {version && (
-        <div className="mt-5">
-          <p className="field-label">
-            构建
-            {type === 'vanilla' && <span className="mono-meta ml-3 font-normal">原版没有构建号，只有一个</span>}
-            {type === 'fabric' && (
-              <span className="mono-meta ml-3 font-normal">Fabric 固定用最新的稳定 Loader，没得挑</span>
-            )}
-            {type === 'forge' && (
-              <span className="mono-meta ml-3 font-normal">
-                前两个是 Forge 官方升级表里标的推荐 / 最新，后面按版本号从新到旧排 ——
-                所以后面的历史构建里可能出现比官方「最新」号还大的版本
-              </span>
-            )}
           </p>
-          {loading === 'builds' ? (
-            <p className="text-[12.5px] text-ink-3">正在取 {version} 的构建…</p>
-          ) : builds === null || builds.length === 0 ? (
-            <p className="text-[12.5px] text-ink-2">这个版本没有可下载的构建。</p>
-          ) : (
-            <>
-              {pickedMissing && (
-                <p className="mb-3 border-l-[3px] border-danger bg-[#1c1314] px-4 py-2.5 text-[12.5px] leading-relaxed text-[#ffc2c2]">
-                  <b className="text-ink-1">{javaShortage(value?.javaMajor ?? 0, javaMax)}</b>
-                  ，下下来也起不来。先把 Java {value?.javaMajor} 装好（设置页的「Java 运行时」里点
-                  「重新扫描」就能认出来），或者换一个低一些的版本。
-                </p>
-              )}
-              {!builds.some(isStable) && (
-                <p className="mb-3 border-l-[3px] border-warn bg-[#1a1812] px-4 py-2.5 text-[12.5px] leading-relaxed text-[#e7dcb2]">
-                  <b className="text-ink-1">{version} 目前一个稳定构建都没有</b>
-                  ，列出来的全是 BETA / ALPHA（Paper 对新版本是先出测试版、稳定了才标记）。
-                  想稳一点就换一个老一些的版本，比如 1.21.4 这种已经全量稳定的。
-                </p>
-              )}
-              {type === 'forge' && (
-                <p className="mb-3 border-l-[3px] border-cyan bg-[#131b1a] px-4 py-2.5 text-[12.5px] leading-relaxed text-ink-2">
-                  Forge 跟别家不一样：下的是<b className="text-ink-1">安装器</b>，下完还要在本机跑一遍才算装好。
-                  这一步会再下几十到一百多 MB 的库文件（实测 1.20.4 全流程 34 秒、1.12.2 31 秒），
-                  全程自动，装完服务端文件会自动指到对的那个 jar，不用你管。
-                </p>
-              )}
-              <div className="px-card">
-              {builds.map((b) => {
-                const on = value?.build === b.id && value?.version === version
-                return (
-                  <button
-                    key={b.id || b.name}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() =>
-                      onPick({
-                        version,
-                        build: b.id,
-                        tag: b.tag,
-                        javaMajor: b.javaMajor,
-                        javaFrom: b.javaFrom,
-                        size: b.size,
-                        name: b.name,
-                        mirror,
-                      })
-                    }
-                    className="row-b flex w-full flex-wrap items-center gap-x-3.5 gap-y-1.5 px-4 py-2.5 text-left"
-                    style={{ background: on ? 'var(--color-raised)' : 'transparent' }}
-                  >
-                    <span
-                      className={`mono-value shrink-0 ${on ? 'font-bold text-accent' : ''}`}
-                      style={{ minWidth: 74 }}
-                    >
-                      {b.label || (b.id > 0 ? `#${b.id}` : '官方')}
-                    </span>
-                    {b.channel && (
-                      <span className={`chip shrink-0 ${isStable(b) ? 'chip-g' : 'chip-w'}`}>
-                        {channelLabel(b.channel)}
-                      </span>
-                    )}
-                    <span className="mono-meta shrink-0">{fmtSizeMaybe(b.size)}</span>
-                    <span className={`mono-meta shrink-0${javaMissing(b.javaMajor) ? ' text-[#ffc2c2]' : ''}`}>
-                      需要 Java {b.javaMajor || '?'}
-                    </span>
-                    {javaMissing(b.javaMajor) && <span className="chip chip-d shrink-0">跑不起来</span>}
-                    <span className="mono-meta ml-auto shrink-0">{b.time ? fmtTime(b.time) : ''}</span>
-                  </button>
-                )
-              })}
-                {builds.length >= 20 && (
-                  <p className="mono-meta px-4 py-2.5">
-                    {type === 'forge'
-                      ? '只列出 20 个。整合包锁了更老的 Forge 版本的话，去源站下那个版本的安装器，放进实例目录再跑一遍就行。'
-                      : '只列出最近 20 个构建。更老的版本用的人少，需要的话直接去源站下再手动放进实例目录。'}
-                  </p>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+        </>
       )}
     </div>
   )

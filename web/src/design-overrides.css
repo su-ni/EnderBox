@@ -1,0 +1,1501 @@
+@layer design {
+/* 设计稿样式表的**适配层**。
+ *
+ * design.css 是从 docs/design/pixel-refresh/styles.css 整份复制来的（唯一真相源，不许改它）。
+ * 那边是**静态演示页**，在真实面板里只有两处必须覆盖 —— 本文件就是那两处。
+ *
+ * ⚠ 本文件与 design.css 同在 @layer design —— 靠 main.tsx 的引入顺序排在它之后（同层后来者胜）。
+ *   （旧注释「不能放进 @layer / design.css 是 unlayered」已过时，层序见 index.css 顶部声明。）
+ */
+
+/* ① 铺满全屏。设计稿的 .app 是 `max-width:1500px; margin:0 auto`（演示页在宽屏上居中留边），
+      高度再减掉它自己 38px 的 .draftbar 工具条（演示页专属）。真实面板要铺满、且没有 draftbar。 */
+.app {
+  max-width: none;
+  margin: 0;
+  height: 100vh;
+}
+
+/* ② React 挂载点：不参与布局，交给 .app */
+#root {
+  display: block;
+  min-height: 100vh;
+}
+
+/* ②b 登录页：设计稿的 .login-wrap 减掉了演示页 38px 的 draftbar，
+      真机上没有那条 —— 减了会让卡片整体上浮 19px。 */
+.login-wrap {
+  min-height: 100vh;
+}
+
+/* ③ 玩家表：压掉 index.css 里**老玩家组件**同名类漏出来的属性。
+ *
+ * index.css 还留着老 PlayersPanel 的 CSS，类名与设计稿撞了（.prow/.pstat…）。
+ * design.css 在 @layer design、index.css 在更低的 components/app 层 —— 两者都声明的属性 design.css 赢；
+ * 但凡是 design.css **没写**的属性，index.css 那条就会漏出来。
+ * 实测抓到：`.prow { min-height: 54px }` 会把设计稿的行从 49px 撑到 54px（肉眼就是「行距偏松」），
+ * `.prow { border-bottom }` 也会与设计稿的 border-top 分行规则打架。一并压掉。
+ *
+ * ⚠ 不要去 index.css 删老规则：那套 CSS 还指着老组件接真实名册接口，等所有页都搬完再统一瘦身。
+ */
+.prow {
+  min-height: 0;
+  border-bottom: 0;
+}
+
+/* ④ 行主体当按钮用。
+ *
+ * 设计稿是静态演示页，`.rmain` 只是个 <div>；真实面板里「点名字看详情」是主入口，
+ * 得是 <button>（键盘可达 + 语义正确）。.rmain 自己只声明了 min-width，
+ * 按钮的默认外观（灰底、边框、内边距、居中、系统字体）必须裸化，否则整行会变形。
+ * 几何依旧全部由 .rmain / .rtitle / .rsub 决定 —— 这里只做「清零」，不加任何新视觉。
+ */
+button.rmain,
+button.fname,
+button.rname {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+button.rmain:hover .rtitle,
+button.fname:hover .n { color: var(--cyan); }
+button.rmain:focus-visible,
+button.fname:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⑤ 旧类 → 设计语言：**材质映射层**
+
+   还剩一批面板（文件 / 备份 / 任务 / 设置 / 整合包 / 市场 / 详情 / 向导 …）挂着上一版的
+   类名。调色板其实早对齐了，差的是**材质**：
+
+     旧面板     十字黑框（box-shadow 四向 3px 黑）+ 无边框实底标签
+     设计稿     1px 黑描边 + 硬投影 + 内斜面（border 四边不同明度）+ 带 1px 描边的透明标签
+
+   所以这里把材质拉平一次 —— 比逐个文件重写结构便宜，也不会漏掉某页。
+   **结构性的差异**（页头 / 面板头 / 行列表）不在这层，仍要按页改。
+
+   ⚠⚠ 写在本文件 = 未分层 → 对 index.css（`@layer components`）**无条件胜出**，
+      连 `:hover` 也一样赢（层顺序优先于特异性）。所以凡在这里覆盖的属性，
+      hover / focus 态**必须自己补一份**，否则按钮会在鼠标移上去时毫无反应 ——
+      这种 bug 修起来比写它贵十倍，别省。
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 面板：十字黑框 → 设计稿 .panel 的材质 ── */
+.px-card {
+  background: var(--sf-1);
+  border: 2px solid var(--bg-0);
+  border-top-color: var(--line-2);
+  border-left-color: var(--line-2);
+  border-right-color: #04060a;
+  border-bottom-color: #04060a;
+  box-shadow: 0 0 0 1px #000, var(--sh-hard);
+}
+/* .pxb / .pxb-2 是给「不是面板、但也要像素硬边」的块用的（进度条槽、缩略图框…） */
+.pxb {
+  box-shadow: 0 0 0 1px #000, var(--sh-hard);
+}
+.pxb-2 {
+  box-shadow: 0 0 0 1px #000, 2px 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+/* ── 按钮：草绿主色 → 设计稿 .btn-primary（青）──
+   设计稿里页面级动作（获取模组 / 新建世界 / 安装）统一是青底。
+   启动 / 停止那两颗走 .btn-start / .btn-stop，不在这里，别顺手一起改。 */
+.btn-grass {
+  color: #04211f;
+  background: linear-gradient(180deg, var(--cyan-l), var(--cyan));
+  border-top-color: #bffaf6;
+  border-left-color: #bffaf6;
+  border-right-color: var(--cyan-d);
+  border-bottom-color: var(--cyan-d);
+}
+.btn-grass:hover:not(:disabled) {
+  background: linear-gradient(180deg, #9df6f1, var(--cyan-l));
+}
+.btn-grass:disabled {
+  background: linear-gradient(180deg, var(--cyan-l), var(--cyan));
+}
+
+/* 按钮尺寸：.btn-sm → 设计稿 .btn.sm */
+.btn-sm {
+  padding: 5px 11px;
+  font-size: 12.5px;
+}
+
+/* ── 标签：实底无框 → 设计稿 .chip（1px 描边 + 极淡同色底）── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  background: var(--sf-2);
+  border: 1px solid var(--line-2);
+}
+.chip-g {
+  color: var(--ok);
+  border-color: rgba(87, 211, 100, 0.5);
+  background: rgba(87, 211, 100, 0.08);
+  font-weight: 400;
+}
+.chip-w {
+  color: var(--warn);
+  border-color: rgba(242, 193, 78, 0.5);
+  background: rgba(242, 193, 78, 0.08);
+  font-weight: 400;
+}
+.chip-d {
+  color: #ff9a90;
+  border-color: rgba(232, 86, 74, 0.5);
+  background: rgba(232, 86, 74, 0.1);
+}
+.chip-c {
+  color: var(--cyan);
+  border-color: rgba(51, 213, 207, 0.5);
+  background: rgba(51, 213, 207, 0.08);
+}
+
+/* ── 筛选标签：.fchip → 设计稿 .chipf（2px 像素边 + 选中青底）── */
+.fchip {
+  padding: 5px 12px;
+  font-family: var(--f-body);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  background: var(--sf-2);
+  border: 2px solid var(--bg-0);
+  border-top-color: var(--line-2);
+  border-left-color: var(--line-2);
+  border-right-color: #04060a;
+  border-bottom-color: #04060a;
+  box-shadow: none;
+  font-weight: 400;
+}
+.fchip:hover {
+  color: var(--ink-1);
+}
+.fchip.on {
+  color: #04211f;
+  background: var(--cyan);
+  border-top-color: #bffaf6;
+  border-left-color: #bffaf6;
+  border-right-color: var(--cyan-d);
+  border-bottom-color: var(--cyan-d);
+  font-weight: 400;
+}
+.fchip.tab {
+  padding: 7px 14px;
+  font-size: 12.5px;
+}
+
+/* ── 输入控件：十字 2px 黑框 → 设计稿 .inp 的材质 ── */
+.px-input {
+  background: #0a0e12;
+  color: var(--ink-1);
+  border: 2px solid #05070a;
+  border-right-color: var(--line-2);
+  border-bottom-color: var(--line-2);
+  box-shadow: none;
+}
+.px-input:focus {
+  border-right-color: var(--cyan);
+  border-bottom-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan-d);
+}
+.px-input::placeholder {
+  color: var(--ink-3);
+}
+
+/* 搜索框：同上，材质换成 .inp，焦点给青色（不是草绿） */
+.search {
+  background: #0a0e12;
+  border: 2px solid #05070a;
+  border-right-color: var(--line-2);
+  border-bottom-color: var(--line-2);
+  box-shadow: none;
+  transition: border-color var(--dur), box-shadow var(--dur);
+}
+.search:focus-within {
+  border-right-color: var(--cyan);
+  border-bottom-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan-d);
+}
+
+/* ── 进度条：挖槽 + 主色填充 → 设计稿 .prog（含条纹）── */
+.pbar {
+  height: 16px;
+  background: #0a0e12;
+  border: 2px solid #05070a;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+.pbar > i {
+  background: linear-gradient(180deg, var(--cyan-l), var(--cyan) 60%, var(--cyan-d));
+}
+.pbar > i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.2) 0 6px,
+    transparent 6px 12px
+  );
+  background-size: 24px 100%;
+  animation: xpstripe 1.1s linear infinite;
+}
+.pbar > i {
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── 方形图标按钮：加设计稿的像素斜面（旧版是平的）── */
+.ibtn {
+  border: 2px solid var(--bg-0);
+  border-top-color: var(--line-2);
+  border-left-color: var(--line-2);
+  border-right-color: #04060a;
+  border-bottom-color: #04060a;
+  background: rgba(255, 255, 255, 0.03);
+}
+.ibtn:hover:not(:disabled) {
+  background: var(--sf-3);
+  color: var(--ink-1);
+}
+.ibtn.on {
+  background: rgba(51, 213, 207, 0.16);
+  color: var(--cyan);
+}
+.ibtn.on:hover:not(:disabled) {
+  background: rgba(51, 213, 207, 0.24);
+  color: var(--cyan-l);
+}
+.ibtn.bad {
+  background: rgba(232, 86, 74, 0.18);
+  color: #ff9d92;
+}
+.ibtn.bad:hover:not(:disabled) {
+  background: rgba(232, 86, 74, 0.28);
+  color: #ffc2c2;
+}
+
+/* ── 字段标签 / 说明：对齐设计稿 .field 的字级 ── */
+.field-label {
+  font-size: 13px;
+  color: var(--ink-1);
+}
+.field-hint {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* ── 眉标：对齐设计稿 .eyebrow（像素字体 + 更宽字距）。只放拉丁，汉字会回退。 ── */
+.eyebrow {
+  font-family: var(--f-pix);
+  font-size: 11.5px;
+  letter-spacing: 0.18em;
+}
+
+/* ── 键值明细行：.srow-k / .srow-v → 设计稿 .srow .k / .v ── */
+.srow-k {
+  color: var(--ink-3);
+  font-family: var(--f-pix);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+}
+.srow-v {
+  color: var(--ink-2);
+  font-family: var(--f-term);
+  font-size: 14px;
+}
+
+/* ── .tog 的「正在提交」态 ──
+   设计稿是静态页，开关永远可点；真实面板改一次要发一个请求，那段窗口里必须锁住，
+   否则连点会让「开 → 关 → 开」互相覆盖，最后停在哪全看返回顺序。
+   压暗的程度照抄 .btn:disabled，别自己另定一套。 */
+.tog.dis {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── 机器数据小字：.mono-meta / .mono-value → 设计稿的终端字体（--f-term）──
+   设计稿把「路径 / 时间 / 大小 / 版本号」这类机器读数统一交给 VT323（.mk-stats / .srow .v），
+   旧类还给系统等宽字体，在这套像素面板里格格不入。字号沿用旧值（行高不变，纯换字体）。 */
+.mono-meta {
+  font-family: var(--f-term);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.mono-value {
+  font-family: var(--f-term);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 「人话 + 数字」的混排行（下载气泡/台账的 step 描述）──
+   ⚠ 这类行不能用 .mono-meta：--f-term 是 VT323，**没有汉字**，
+   中文全靠回退字体 —— 一行里「正在下载」用雅黑、「1.2 MB」用像素细字，
+   字重和基线都对不上（用户原话「看着很割裂」）。
+   正文栈 + tabular-nums：数字照样不抖，中文字体和全站一致。 */
+.step-line {
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 台账里「总量未知」的进度条（上游不给 Content-Length / 装机阶段）──
+   不假装知道进度：fill 铺满 + 呼吸，配合旁边「—」的百分比。
+   满格不动的条子会被读成「卡在 100%」，比不给条子更糟（.pbar.unknown 同款判据）。 */
+.prog.indet .fill {
+  animation: sk-pulse 1.25s ease-in-out infinite;
+}
+
+/* ── 版本行 / 市场卡片当 <button> 用 ──
+   设计稿是静态演示页，.vrow / .mk-card 都是 <div>；真实面板里它们是入口，
+   必须是 <button>（键盘可达 + 语义正确）。这里只补「按钮默认外观与设计稿冲突」的那几项，
+   **不重写**设计稿已声明的几何（background / border / padding 一概不动 ——
+   动了就会用更高的 `button.x` 特异性盖掉 `.x:hover` / `.x.on` 的状态色）。
+
+   ⚠ .vrow 自己没声明 background / 其余三边 border，按钮默认的灰底和 outset 边框会漏出来，
+      必须显式清零；清零后 :hover / .on 的 background（特异性 b=2）仍能盖过 button.vrow（b=1）✅ */
+button.vrow {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line-1);
+}
+button.vrow:first-child {
+  border-top: 0;
+}
+/* 版本行禁用（安装 / 升级作业在跑时锁定整张表）：压暗 + 不响应 hover。
+   覆盖层在 index.css（@layer）之上，:hover 态必须自己补 —— 见文件头 ⚠。 */
+button.vrow:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+button.vrow:disabled:hover {
+  background: none;
+}
+button.mk-card {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+/* ── Java 行当 <button> 用（设计稿的 .java-row 是静态 div）──
+   .java-row 自己只声明了网格与 :hover，按钮默认外观必须清零。
+   清零后 :hover（b=2）仍压得住 button.java-row（b=1）✅ */
+button.java-row {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line-1);
+  cursor: pointer;
+}
+button.java-row:first-child {
+  border-top: 0;
+}
+/* 选中态：和 .vrow.on 同一套语言（左侧青条 + 渐变底）—— 设计稿没有这个态，
+   它画的是静态列表，真机上「当前选的是哪个」必须一眼可见。 */
+button.java-row.sel {
+  background: linear-gradient(90deg, rgba(51, 213, 207, 0.13), transparent);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+
+/* ── 弹窗：设计稿的 .dlg 没有「危险」变体（演示页里弹窗都是中性的）──
+   真实面板里删除 / 强杀 / 还原这类不可逆操作要一条红标题带，防止有人看都没看就按了确认。
+   只动标题带的底色与字色，材质（2px 底边框、sf-2 底）仍是设计稿那一套。 */
+.dlg-head.danger {
+  background: rgba(232, 86, 74, 0.09);
+}
+.dlg-head.danger h2 {
+  color: #ffb0a8;
+}
+/* 动作按钮多于两个时窄屏要能折行（设计稿演示页最多两个按钮，没留 wrap） */
+.dlg-foot {
+  flex-wrap: wrap;
+}
+
+/* ── Toggle 的按钮外壳 ──
+   设计稿的 .tog 是个静态 <span>（演示用），真实组件要键盘可达：
+   外面套一层无样式 button，样式仍然全是 .tog 的。
+   ⚠ 别直接给 button 挂 .tog —— button 自带 padding/font，会跟 .tog 的像素材质打架。 */
+.tog-btn {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.tog-btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+/* ── 弹窗外壳：居中 + 安全滚动（覆写设计稿的「顶对齐」）──
+   design.css 的 .dlg-overlay 是 align-items:flex-start + padding-top:48px（顶对齐）。
+   用户对「弹窗上浮、不居中」有明确抱怨，所以改为垂直居中：
+   .dlg 用 margin:auto 双向居中 —— 比 align-items:center 安全，
+   内容比视口高时 auto margin 自动退化为 0，顶部/底部都滚得到（center 会把顶部裁掉、滚不上去）。
+   padding 顺势改对称（顶对齐时上 48 下 24 是给视口留呼吸，居中了就不需要不对称）。 */
+.dlg-overlay {
+  padding: 24px;
+}
+.dlg-overlay > .dlg {
+  margin: auto;
+  /* 入场：8px 上浮 + 淡入。backwards 而不是 both —— 动画结束不把 transform 钉在元素上
+     （非 none 的 transform 会造包含块，见 index.css 里 .anim-in 的说明）。
+     ⚠ 这里原本写的是 `rise`，但那个关键帧**只定义了 `to` 帧**，要靠元素自己带
+     初始 opacity/transform 才有效果 —— 而 .dlg 没有 → 「有声无画」，弹窗仍是硬切。
+     换成带 `from` 帧的 dlgIn。
+     ⚠ 注意选择器是 `.dlg-overlay > .dlg`（两个类）：特异性高于后面单类的 `.dlg` 规则，
+       所以**只改这一处**就行，别指望在文件末尾补一条 `.dlg{}` 能盖过它（实测被压过）。 */
+  animation: dlgIn var(--dur) var(--ease) backwards;
+}
+
+/* ── 右信息栏：多个 .rail-sec 之间留 16px（设计稿用逐段 inline style 写的，
+   搬进组件后用相邻选择器统一表达；第一个之前不加）── */
+.rail-sec + .rail-sec {
+  margin-top: 16px;
+}
+
+/* ── .sec-head 允许折行：设计稿演示页的标题都短，真机上中文项目名可能很长
+   （sec-head 是 flex 不换行的，长了会顶出面板）。折行是无副作用的兜底。
+   ⚠ 别改成 flex-wrap:nowrap —— 长标题会横向溢出触发体检红灯。 */
+.sec-head {
+  flex-wrap: wrap;
+}
+
+/* ── 版本行下面「这个版本要先装：」的横条（设计稿 mod.html 里的 inline 样式落成类）──
+   整宽、极淡黄底、一条上分隔线 —— 跟在 vrow 后面时和它连成一体。 */
+.depbar {
+  padding: 10px 14px 12px;
+  background: rgba(242, 193, 78, 0.06);
+  border-top: 1px solid var(--line-1);
+}
+/* ── 装前置队列的卡：换成设计稿 .panel + .con-head 结构 ──
+   index.css 里旧 .dep-card 的 12px 14px 内边距（@layer）会留存下来 ——
+   它顶破 con-head 的满宽底边线，这里显式清零；卡体自己再补 12px 14px。
+   滑出动画（.dep-card.leaving）保持原样。 */
+.panel.dep-card {
+  padding: 0;
+}
+/* badge 的黄色变体：设计稿 mod.html 里是 inline 写的，这里收成类 */
+.badge.w {
+  color: var(--warn);
+  border-color: rgba(242, 193, 78, 0.55);
+  background: rgba(242, 193, 78, 0.1);
+}
+/* badge 当按钮用（点前置名去挑版本）：
+   只清按钮的灰底、补指针；border / 字体一概不碰 —— .badge / .badge.w 自己的声明要生效 */
+button.badge {
+  background: none;
+  cursor: pointer;
+}
+
+/* ── 作业进度卡的两种状态色（设计稿只给了 nbox 的中性 / 警告 / 危险三态）──
+   成功的绿与 .chip.g / .btn-start 同一个绿；进行中的青与运行状态点 / .btn-primary 同一个青。 */
+.nbox.ok {
+  border-left-color: var(--ok);
+  background: rgba(87, 211, 100, 0.07);
+  color: #d9efd9;
+}
+.nbox.ok .hd {
+  color: #cdf3cd;
+}
+.nbox.live {
+  border-left-color: var(--cyan);
+  background: rgba(51, 213, 207, 0.06);
+}
+
+/* ── 市场卡片「整卡可点」：内容保持设计稿的 div/h3/p，可点性靠末尾铺满的透明按钮 ──
+   为什么不是把 .mk-card 直接做成 <button>：button 里只允许 phrasing content，
+   而设计稿的卡片内部是 div/h3/p —— 它们的 CSS（.mk-top .tx h3、.mk-desc…）
+   就是「材质」本身，换标签等于把那套选择器全改写一遍。
+   铺一层透明按钮：键盘可达、语义正确（一个「查看详情」动作）、几何全由 .mk-card 决定。 */
+.mk-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+/* 键盘焦点环：键盘用户看不到 hover 的青色边框，得给一个明确的焦点标记 */
+.mk-card:has(.mk-hit:focus-visible) {
+  border-top-color: var(--cyan);
+  border-left-color: var(--cyan);
+}
+.mk-hit:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+/* 卡片图标槽里的真实图片（Modrinth 项目图标）：填满 46px 的槽，硬边贴像素风 */
+.mk-ico img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 2px solid #04060a;
+  box-shadow: 0 0 0 1px #000;
+}
+/* 没有图片时用 i-cube 兜底：它也铺满整个槽（设计稿的 .mk-ico 就是 46px 的方块图标） */
+.mk-ico > svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── 市场结果行「就地展开」出来的版本区：和上面的行连成一体 ──
+   （设计稿没有「行内展开」这个形态——它是真实交互的需要：点一行就在原地看版本、
+   不跳整屏。材质用 sf-2 + 一条上分隔线，视觉上归属上面那一行。） */
+.rexp {
+  background: var(--sf-2);
+  border-top: 1px solid var(--line-1);
+  padding: 10px 14px 12px;
+}
+
+/* ════════ 下载台账（侧栏「下载与安装」弹窗）════════
+   这一版是推倒重来的：进行中 =「作业票」卡片、结束 = 紧凑行，两种层级分开。
+   卡片用 ricon 同款的立体描边（上/左提亮），底色比弹窗底亮一档（sf-2）——
+   它承载的是「正在动的东西」，配得上这点面积和亮度。 */
+.dl-card {
+  background: var(--sf-2);
+  border: 2px solid #04060a;
+  border-top-color: var(--line-2);
+  border-left-color: var(--line-2);
+  padding: 12px 14px 13px;
+}
+.dl-card .ricon { flex: none; }
+/* 实时速度：终端字 + 青色，比正文大一号 —— 扫一眼就知道还在动 */
+.dl-rate {
+  font-family: var(--f-term);
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  color: var(--cyan);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* 进度条右侧的字节读数。min-width 兜住两列的对齐（数字不抖列） */
+.dl-bytes {
+  font-family: var(--f-term);
+  font-size: 14px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  min-width: 96px;
+  text-align: right;
+}
+/* 结束行：一行放完。hover 只提亮 —— 行本身不是可点区域（可点的是名字和按钮） */
+.dl-done-list { display: flex; flex-direction: column; }
+.dl-done { padding: 8px 10px; margin: 0 -10px; border-top: 1px solid var(--line-1); }
+.dl-done:first-child { border-top: 0; }
+.dl-done:hover { background: var(--sf-2); }
+.dl-dicon {
+  width: 24px; height: 24px; flex: none; display: grid; place-items: center;
+  background: var(--sf-3); border: 2px solid #04060a;
+  border-top-color: var(--line-2); border-left-color: var(--line-2);
+}
+.dl-done-time,
+.dl-done-size {
+  font-family: var(--f-term);
+  font-size: 14px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.dl-done-time { min-width: 76px; text-align: right; }
+.dl-done-size { min-width: 72px; text-align: right; }
+/* 长的失败原因缩进到标题位置（24 图标 + 10 间距）说完整 —— chip 装不下它 */
+.dl-done-err { margin: 4px 0 0 34px; font-size: 12.5px; line-height: 1.6; color: #ff9a90; }
+/* ════════ 新建向导：版心与标准页统一（不封 1080px）════════
+   设计稿的 .wz-shell 是 `max-width:1080px; margin:0 auto`（演示页口径）。放到 2K/超宽屏上，
+   1080 版心居中后左右各空 400px+，用户直接点名为「左右冗余」。
+   标准页走 `.content`（左右 30px gutter、不封顶）—— 向导这里改成同一口径：
+   根节点给 30px gutter（CreateWizard.tsx 的 px-[30px]），shell 自身不再封宽。 */
+.wz-shell { max-width: none; width: 100%; margin: 0; }
+
+/* ════════ 新建向导：类型卡改成「图标+标题一行 / 描述全宽一行」════════
+   设计稿是「图标 | 文字块」两列 flex：文字区只剩 127px，一句话要折三行；
+   而不可用卡显示的是后端 note（原先最长 135 字 = 13 行），把那一整行撑到 310px，
+   同一屏里卡片高矮差 108px（实测 202 / 310）。
+   改法：图标与标题同行（图标仍在标题左侧），描述另起一行并跨到图标下方 → 127px → 171px；
+   描述再钉死两行（1 行的由 min-height 补齐、超过的截断），配合同样压到两行的文案，
+   九张卡从「两行两个高度」变成整屏同一高度。
+   ⚠ .kinds 的行高本来就是内容驱动的（两行 202 + 310），别去动容器的 align-content；
+   要齐就得让每张卡的内容一样高 —— 这就是这个改法成立的原因。 */
+.kind {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 3px 10px;
+  padding: 12px 13px;
+  align-items: center;
+}
+.kind .ico { grid-column: 1; grid-row: 1; }
+.kind .nm { grid-column: 2; grid-row: 1; min-width: 0; font-size: 13.5px; font-weight: 700; }
+.kind .ds {
+  grid-column: 1 / -1;
+  font-size: 12px; color: var(--ink-3); line-height: 1.5;
+  /* 钉死两行：文案本身别再写超两行（TYPE_INFO.desc / 后端 note 都按两行写）。
+     这里只是兜底 —— 真出了省略号，说明那句文案该收短了。 */
+  min-height: 36px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* ════════ 版本/构建选择：两列等高、列表吸底（向导第 2 步 + 配置页「换服务端」共用）════════
+   演进：最早是两列各自封顶内滚（max-height 260~520px）。问题 —— 右列（Java 提醒 +
+   构建列表）在构建加载完成后整列变高，左列版本列表却停在 max-height 不动，
+   底下空一大块（2026-10-09 用户截图：面板 874px 高，左列列表只占 303px）。
+   现在：网格行高由两列共同决定（align-items: stretch 默认值），两列都是 flex 列、
+   列表 flex:1 吸到底 —— 右列长多高，左列跟着长，两边底边永远齐平。
+   min-height 两处：列内 240px 是列表下限（别被提醒块压没）；网格 430px 起是整步的
+   视口下限（530px = 网格上下固定装饰：顶栏/步骤条/相关行/面板页脚/HUD，别随手改，
+   改了要么整页出滚动条、要么面板空半屏）。
+   ⓘ .vlist 全站多个组件共用，别直接改它；.svgrid/.svcol/.vpick 都是这个组件专用的。 */
+.svgrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 0;
+}
+.svgrid.compact { grid-template-columns: minmax(0, 1fr) 280px; }
+.svcol {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.svcol > .vpick {
+  flex: 1 1 0;
+  min-height: 240px;
+  overflow-y: auto;
+}
+@media (min-width: 861px) {
+  .svgrid { min-height: clamp(430px, calc(100dvh - 530px), 640px); }
+}
+
+/* ════════ 文件页与列表行 ════════ */
+/* ⚠ .frow 的 CSS 默认是 5 列（图标/名称/大小/时间/操作）—— 那个形态没有进入实际使用：
+   设计稿 files 块每行都靠 inline style 覆盖成 3 列（图标 / 名称+fmeta 副行 / 操作），
+   React 侧同样是 inline 覆盖。这里**不再补任何列定义（含窄屏）**：
+   design.css 的 @media(860px) 已自带 .frow → 28px 1fr auto + 隐藏 .fmeta 的逻辑。
+   历史：这里曾把它改成 5 列表格式（复选框 / 排序 / 表头）—— 复核设计稿后已改回。 */
+
+/* 列表描述行只给一行。数据源（比如 Modrinth 的 description）可能整段是版权文本，
+   不截断会把行高撑歪（Konkrete 那行曾撑到 4 行）。全文挂在 title 上悬停看。 */
+.rsub.one-line { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 行尾「更多」菜单。z-95：高于抽屉(70)和对话框(80) —— 菜单是从它们里面弹出来的 */
+.rmenu {
+  position: fixed; z-index: 95; min-width: 152px; padding: 4px;
+  display: flex; flex-direction: column;
+  background: var(--sf-2); border: 2px solid #04060a;
+  border-top-color: var(--line-2); border-left-color: var(--line-2);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+  animation: menuIn 120ms var(--ease);
+}
+.rmenu-i {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 9px; background: none; border: 0; cursor: pointer;
+  font-size: 12.5px; color: var(--ink-2); text-align: left;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.rmenu-i:hover { background: rgba(51, 213, 207, 0.12); color: var(--ink-1); }
+@keyframes menuIn {
+  from { opacity: 0; transform: translateX(-100%) translateY(-4px); }
+  to { opacity: 1; }
+}
+/* 上传进度条（多文件逐个传时显示）。与台账共用 .prog，这里只补一条容器 */
+.fupbar {
+  display: flex; align-items: center; gap: 12px; padding: 9px 14px;
+  background: var(--sf-2); border-bottom: 1px solid var(--line-1);
+}
+.fupbar .prog { flex: 1; min-width: 0; }
+
+/* ── 配置页字段行：控件撑满控件列（设计稿 `.field` = 190px 标签 | 1fr 控件）──
+   设计稿里：input `.inp` width:100%（630px）、stepper 通栏（内部 值输入框 flex 吃掉余量）、
+   开关 52px 左对齐。旧实现给控件包了 flex-end → 输入框塌成固有宽度（178px）全挤右边，
+   中间空几百像素，整页显得「散架」（用户 2026-10-09：「配置页重新设计，好丑」）。
+   Crow 现在把控件包在 `.ctl` 里，这里负责「撑满」，只作用在配置页自己的包装层上。 */
+.field > .ctl { min-width: 0; }
+.field > .ctl > .px-input,
+.field > .ctl > input.inp,
+.field > .ctl > select { width: 100%; }
+.field > .ctl > .stepper,
+.field > .stepper { width: 100%; }
+.field > .ctl .stepper input,
+.field > .stepper input { flex: 1 1 auto; min-width: 0; }
+/* ⚠ .tog 是 <span>：块级 .ctl 里会退回 inline，宽高直接失效（塌成 4px）。
+   设计稿里它靠「作为 grid item 被块级化」，这里显式补上。 */
+.field > .ctl > .tog { display: block; }
+
+/* ── 原生下拉框：去系统外观 + 像素箭头（两级）──
+   ① 兜底（不支持 base-select 的老浏览器）：appearance:none + 背景画 9×5 小三角（贴右缘）。
+   ② Chrome 135+ 的 appearance:base-select：**连弹层一起**换成像素风 ——
+      触发器 =「文字 + 8px 间隙 + 像素 chevron」（设计稿 .sel 的排法：箭头跟在文字后面，
+      不是贴右缘）；弹层 = .rmenu 同款材质（sf-2 底 + 硬阴影 + 方角）。
+      ⚠ 2026-10-09 教训：第一版只做了 ①，用户「没看见下拉选框有变化」——9×5 小三角跟
+      系统自带的箭头肉眼几乎一样。② 才是能被看见的那版，① 只留给老浏览器。
+   ⚠ .px-input / .inp / .sel 各自用 background 简写给了底色（会重置 background-image）——
+      所以规则都带类名（同层内按 specificity 决出）。 */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+}
+select.px-input,
+select.inp,
+select.sel {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='5' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h9v1H0zM1 1h7v1H1zM2 2h5v1H2zM3 3h3v1H3zM4 4h1v1H4z' fill='%238593a2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 26px;
+}
+@supports (appearance: base-select) {
+  select.px-input,
+  select.inp,
+  select.sel {
+    appearance: base-select;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background-image: none;
+  }
+  select.px-input,
+  select.inp { padding-right: 11px; }
+  select.sel { padding-right: 10px; }
+  /* 箭头：设计稿 i-chev-r 原形（4 根 rect 的像素 ▶），10×10，ink-2 */
+  select.px-input::picker-icon,
+  select.inp::picker-icon,
+  select.sel::picker-icon {
+    content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cg fill='%23b0bfcc'%3E%3Crect x='5' y='4' width='2' height='8'/%3E%3Crect x='7' y='5' width='2' height='6'/%3E%3Crect x='9' y='6' width='2' height='4'/%3E%3Crect x='11' y='7' width='2' height='2'/%3E%3C/g%3E%3C/svg%3E");
+    width: 10px;
+    height: 10px;
+    margin: 0;
+  }
+  /* 弹层：与侧栏右键菜单 .rmenu 同一套材质。option 也要各写一遍底色 */
+  ::picker(select) {
+    appearance: base-select;
+    background: var(--sf-2);
+    border: 2px solid #04060a;
+    border-top-color: var(--line-2);
+    border-left-color: var(--line-2);
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+    color: var(--ink-2);
+    font-size: 12.5px;
+    margin-top: 2px;
+  }
+  option {
+    padding: 8px 10px;
+    background: var(--sf-2);
+    color: var(--ink-2);
+  }
+  option:hover { background: rgba(51, 213, 207, 0.12); color: var(--ink-1); }
+  option:checked { color: var(--cyan); }
+  option::checkmark { display: none; }
+  /* 打开中：右/下描边点亮成青（与 .inp:focus 同一语言） */
+  select.px-input:open,
+  select.inp:open,
+  select.sel:open {
+    border-right-color: var(--cyan);
+    border-bottom-color: var(--cyan);
+  }
+}
+
+/* ── 顶栏「设置」按钮的激活态 ──
+   设置从 tabbar 挪到顶栏之后，「现在就在设置页」仍要看得出来。
+   cyan = 选中态（accent 草绿是 CTA / 运行态，别用）。 */
+.topbar .btn[aria-current='page'],
+.topbar .btn[aria-current='page']:hover:not(:disabled) {
+  color: var(--cyan);
+}
+
+/* ── 概览页控制台必须封顶（2026-10-09）──
+   ⚠ 实测事故：1447 行日志时 .console 被撑到 **32030px**，.con-body 的
+   clientHeight == scrollHeight（31925 == 31925，**完全没内滚**），.grid-2 行高也被撑成
+   32030px，左右两列一起被拉爆 —— 整页三万多像素。
+
+   根因：`.con-body` 只有 min-height 没有上限，而 `.console{height:100%}` 在
+   `.grid-2` 的 auto 行高里会解析成 auto（百分比高度对不定高父级无效）
+   → 面板高度 = 内容高度 → 日志多长、页面就多长。与当年 ServerPicker 上
+   「grid 行被内容撑高」是同一个病。
+
+   修法：只给概览页的控制台面板封顶。上限取 480px 是贴着右列自然高（实测 437px）取的，
+   这样两列仍然等高（设计稿本来的排法），日志超出则面板内滚。
+
+   ⚠ 别改成 `.grid-2{align-items:start}` —— design.css:1198 留着血书：那会让两列各按
+   内容高、右列短一截，「一眼就不对」。 */
+.page[data-page='home'] .con-body {
+  /* 限在**日志区本身**，不是面板：限住 body 之后面板的内容高就确定了
+     （head + body + input），grid 行高 = max(两列)，另一列由 stretch 补齐 → 两列仍然等高。 */
+  max-height: clamp(240px, 34vh, 360px);
+}
+.page[data-page='home'] .console {
+  /* height:auto：design.css 的 .console{height:100%} 在 .grid-2 的 auto 行高里算不出值
+     （百分比高度对不定高父级无效），且会挡住 grid item 的 stretch 接管。
+     实测：只限面板 max-height 时左列 398 / 右列 436，差 38px 不等高。 */
+  height: auto;
+}
+/* 日志时间列：当源日志本身不带时间戳时，退回到「面板收到这一行的时刻」。
+   弱化显示以示区别（悬停有 title 说明），不让它冒充服务端给的时间。 */
+.log-line .t.est {
+  opacity: 0.5;
+}
+
+/* 市场列表行上的「客户端 / 服务端」徽标（.side-warn / .side-ok）。
+   用告警黄和青区分两侧，而不是沿用中性分类 chip 的灰 —— 它会决定服务器能不能起来，
+   和「装饰 / 科技」那种用途标签不是一个量级的提醒。 */
+.rrow .chip.s.side-warn {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.rrow .chip.s.side-ok {
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+
+/* ── 模组列表的多选：复选框列 ──
+   设计稿的 .rrow 没有复选框位（它没有批量操作），这是本项目的功能延伸：
+   在原四列（图标 / 主体 / 元信息 / 动作）**最左边**插一列 22px 的勾选位。
+   ⚠ 窄屏（≤860px）design.css 会把 .rmeta 整列收掉，这里必须跟着改，
+   否则那档下会多出一个空列、把标题挤成竖排。 */
+/* ⚠⚠ 只改**带勾选位的那种行**（.has-ck），绝不直接改 `.rrow`：
+   `.rrow` 是设计稿的通用行类，**市场搜索结果也在用它**（那边没有复选框）。
+   第一版直接改 `.rrow` 的列数 → 市场行的 4 个子元素被塞进 5 列：图标挤进 22px 列、
+   标题与描述全被压成竖排（实测行高 143 / 204 / 235px，一眼就不对）。
+   **教训：动共享类之前先 grep 出所有使用者。** */
+.rrow.has-ck {
+  grid-template-columns: 22px 32px minmax(0, 1fr) auto auto;
+}
+@media (max-width: 860px) {
+  .rrow.has-ck {
+    grid-template-columns: 22px 32px minmax(0, 1fr) auto;
+  }
+}
+
+/* 勾选位。用原生 checkbox（键盘空格能勾上），靠 accent-color 跟着主题走。 */
+.rsel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rsel input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--cyan);
+  cursor: pointer;
+}
+
+/* 选中行：左竖线青 + 极淡底，够看清又不盖掉行本身的内容 */
+.rrow.sel {
+  background: rgba(74, 237, 217, 0.07);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+
+/* 批量操作条：选中若干行后出现在列表上方 */
+.selbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 2px solid var(--bg-0);
+  background: var(--sf-2);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+/* ── 交互动效补齐（2026-10-09）──
+   design.css 已经把「像素风回手感」定义好了：按下位移 1px + 边框翻色（.btn:active）、
+   主按钮 hover 扫光（.btn-primary::after + sweep）、开关滑块位移（.tog .knob）……
+   但 **`.btn` 本身一条 transition 都没有**（它有 24 条规则，全是瞬时的），
+   于是那些精心设计的终态全在「啪」地跳变。这里只补过渡，**不改任何终态**。
+
+   ⚠ 只过渡 color / background / border-color / transform —— 这些不触发重排。
+   过渡 width / height / padding / margin 会让布局跟着抖，本项目在「吸顶抽搐」上栽过一次。
+   ⚠ 渐变不能过渡（CSS 限制）：`.btn-primary` 的 hover 背景仍是瞬变，
+   但它有 sweep 扫光兜着，观感反而是对的 —— 别为了「看起来在动」去改掉那个渐变。
+   ⚠ `prefers-reduced-motion` 已在 design.css:646 / index.css 多处覆盖，这里不用再写。 */
+
+.btn {
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+/* 标签类：chip / badge / 状态块。它们大量用于「点了就变」的筛选与状态切换，
+   没有过渡时整页都是硬切。 */
+.chip,
+.badge,
+.sel,
+.stat,
+.chipf {
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+/* 复选框（模组页批量）：勾选时给一点点回手，但别做回弹 —— 与全局 ease 一致 */
+.rsel input[type='checkbox'] {
+  transition: transform var(--dur-fast) var(--ease);
+}
+.rsel input[type='checkbox']:active {
+  transform: scale(0.9);
+}
+/* ── 对话框入场（2026-10-09）──
+   design.css 的 `.dlg` / `.dlg-overlay` **一条动画都没有**：点开模组详情是硬切出来的，
+   而右侧抽屉 `.sheet` 有 sheetIn —— 同一个产品里两种弹层观感不一致。
+
+   ⚠⚠ 必须用 `backwards`，**不能用 `both`**：
+   `both` 会把最后一帧的 `transform: none` 永久留在元素上，Chrome 归一化成
+   `matrix(1,0,0,1,0,0)`；而**祖先一旦有 transform，内部的 position:fixed 就会认它当包含块**
+   → 弹层被压扁。本项目在抽屉上栽过同一个坑。
+   `backwards` 只在动画开始前套用第一帧，跑完就摘掉。
+
+   ⚠ reduced-motion 已被 index.css / design.css 的全局规则兜住（1ms），这里不重复写。 */
+@keyframes dlgIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes dlgOverlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.dlg-overlay {
+  animation: dlgOverlayIn var(--dur) var(--ease) backwards;
+}
+/* ⚠ 这里原本还有一条单类 `.dlg{animation:dlgIn}` —— 删掉。
+   真正生效的是上面 :461 的 `.dlg-overlay > .dlg`（两个类，特异性更高）；
+   留一条盖不过任何东西的死规则在这儿，下次改动画的人会先看到它、以为改这里就够了。 */
+} /* ← @layer design 结束 */
+
+/* ── MC 百科关系星图（McmodGraph.tsx）─────────────────────────
+   用户点名「照 mc 百科的做法」，所以我们照抄了站方画图的参数（见组件顶部注释）：
+   圆圈节点 + 名字在右 + 带箭头的细边 + 力导向布局 + hover 出简介卡。
+
+   位置：**页末通栏**（ProjectShell 的 below 槽），不是右信息栏 —— 图要占满宽度才看得清，
+   300px 的右栏里 302 个节点会糊成一团（上一版就是这么被否掉的）。
+
+   材质遵守项目规范：**零渐变、零阴影、零装饰圆角**。节点是「圆」——
+   圆是图形的形状本身（站方用的就是 circle），不是卡片/按钮那种装饰性圆角容器，不算破例。
+   配色一律取自站方 JSON 的分类色（前置红 / 拓展蓝 / 联动灰 / 中心深蓝）。 */
+@layer design {
+  .mcg-sec {
+    padding: 16px 18px;
+  }
+  .mcg-idle {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .mcg-hint,
+  .mcg-err,
+  .mcg-src {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.65;
+    color: var(--color-ink-3);
+  }
+  .mcg-err {
+    color: var(--color-warn);
+  }
+  /* 来源必显：这是第三方站点的数据，不是我们的接口，用户得知道该怪谁 */
+  .mcg-src {
+    padding-top: 8px;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .mcg-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* 工具条：左边名称 + 规模，右边缩放按钮 */
+  .mcg-toolbar {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .mcg-tb-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-ink-1);
+  }
+  .mcg-tb-sub {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--color-ink-3);
+  }
+  .mcg-tb-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  /* 手势提示（左键转 / 右键平移 / 滚轮缩放）。窄屏字挤，直接藏 —— 触摸端本来也用不上鼠标手势 */
+  .mcg-tb-help {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--color-ink-3);
+    opacity: 0.9;
+  }
+  @media (max-width: 560px) {
+    .mcg-tb-help { display: none; }
+  }
+
+  /* 画布高度。图形本身的长宽比由组件里的 Rx/Ry 上限控制（不会随画布比例走样），
+     所以这里给一个宽松的档位即可：小屏矮、大屏高，别把页面撑得没边。 */
+  .mcg-canvas {
+    position: relative;
+    width: 100%;
+    height: clamp(360px, 62vh, 680px);
+    /* 节点画到框外时由内层 SVG 裁掉（见 .mcg-svg）。这里用 visible 是为了让
+       布局最省心：外层不参与裁剪，也就不给滚动链添任何变量。
+       ⚠⚠ 真正会坏滚轮的是下面那条 touch-action —— 那条别动。 */
+    overflow: visible;
+    border: 1px solid var(--color-line);
+    background: var(--color-panel-2);
+    /* ⚠⚠⚠ 这条是「星图滚不动」的**真凶**，别改成 none。
+       曾经写的是 touch-action:none（为了禁掉拖拽时的原生滚动），结果触摸板/触屏上
+       双指滚动被它整条夺走、变成元素内的拖拽手势，页面再也滚不动 —— 用户就是这个症状
+       （「我怎么滚动不了星图」）。pan-y = 纵向滚动放行给页面、横向留给 JS 拖拽。
+       ⚠ 注意：鼠标滚轮不受 touch-action 影响（那条路上真凶另有其他），所以只测鼠标滚轮
+       是发现不了这个问题的 —— 必须用触摸板/触屏，或至少知道它只作用于触摸输入。 */
+    touch-action: pan-y;
+    /* 左键拖=转动、右键/中键拖=平移（2026-10-10 加平移）；抓握光标对两种手势都成立 */
+    cursor: grab;
+    /*
+      屏蔽文本选中：拖拽转星图时，浏览器默认会把划过的文字（那些节点名）整片选中，
+      拖一下就糊一片蓝。转动是手势，不是选文字 —— 这里禁掉。
+      ⚠ 只作用于画布内部，页面别处的文字照样能正常选中复制。
+      ⚠ 别用 user-select:none 之外的方式（比如 preventDefault 掉 mousedown）：
+        那样会连点击/聚焦一起干掉。
+    */
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  /* SVG 自己裁掉画到框外的节点（外层盒子保持 overflow:visible，不给滚动链添变量）。 */
+  .mcg-svg {
+    display: block;
+    overflow: hidden;
+  }
+
+  /* 深度档容器：由远及近 12 档，靠 paint order 实现遮挡（见组件里主循环那段注释）。
+     远的档压暗，强化「近实远虚」的立体感 —— 纯透明度，不是阴影/发光。
+     ⚠ 实测（probe_panel.mjs 的 BUCKETS 输出）常态只用 nth-child 4~9 —— 梯度必须
+     沿这段铺满 0.60→1.0；1~3 档只有 pitch 拖到极限才碰到，作更暗的兜底。
+     （2026-10-10 修：之前只写到第 5 档、且最暗只到 0.72，过半深度范围没有明暗差。） */
+  .mcg-bk:nth-child(1) > .mcg-node { opacity: 0.45; }
+  .mcg-bk:nth-child(2) > .mcg-node { opacity: 0.50; }
+  .mcg-bk:nth-child(3) > .mcg-node { opacity: 0.55; }
+  .mcg-bk:nth-child(4) > .mcg-node { opacity: 0.60; }
+  .mcg-bk:nth-child(5) > .mcg-node { opacity: 0.67; }
+  .mcg-bk:nth-child(6) > .mcg-node { opacity: 0.75; }
+  .mcg-bk:nth-child(7) > .mcg-node { opacity: 0.83; }
+  .mcg-bk:nth-child(8) > .mcg-node { opacity: 0.92; }
+  .mcg-bk:nth-child(9) > .mcg-node { opacity: 1; }
+  .mcg-bk:nth-child(10) > .mcg-node { opacity: 1; }
+  .mcg-bk:nth-child(11) > .mcg-node { opacity: 1; }
+  .mcg-bk:nth-child(12) > .mcg-node { opacity: 1; }
+
+  .mcg-canvas:active {
+    cursor: grabbing;
+  }
+
+  /*
+    星尘层：339 条边全画会糊成毛球（「不像星系」的另一半原因），压到 0.12 之后
+    颜色信息还在，观感却是「雾」不是「网」。
+    ⚠⚠ **值必须写在 CSS 里**：CSS 优先级高于 SVG 的 presentation attribute，
+    组件里那个 `opacity="0.12"` 属性会被这里覆盖 —— 两边各写一个数迟早对不上。
+    ⚠ 原来的「hover 时整层压淡」删掉了：改成 .mcg-edge-hot 只高亮当前行星连通的那几条，
+    比把 339 条一起变淡清楚得多（变淡之后还是一整片，读不出任何信息）。
+  */
+  .mcg-edge {
+    stroke-width: 1.5;
+    opacity: 0.12;
+  }
+
+  .mcg-circle {
+    stroke: var(--color-panel);
+    stroke-width: 1.5;
+    transition: stroke-width 120ms;
+  }
+  .mcg-node {
+    cursor: pointer;
+  }
+  .mcg-node:hover .mcg-circle {
+    stroke: var(--color-ink-1);
+    stroke-width: 2.5;
+  }
+  /* 被点中的节点：加一圈青描边，跟信息卡呼应（一眼知道卡在说谁） */
+  .mcg-node.is-picked .mcg-circle {
+    stroke: var(--color-cyan);
+    stroke-width: 3;
+  }
+  /* 中心点外圈：跟站方一样，一眼认出「这是谁」 */
+  .mcg-halo {
+    fill: none;
+    stroke: var(--color-cyan);
+    stroke-width: 2;
+    stroke-dasharray: 3 3;
+    opacity: 0.9;
+  }
+  /* 名字：站方 label{position:right,formatter:{b}}。
+     mono 只给机器数据 —— 这里是人读的模组名，用正文衬线/无衬线即可。 */
+  .mcg-label {
+    font-size: 11px;
+    fill: var(--color-ink-1);
+    pointer-events: none;
+    paint-order: stroke;
+    stroke: var(--color-panel-2);
+    stroke-width: 2.5px;
+    stroke-linejoin: round;
+  }
+  .mcg-node.is-center .mcg-label {
+    font-size: 12.5px;
+    font-weight: 700;
+    fill: var(--color-ink-1);
+    /* 中心点上汇聚着几十条箭头，2.5px 描边不够，字会被穿花 —— 加粗到 3.5px 才镇得住 */
+    stroke-width: 3.5px;
+  }
+
+  /* 图例（分类色 + 分类名 + 该类节点数）——站方 legend 就是 categories 的名字。
+     纯展示；「瘦身」交给上面的层级档位（.mcg-depth）。 */
+  .mcg-cats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 11.5px;
+    color: var(--color-ink-2);
+  }
+  .mcg-cats li {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .mcg-swatch {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 9px;
+  }
+  .mcg-cat-count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-ink-3);
+  }
+
+  /* 层级档位（全部 / 2层 / 1层）：工具条里的一组分段按钮。
+     零圆角 —— 靠 1px 描边 + 选中态描边变青来区分，不用填充块堆叠。 */
+  .mcg-depth {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid var(--color-line);
+  }
+  .mcg-depth-btn {
+    padding: 3px 9px;
+    border: 0;
+    border-left: 1px solid var(--color-line);
+    background: transparent;
+    color: var(--color-ink-2);
+    font: inherit;
+    font-size: 11.5px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 120ms, background 120ms;
+  }
+  .mcg-depth-btn:first-child {
+    border-left: 0;
+  }
+  .mcg-depth-btn:hover {
+    color: var(--color-ink-1);
+  }
+  /* 选中态：青底深字（跟项目里「选中=青」一致） */
+  .mcg-depth-btn.on {
+    background: var(--color-cyan);
+    color: #062825;
+  }
+  .mcg-hint {
+    font-size: 11px;
+  }
+
+  /* hover 卡片：跟站方 tooltip 一样给「名字 + 简介」，跟随鼠标。
+     ⚠ 用 position:fixed 而不是 absolute —— 鼠标可能落在画布任何位置，absolute 得反算父坐标。
+     fixed 相对视口定位，组件直接传 clientX/clientY，最省事。它挂在 .mcg-wrap 下、
+     不在 .mcg-canvas（overflow:hidden）里面，所以不会被裁。 */
+  .mcg-tip {
+    position: fixed;
+    z-index: 60;
+    max-width: 320px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-line);
+    background: var(--color-panel);
+    pointer-events: none;
+  }
+  .mcg-tip-name {
+    display: inline-block;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+    pointer-events: auto;
+  }
+  .mcg-tip-name:hover {
+    text-decoration: underline;
+  }
+  .mcg-tip-cat {
+    margin-left: 8px;
+    font-size: 10.5px;
+    color: var(--color-ink-3);
+  }
+  .mcg-tip-content {
+    margin: 5px 0 0;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--color-ink-2);
+  }
+
+  /* ▍点节点 → 右侧信息面板（星系式交互：点行星看详情）
+     面板是 absolute 浮层盖在画布右 ~300px，占住步进动画让出来的位置（节点挪到左 36%）。
+     零圆角零阴影：1px 描边 + 面板底色 + 左侧一条分类色竖条（替代图标）。
+     旧的「画布下方文档流卡片」已被这个浮层取代。 */
+  .mcg-stage {
+    position: relative;
+  }
+  /*
+    点行星 → 右侧信息面板。
+    ⚠ 是 absolute 浮层盖在画布右侧，**不是 flex 兄弟** —— 做成兄弟会挤窄画布，
+    ResizeObserver 触发 → effect 重建 → 整图重画，肉眼可见地闪。
+    ⚠ 宽度 320 而不是 300：设计稿的 .srow 是「左标签 + 右值」两栏，300 会挤。
+  */
+  /*
+    ⚠ 高度跟着内容走（bottom:auto + max-height），**不**顶天立地撑满画布。
+    撑满那版内容短时中间会空出 ~150px，footer 还被 margin-top:auto 推到最底 ——
+    看着就是「中间破了个洞」（2026-10-10 实测 gap 148px）。内容长了 max-height 兜住，
+    内部照常滚动，行为不变。
+  */
+  .mcg-side {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: auto;
+    max-height: 100%;
+    width: min(320px, 48%);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 13px 14px;
+    border-left: 1px solid var(--color-line);
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-panel);
+    overflow-y: auto;
+  }
+  .mcg-side-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  /* 分类色竖条：贴在抬头行里（跟着名字的高度走），不是整条面板高 */
+  .mcg-side-bar {
+    flex: 0 0 3px;
+    align-self: stretch;
+    min-height: 20px;
+  }
+  /*
+    ⚠ 名字用**正文色**，不用分类色。分类色是站方给的分类值（深红/深紫那一档），
+    在面板底上对比度不够，而且会和下面的关系句抢视觉。分类的身份感交给
+    左边的竖条 + chip 描边就够了，名字回归 ink-1（正文色，对比度达标）。
+  */
+  .mcg-side-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--color-ink-1);
+    word-break: break-word;
+  }
+  .mcg-side-x {
+    flex: 0 0 auto;
+  }
+  .mcg-side-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    /* 不再 margin-top:auto 顶到面板最底：面板高度=内容高度，footer 跟着内容走 */
+    padding-top: 10px;
+    border-top: 1px solid var(--color-line);
+  }
+  .mcg-side-note {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--color-ink-3);
+  }
+
+  /*
+    旋臂骨架：两条对数螺旋虚线，参数与 spiralLayout **同源**，所以行星必然落在它上面。
+    ⚠⚠ 上一版是三条同心椭圆 —— 行星根本不落在圈上，那只是「和点位无关的纯装饰」，
+    看着像乱画，是「不像星系」的一大原因。骨架的意义在于**说出旋臂在哪**。
+  */
+  .mcg-arm {
+    fill: none;
+    /* ⚠ 别用 --color-line-2（这个变量不存在）。--color-line 在画布底 #19212a 上太暗，
+       看不出是旋臂；这里取 ink-3 配低透明度，做出一条「若有若无的引导线」。 */
+    stroke: var(--color-ink-3);
+    stroke-width: 1;
+    stroke-dasharray: 2 5;
+    opacity: 0.26;
+  }
+
+  /* 选中聚焦：非邻居压暗（一眼读出「这颗行星和谁相连」）。
+     ⚠ 特异性要压过 .mcg-bk:nth-child(n) > .mcg-node 的远档 opacity —— 写两层类 +
+        放在远档规则之后（同层同特异，后者胜）。 */
+  .mcg-bk > .mcg-node.is-dim {
+    opacity: 0.24;
+  }
+
+  /* 窄屏：面板落到画布下方（position:static 回到正常流，不再盖住图形） */
+  @media (max-width: 560px) {
+    .mcg-side {
+      position: static;
+      width: 100%;
+      border-left: 0;
+      border-top: 1px solid var(--color-line);
+    }
+  }
+
+  /*
+    ▍面板内小部件。旧的 `.mcg-card-*`（那套「画布下方文档流卡片」的遗留）随老卡片一起
+    弃用，统一换成 `.mcg-side-*` —— 名字对齐当前结构，不留两套说法。
+  */
+  .mcg-side-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+  }
+  .mcg-side-chip {
+    display: inline-block;
+    padding: 1px 7px;
+    border: 1px solid var(--color-line);
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--color-ink-3);
+  }
+  .mcg-side-rel {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--color-ink-2);
+  }
+  /*
+    数值行直接复用设计稿的 `.srow`（design.css 已有 .srow/.k/.v，项目适配成 .srow-k/.srow-v），
+    不再自造一段「依赖 N 个 · 被 N 个依赖」的统计文字 —— 那是设计稿里没有的排版。
+  */
+  .mcg-side-rows > .srow {
+    padding: 7px 0;
+  }
+  .mcg-side-rows > .srow .srow-k {
+    width: 76px;
+  }
+  /*
+    小标题 ⚠ 不用 `.eyebrow`：那是像素字体，只对拉丁有效，汉字会回退成另一个样子
+    （设计稿那条注释也写了「仅拉丁」）。这里自己给一个汉字版的小标签。
+  */
+  .mcg-side-cap {
+    display: block;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--color-ink-3);
+  }
+  .mcg-side-desc p {
+    margin: 4px 0 0;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--color-ink-2);
+    /* 简介可能很长：面板里最多 6 行，多的裁掉（要看全文点「MC 百科条目」） */
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  /*
+    核球辉光：两层同心半透明圆叠出「越往外越淡」。
+    ⚠ 不用 <radialGradient> —— 项目是零渐变；同心圆叠加一样能做出辉光，且不引入装饰性渐变。
+  */
+  .mcg-core-glow {
+    /* ⚠ 用 cyan 而不是节点分类色：中心那颗的分类色是深蓝，深蓝光晕在深蓝底上等于隐形 */
+    fill: var(--color-cyan);
+    stroke: none;
+    pointer-events: none;
+  }
+  .mcg-core-glow.far {
+    opacity: 0.09;
+  }
+  .mcg-core-glow.near {
+    opacity: 0.2;
+  }
+  /* 高亮边层：只画当前行星连通的那几条（青＝项目里「交互/数据高亮」的既定语义） */
+  .mcg-edge-hot {
+    stroke: var(--color-cyan);
+    stroke-width: 2;
+    opacity: 0.9;
+    pointer-events: none;
+  }
+
+  /* ── 承接式切页：页签指示条 ─────────────────────────
+     换页时外壳与页签都不动，只有这枚菱形从旧页签滑到新页签（内容区做上下承接交接）。
+     ⚠ 原生 .tab.on::after 那枚常隐 —— 视觉由 .tab-glide 独家负责，免得两枚菱形同框。
+     位置（left/top）由 App.tsx 量 .tab.on 的中心写进来，这里只管长相与滑动。 */
+  .tabbar {
+    position: relative;
+  }
+  .tab.on::after {
+    opacity: 0;
+    animation: none;
+  }
+  .tab-glide {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    margin: -3px 0 0 -3px;
+    background: var(--cyan);
+    transform: rotate(45deg);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      left var(--dur-slow) var(--ease),
+      top var(--dur-slow) var(--ease),
+      opacity var(--dur) var(--ease);
+  }
+} /* ← @layer design 结束 */

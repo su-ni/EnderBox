@@ -38,10 +38,9 @@ export function StepInput({
   }
 
   return (
-    <span className="step-ctl">
+    <span className="stepper">
       <button
         type="button"
-        className="sb"
         aria-label={`${label} 减少`}
         // 按住 Shift 一次走 10 格：端口那种五位数靠一格一格点太累
         onClick={(e) => bump(-1, e.shiftKey)}
@@ -54,17 +53,19 @@ export function StepInput({
         inputMode="numeric"
         aria-label={label}
         value={String(value)}
+        style={{ width: 92 }}
         onChange={(e) => onChange(e.target.value.replace(/[^\d-]/g, ''))}
       />
-      {suffix && <span className="mono-meta shrink-0 px-1">{suffix}</span>}
       <button
         type="button"
-        className="sb"
         aria-label={`${label} 增加`}
         onClick={(e) => bump(1, e.shiftKey)}
       >
         +
       </button>
+      {suffix && (
+        <span style={{ alignSelf: 'center', marginLeft: 8, fontSize: 12.5, color: 'var(--ink-3)' }}>{suffix}</span>
+      )}
       {right}
     </span>
   )

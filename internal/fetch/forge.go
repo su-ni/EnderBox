@@ -105,9 +105,8 @@ func promoMCVersions(promos map[string]string) []Version {
 			continue
 		}
 		seen[mc] = true
-		// promos 里的都是正式版（Forge 不为快照出推荐）。Stable 表示「不是快照/预发布」，
-		// 跟 Paper 的 STABLE 通道不是一回事，别混。
-		out = append(out, Version{ID: mc, Stable: true})
+		// promos 里的都是正式版（Forge 不为快照出推荐），所以这里不需要再标「稳不稳定」。
+		out = append(out, Version{ID: mc})
 	}
 	return out
 }

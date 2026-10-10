@@ -169,13 +169,23 @@ func (m *Manager) javaCandidates() []string {
 
 	// 1. 本程序托管的运行时：runtimes/<名字>/bin/java
 	//    允许一层嵌套，因为下载包解压出来常常是 runtimes/jdk-21/jdk-21.0.3/bin/java
-	if roots, err := filepath.Glob(filepath.Join(m.baseDir, "runtimes", "*", "bin", exe)); err == nil {
-		for _, r := range roots {
-			add(r)
-		}
+	//
+	//    ⚠ 以点开头的目录一律跳过（判定见 isStagedPath）。安装 JDK 会在
+	//    runtimes/.staging/<名字>/ 下解压，那是「解到一半」的中间态 ——
+	//    把它认成「本机可用的 Java」，用户就会在一个正在被覆盖的目录上开服。
+	runtimeGlobs := []string{
+		filepath.Join(m.baseDir, "runtimes", "*", "bin", exe),
+		filepath.Join(m.baseDir, "runtimes", "*", "*", "bin", exe),
 	}
-	if roots, err := filepath.Glob(filepath.Join(m.baseDir, "runtimes", "*", "*", "bin", exe)); err == nil {
+	for _, g := range runtimeGlobs {
+		roots, err := filepath.Glob(g)
+		if err != nil {
+			continue
+		}
 		for _, r := range roots {
+			if m.isStagedPath(r) {
+				continue
+			}
 			add(r)
 		}
 	}
@@ -290,6 +300,23 @@ func (m *Manager) JavaRuntimes() []JavaRuntime {
 		return out[i].Path < out[j].Path
 	})
 	return out
+}
+
+// isStagedPath 判断 runtimes/ 下这条命中是不是我们自己的中间产物。
+// 安装 JDK 时会在 runtimes/.staging/<名字>/ 里解压，目录名以点开头 ——
+// 那种目录可能正被覆盖，不能算「本机可用的 Java」。
+func (m *Manager) isStagedPath(hit string) bool {
+	prefix := filepath.ToSlash(filepath.Join(m.baseDir, "runtimes")) + "/"
+	rest := strings.TrimPrefix(filepath.ToSlash(hit), prefix)
+	if rest == filepath.ToSlash(hit) {
+		return false // 根本不在 runtimes/ 下，不归这条管
+	}
+	for _, seg := range strings.Split(rest, "/") {
+		if strings.HasPrefix(seg, ".") {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Manager) javaSource(p string) string {

@@ -1,0 +1,135 @@
+<!-- ServerBox 设计稿 · 单屏模块：config
+     从 index.html 里原样切出来（index.html 仍是总预览，未改动）。
+     搬进 React 时一个文件对应一屏；class 名与 index.html 保持一致。 -->
+<section class="page" data-page="config">
+          <div class="sec-head reveal" style="--rd:.1s">
+            <span class="idx">03</span>
+            <h2>配置</h2>
+            <span class="sub">改完立即生效的分组在前，服务端自己的 server.properties 改完要重启才读</span>
+            <div class="spacer"></div>
+            <button class="btn sm" type="button"><svg class="pic"><use href="#i-search"/></svg>搜索设置</button>
+          </div>
+
+          <div class="cfg-wrap">
+            <div class="panel reveal" style="--rd:.12s">
+              <i class="corner"></i>
+              <div class="cfg-nav" id="cfgNav">
+                <button class="on" data-pane="inst" type="button"><svg class="pic"><use href="#i-book"/></svg>实例设置<span class="n">6</span></button>
+                <button data-pane="net" type="button"><svg class="pic"><use href="#i-compass"/></svg>网络与身份<span class="n">5</span></button>
+                <button data-pane="play" type="button"><svg class="pic"><use href="#i-table"/></svg>玩法<span class="n">7</span></button>
+                <button data-pane="world" type="button"><svg class="pic"><use href="#i-grass"/></svg>世界生成<span class="n">5</span></button>
+                <button data-pane="pm" type="button"><svg class="pic"><use href="#i-users"/></svg>玩家管理<span class="n">3</span></button>
+                <button data-pane="remote" type="button"><svg class="pic"><use href="#i-lever"/></svg>远程控制<span class="n">3</span></button>
+              </div>
+            </div>
+
+            <div class="panel reveal" style="--rd:.16s">
+              <i class="corner"></i>
+              <div class="con-head tex-stone">
+                <svg class="pic" style="color:var(--cyan)"><use href="#i-book"/></svg>
+                <h2 id="cfgTitle">实例设置</h2>
+                <span style="font-size:12.5px;color:var(--ink-3)" id="cfgSub">6 项 · 我们自己管的配置，改完立刻生效</span>
+                <div class="spacer"></div>
+                <span style="font-family:var(--f-term);font-size:14px;color:var(--ink-3)">第 <b id="cfgIdx">1</b> / 6 组</span>
+              </div>
+
+              <!-- 实例设置 -->
+              <div class="cfg-pane on" data-pane="inst">
+                <div style="padding:6px 16px 16px">
+                  <div class="field">
+                    <div><div class="lb">名称</div><div class="hint">左侧列表里显示的名字</div></div>
+                    <input class="inp" value="生存服 · 长期档">
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">端口</div><div class="hint">朋友连进来的地址就是 IP:端口</div></div>
+                    <div class="stepper"><button type="button">−</button><input class="inp" value="25565"><button type="button">+</button></div>
+                  </div>
+                  <!-- 校验错误态演示 -->
+                  <div class="field invalid">
+                    <div><div class="lb">内存上限 (MB)</div><div class="hint">原版 2 GB 够 5 个玩家</div></div>
+                    <div>
+                      <div class="stepper"><button type="button">−</button><input class="inp" value="256"><button type="button">+</button></div>
+                      <div class="err"><svg class="pic" style="width:12px;height:12px"><use href="#i-ban"/></svg>至少要 1024 MB，否则 Paper 起不来（当前 256）</div>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">开机自动启动</div><div class="hint">守护进程起来时自动把它拉起来</div></div>
+                    <div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div>
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">崩溃自动重启</div><div class="hint">5 秒重试 1 次，连续 3 次不起来就停下</div></div>
+                    <div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div>
+                  </div>
+                  <div class="field">
+                    <div><div class="lb">Java 路径</div><div class="hint">留空 = 按 MC 版本自动挑</div></div>
+                    <input class="inp" placeholder="留空 = 自动挑最合适的">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 网络与身份 -->
+              <div class="cfg-pane" data-pane="net">
+                <div style="padding:6px 16px 16px">
+                  <div class="field"><div><div class="lb">服务器 IP</div><div class="hint">留空 = 监听所有网卡</div></div><input class="inp" placeholder="留空 = 0.0.0.0"></div>
+                  <div class="field"><div><div class="lb">server-port</div><div class="hint">server.properties 里的同名键</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="25565"><button type="button">+</button></div></div>
+                  <div class="field"><div><div class="lb">正版验证</div><div class="hint">关掉才能让离线客户端连进来</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">MOTD</div><div class="hint">服务器列表里显示的一句话</div></div><input class="inp" value="§a生存服 §7· §f长期档 1.21.4"></div>
+                  <div class="field"><div><div class="lb">最大玩家数</div><div class="hint">当前是默认值，体检里就是这条没过</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="20"><button type="button">+</button></div></div>
+                </div>
+              </div>
+
+              <!-- 玩法 -->
+              <div class="cfg-pane" data-pane="play">
+                <div style="padding:6px 16px 16px">
+                  <div class="field"><div><div class="lb">游戏模式</div><div class="hint">新玩家进入时的默认模式</div></div><input class="inp" value="survival"></div>
+                  <div class="field"><div><div class="lb">难度</div><div class="hint">easy / normal / hard / peaceful</div></div><input class="inp" value="normal"></div>
+                  <div class="field"><div><div class="lb">强制游戏模式</div><div class="hint">每次进服都重置为上面的模式</div></div><div class="tog" role="switch" aria-checked="false"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">允许飞行</div><div class="hint">生存模式下也允许飞</div></div><div class="tog" role="switch" aria-checked="false"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">PvP</div><div class="hint">玩家之间能否互相伤害</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">死亡不掉落</div><div class="hint">keepInventory，多数长期档会开</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">命令方块</div><div class="hint">关掉可减少被滥用的风险</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                </div>
+              </div>
+
+              <!-- 世界生成 -->
+              <div class="cfg-pane" data-pane="world">
+                <div style="padding:6px 16px 16px">
+                  <div class="field"><div><div class="lb">世界种子</div><div class="hint">留空 = 每次随机</div></div><input class="inp" placeholder="留空 = 随机"></div>
+                  <div class="field"><div><div class="lb">世界类型</div><div class="hint">default / flat / large_biomes / amplified</div></div><input class="inp" value="default"></div>
+                  <div class="field"><div><div class="lb">生成结构</div><div class="hint">村庄、要塞、遗迹等</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">允许下界</div><div class="hint">关掉后下界传送门失效</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">视距 (chunks)</div><div class="hint">越大越吃内存，8~12 是家用机甜点</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="10"><button type="button">+</button></div></div>
+                </div>
+              </div>
+
+              <!-- 玩家管理 -->
+              <div class="cfg-pane" data-pane="pm">
+                <div style="padding:6px 16px 16px">
+                  <div class="field"><div><div class="lb">白名单</div><div class="hint">开启后只有名单里的人能进</div></div><div class="tog on" role="switch" aria-checked="true"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">自动踢出挂机</div><div class="hint">超过设定分钟没输入就踢</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="30"><button type="button">+</button></div></div>
+                  <div class="field"><div><div class="lb">出生点保护半径</div><div class="hint">spawn-protection，0 为关闭</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="16"><button type="button">+</button></div></div>
+                </div>
+              </div>
+
+              <!-- 远程控制 -->
+              <div class="cfg-pane" data-pane="remote">
+                <div style="padding:6px 16px 16px">
+                  <div class="field"><div><div class="lb">启用 RCON</div><div class="hint">给远程工具发指令用，日常不用开</div></div><div class="tog" role="switch" aria-checked="false"><span class="knob"></span></div></div>
+                  <div class="field"><div><div class="lb">RCON 端口</div><div class="hint">默认 25575</div></div><div class="stepper"><button type="button">−</button><input class="inp" value="25575"><button type="button">+</button></div></div>
+                  <div class="field"><div><div class="lb">RCON 密码</div><div class="hint">开了 RCON 就该换成强密码</div></div><input class="inp" type="password" value="••••••••••"></div>
+                </div>
+              </div>
+
+              <!-- 未保存强提醒 -->
+              <div class="unsaved">
+                <span class="dotw"></span>
+                <span style="font-size:12.5px;color:var(--ink-1)">有 <b style="font-family:var(--f-pix);color:var(--copper)">2</b> 处改动尚未保存 —— 其中 1 处校验未通过</span>
+                <button class="btn btn-primary sm" type="button"><svg class="pic"><use href="#i-check"/></svg>保存这一组</button>
+                <button class="btn btn-ghost sm" type="button">放弃改动</button>
+                <div class="spacer" style="margin-left:auto"></div>
+                <button class="btn sm" id="cfgPrev" type="button"><svg class="pic"><use href="#i-chev-l"/></svg>上一组</button>
+                <button class="btn sm" id="cfgNext" type="button">下一组<svg class="pic"><use href="#i-chev-r"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </section>
