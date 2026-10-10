@@ -1397,3 +1397,11 @@ modpackOps→internal/jobs 迁移中途停摆，留了一棵编译不过的树�
 3. **监控历史落盘**——现在只有瞬时值，刷新即失
 
 此后转客户端 P0（见 CLIENT-SIDE-ROADMAP.md）。
+
+### 存档粒度搬运 —— 进度
+- ✅ 切片 1（03:0x）：`GET /api/instances/{id}/saves` 列出世界目录（按 **level.dat** 认，不靠目录名；
+  返回 name/active/size/files，恒 [] 不 null）。真机验证：world 25 文件 / 13MB、active=world、未知实例 404。
+- ⬜ 切片 2：单存档**打包导出**（复用 zipDir，走 internal/jobs → 气泡自动有进度）
+- ⬜ 切片 3：**上传**导入（multipart → 解到实例目录）
+- ⬜ 切片 4：**切换**（改 server.properties 的 level-name，需停服 + 校验目标含 level.dat）
+- ⬜ 前端：文件页加「存档」块

@@ -79,6 +79,7 @@ func (s *Server) Routes() http.Handler {
 	s.taskRoutes(mux)
 	s.playerRoutes(mux)
 	s.gameruleRoutes(mux)
+	s.savesRoutes(mux)
 	s.liveRoutes(mux)
 	s.configRoutes(mux)
 	s.systemRoutes(mux)
