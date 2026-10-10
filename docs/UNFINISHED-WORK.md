@@ -33,13 +33,32 @@
 
 ## 二、已确认未开工：统一作业框架 + 进度气泡
 
-> ⚠ **进度（2026-10-11 更新）**：后端已全做完（`internal/jobs` 统一表 + `/api/jobs` 四端点 +
-> 备份创建/还原、导出、模组升级安装全部异步化，已提交）。**但前端只做了一半**：
-> 落地的是**面板内联**的 `JobProgress.tsx`（细进度条），**不是本方案里的右下角 `JobBar` 气泡
-> 与各 kind 的 `JobCard` result 渲染器**。下面「前端：…新增通用 JobCard」这一段仍未开工，
-> 且 kind 命名实际用了 `backup-create` / `backup-restore` / `modpack-export`（与本文档的
-> `backup` / `restore` / `export` 有偏差）。下一轮做气泡时以 `DownloadBar.tsx` /
-> `useDownloadFeed.ts` / `ModpackOpView.tsx` 为基底合并。
+## 二、已确认未开工：统一作业框架 + 进度气泡
+
+> ⚠ **进度（2026-10-11 更新，含精确定位）**
+>
+> **后端：已全做完**（`internal/jobs` 统一表 + `/api/jobs` 四端点 list/get/cancel/dismiss +
+> 备份创建/还原、导出、模组升级安装全部异步化）。提交 `df6be6b`。
+>
+> **前端：气泡容器其实早就有，缺的是「数据层不认识新作业」**——以下是接手时要改的确切位置：
+>
+> 1. `web/src/components/DownloadCenter.tsx:25` 的 `Bubbles` 就是右下角气泡；`App.tsx:796`
+>    已按 `items={dlOpen ? [] : feed.items}` 接好（面板打开时清空，符合 §9.7.4）。
+>    **气泡壳不用新建，别重写。**
+> 2. 缺的是 `web/src/useDownloadFeed.ts` 的 `FeedItem.kind` 只有
+>    `'download' | 'install' | 'upgrade'` —— 没有 backup / restore / export。
+> 3. ⚠ **现存的错**：`web/src/api.ts` 里我加的 `jobToModpackOp()` 把非 install 的 kind **一律扭成
+>    `'upgrade'`**，所以**备份/还原/导出作业在气泡里会被显示成「升级」**。这是本轮引入的 bug，
+>    接手第一件事就该修：让 `FeedItem.kind` 覆盖全部 kind，`opItem()` 按 kind 出文案与 result。
+> 4. 各 kind 的 result 形状（用于 `Bubbles` 里的完成态文案）：
+>    `backup-create`→`{file,size}`；`backup-restore`→`{safety}`；`modpack-export`→`{client,server}`；
+>    `upgrade`/`install`→`{added,replaced,removed,skipped,skippedPaths[],failed[],warnings[]}`
+>    （failed 非空必须逐条列出，不许画全绿）。
+> 5. 我在 `web/src/components/JobProgress.tsx` 做的**面板内联**细条可以保留给面板内用，
+>    但它不是 §4.2 要的右下角气泡形态。
+>
+> 验收：`cd web && npx tsc -b --force` 过；`node tools/sweep.mjs http://127.0.0.1:23333` 42/42；
+> 真机起一个备份作业（`POST /api/instances/{id}/backups` → 拿 jobId）看气泡里是不是如实显示「备份」而不是「升级」。
 
 > 背景与九类慢操作清单见 `LONG-TASKS-INVENTORY.md`。一句话：**现在有四套各写各的进度机制，要「所有功能都加进度」必须先抽一个统一框架，否则会变成七套八套。**
 
