@@ -52,3 +52,13 @@ docs/shots/
 docs/probe-splash/
 docs/probe-stone/
 docs/verify-mcg/
+
+# 历史设计稿（ServerBox 时代，已从仓库移除，仅本地留底）
+docs/design/
+docs/designs/
+docs/DESIGN.md
+
+# 顶层调试/检查临时产物（一次性排查用，不入库）
+checks*.txt
+git_status.txt
+test_*.txt

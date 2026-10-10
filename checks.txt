@@ -1,9 +1,0 @@
-﻿gofmt_unformatted=[]
-build_err: 
-build_exit=0
-vet_err: 
-vet_exit=0
-test: ok  	github.com/su-ni/ServerBox/internal/modpack	1.293s
-
-test_exit=0
-
