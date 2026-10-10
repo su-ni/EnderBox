@@ -425,3 +425,17 @@ OPanel 单独开了 `opanel-mcp` 仓库，支持 Claude Code / OpenClaw 管服�
 | **PCL2 全功能**（⚠ 非源码级） | 官网 `pcl2.aoe.top`（特性列表 + 完整更新日志）；第三方使用指南（`tzjp.cn`、`onlinedown.net` 等）。**闭源，证据强度低，勿当断言** |
 | 我方路由全集 | `internal/api/*.go`（要更全就 grep `mux.HandleFunc`） |
 | 我方页面 | `web/src/App.tsx` 的 `PAGES`：**11 个** —— 概览 / 控制台 / 玩家 / 配置 / 游戏规则 / 插件与模组 / 整合包 / 文件 / 备份与还原 / 计划任务 / 设置 |
+
+---
+
+## ⚠ 2026-10-11 按行为复核（纠正上面的缺口表）
+
+> 教训复现第二次：**别按文件名/印象找，要 grep 行为。** 上面「我们的缺口」表里有一条其实早已落地：
+
+- ✅ **配置编辑器保存前校验 —— 已实现**（此前被记为 P1 缺口）。
+  `internal/api/configs.go` 的 `writeConfigFile` 已在调 `daemon.ValidateConfigText(lang, text)`：
+  覆盖 **json**（`json.SyntaxError.Offset` → 行列）、**toml**（`toml.ParseError.Position`）、**yaml**；
+  有结构问题就回 **422 + issues**，并留了 `req.Validate`（前端「仍然保存」）这个强制出口 ——
+  比 COMPETITOR-GAP 原本建议的「校验 > 高亮」还更完整（已经带行列 + 强制保存逃生门）。
+- ❌ **存档粒度搬运 —— 真没做**（无 world 单打包/上传/下载/切换的任何行为）。
+- ❌ **监控历史落盘 —— 真没做**（`GET /metrics` 只有瞬时值，无环形缓冲/落盘/历史端点）。
