@@ -1405,3 +1405,7 @@ modpackOps→internal/jobs 迁移中途停摆，留了一棵编译不过的树�
 - ⬜ 切片 3：**上传**导入（multipart → 解到实例目录）
 - ⬜ 切片 4：**切换**（改 server.properties 的 level-name，需停服 + 校验目标含 level.dat）
 - ⬜ 前端：文件页加「存档」块
+- ✅ 切片 2（03:0x）：`POST /saves/{name}/export`（起 `save-export` 作业 → 202+jobId，进度走统一作业表）
+  + `GET /saves/download/{file}`（ServeFile，Content-Disposition 带 RFC5987 中文兜底）。
+  校验在起作业前做（存档不存在→400、实例没了→404）；世界名两道防穿越。
+  真机验证：world 25 文件/13.6MB → 导出 zip 10.1MB，下载落盘是合法 zip 含 level.dat；不存在文件 404、`..%2F` 400。

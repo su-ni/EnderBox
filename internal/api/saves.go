@@ -1,10 +1,14 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/su-ni/EnderBox/internal/jobs"
 )
 
 // 存档（world）相关路由。
@@ -15,6 +19,8 @@ import (
 // 有 level.dat 才是真的世界，这条对 vanilla / Paper / Forge 都成立。
 func (s *Server) savesRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/instances/{id}/saves", s.savesList)
+	mux.HandleFunc("POST /api/instances/{id}/saves/{name}/export", s.saveExport)
+	mux.HandleFunc("GET /api/instances/{id}/saves/download/{file}", s.saveDownload)
 }
 
 // saveInfo 存档列表里的一条。
@@ -85,4 +91,69 @@ func (s *Server) savesList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, 200, map[string]any{"items": items, "active": active})
+}
+
+
+// saveExport 把一个存档打包成 zip。分钟级操作 → 起统一作业，立刻回 202 + jobId，
+// 前端轮询 /api/jobs/{id} 拿进度（气泡自动就有，因为 kind 走的是同一张表）。
+//
+// 校验放在起作业**之前**：存档不存在/名字不合法这类「现在就能判定」的错，
+// 当场回 404/400 比让用户盯着一个必然失败的作业强。
+func (s *Server) saveExport(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	world := r.PathValue("name")
+	if err := s.mgr.ResolveSave(id, world); err != nil {
+		// 实例没了 → 404；存档名不合法 / 不是有效存档 → 400（换个存档就好）
+		msg := err.Error()
+		switch {
+		case strings.Contains(msg, "实例不存在"):
+			writeErr(w, 404, msg)
+		case strings.Contains(msg, "不合法") || strings.Contains(msg, "没有这个存档") || strings.Contains(msg, "不是有效的存档"):
+			writeErr(w, 400, msg)
+		default:
+			writeErr(w, 500, msg)
+		}
+		return
+	}
+
+	job := s.jobStore.New(id, "save-export")
+	if job == nil {
+		writeErrReason(w, 409, "busy", "该实例已有一笔作业在跑（备份/还原/导出…），等它结束再试")
+		return
+	}
+	go func() {
+		s.jobStore.SetStage(job, "zip")
+		cb := func(fd, ft int, bd, bt int64, cur string) {
+			s.jobStore.UpdateProgress(job, fd, ft, bd, bt, cur)
+		}
+		res, err := s.mgr.ExportSave(id, world, cb)
+		if err != nil {
+			s.jobStore.Finish(job, jobs.StateFailed, nil, err.Error())
+			return
+		}
+		s.jobStore.Finish(job, jobs.StateDone, map[string]any{
+			"world": res.World,
+			"name":  res.Name,
+			"size":  res.Size,
+		}, "")
+	}()
+	writeJSON(w, 202, map[string]any{"jobId": job.ID})
+}
+
+// saveDownload 把已导出的 zip 发给浏览器。
+// ⚠ 路径只从「数据目录 + basename」拼出来，绝不让 URL 直接当路径（防目录穿越）。
+func (s *Server) saveDownload(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	file := r.PathValue("file")
+	path, err := s.mgr.SaveArchivePath(id, file)
+	if err != nil {
+		writeErr(w, 404, err.Error())
+		return
+	}
+	base := filepath.Base(path)
+	// 文件名可能是中文（世界名）：用 RFC 5987 的 filename* 兜底，老浏览器退回 ASCII 那份。
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition",
+		fmt.Sprintf("attachment; filename=%q; filename*=UTF-8''%s", base, url.PathEscape(base)))
+	http.ServeFile(w, r, path)
 }
