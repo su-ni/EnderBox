@@ -748,7 +748,7 @@ export default function App() {
               </svg>
             </div>
             <div>
-              <div className="nm">SERVERBOX</div>
+              <div className="nm">ENDERBOX</div>
               <div className="sub">MC 服务器管理面板</div>
             </div>
           </div>

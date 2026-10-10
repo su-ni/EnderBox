@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, type BackupItem } from '../api'
+import { api, type BackupItem, type JobSnapshot } from '../api'
 import { Chipf, ConFoot, ConHead, Icon, Panel, SecHead, Tog } from './design'
+import { JobProgress } from './JobProgress'
 import { Empty, SkeletonList, fmtSize, fmtTime, useConfirm } from './ui'
 import { StepInput } from './StepInput'
 import type { BackupPolicy, BackupPolicyView, Instance } from '../types'
@@ -94,17 +95,46 @@ export function BackupPanel({ instance, onToast }: Props) {
     loadPolicy()
   }, [reload, loadPolicy])
 
+  // 压包是分钟级操作：后端受理后立刻回 jobId，「成没成」要问作业状态，
+  // 不能拿这次请求的返回当判据 —— 202 只代表它被受理了，不代表包打好了。
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [jobKind, setJobKind] = useState<'create' | 'restore' | null>(null)
+
+  const onJobFinish = (j: JobSnapshot) => {
+    const was = jobKind
+    setBusy('')
+    setJobId(null)
+    setJobKind(null)
+    if (j.state === 'done') {
+      if (was === 'create') {
+        const res = j.result as { file?: string; size?: number }
+        setLabel('')
+        onToast(`备份完成：${res.file ?? ''}（${fmtSize(res.size ?? 0)}）`)
+      } else {
+        const res = j.result as { safety?: string }
+        const tail = res.safety ? `还原前的现场也存了一份：${res.safety}` : ''
+        onToast(`已还原到 ${pick?.file ?? ''}。${tail}`)
+        setPick(null)
+      }
+      reload()
+    } else if (j.state === 'canceled') {
+      onToast(was === 'create' ? '备份已取消' : '还原已取消')
+      reload()
+    } else {
+      onToast(j.err || (was === 'create' ? '备份失败' : '还原失败'))
+    }
+  }
+
   const create = async () => {
     setBusy('create')
+    setJobKind('create')
     try {
-      const b = await api.backupCreate(instance.id, label.trim())
-      setLabel('')
-      onToast(`备份完成：${b.file}（${fmtSize(b.size)}）`)
-      reload()
+      const r = await api.backupCreate(instance.id, label.trim())
+      setJobId(r.jobId)
     } catch (e) {
-      onToast((e as Error).message)
-    } finally {
       setBusy('')
+      setJobKind(null)
+      onToast((e as Error).message)
     }
   }
 
@@ -135,16 +165,14 @@ export function BackupPanel({ instance, onToast }: Props) {
   const restore = async () => {
     if (!pick) return
     setBusy('restore')
+    setJobKind('restore')
     try {
       const r = await api.backupRestore(instance.id, pick.file)
-      const tail = r.safety ? `还原前的现场也存了一份：${r.safety}` : ''
-      onToast(`已还原到 ${pick.file}。${tail}`)
-      setPick(null)
-      reload()
+      setJobId(r.jobId)
     } catch (e) {
-      onToast((e as Error).message)
-    } finally {
       setBusy('')
+      setJobKind(null)
+      onToast((e as Error).message)
     }
   }
 
@@ -229,6 +257,15 @@ export function BackupPanel({ instance, onToast }: Props) {
       {/* 01 现在就来一份 */}
       <Panel style={{ '--rd': '.12s' } as React.CSSProperties}>
         <ConHead num="01" title="现在就来一份" sub="备注可留空" />
+        {jobId ? (
+          <div style={{ padding: '0 16px 12px' }}>
+            <JobProgress
+              jobId={jobId}
+              label={jobKind === 'restore' ? '正在还原' : '正在备份'}
+              onFinish={onJobFinish}
+            />
+          </div>
+        ) : null}
         <div
           style={{ padding: '14px 16px 16px', display: 'flex', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}
         >

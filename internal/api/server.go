@@ -9,6 +9,7 @@ import (
 
 	"github.com/su-ni/EnderBox/internal/daemon"
 	"github.com/su-ni/EnderBox/internal/fetch"
+	"github.com/su-ni/EnderBox/internal/jobs"
 	"github.com/su-ni/EnderBox/internal/settings"
 )
 
@@ -22,12 +23,12 @@ type Server struct {
 	// bindAddr 守护进程真正绑定的地址。和配置里写的那份对照，
 	// 用来告诉用户「改完重启才生效」。
 	bindAddr string
-	// mpOps 整合包升级的作业表。带锁的内存 map，实现见 modpack.go ——
-	// 这里只负责持有与初始化，逻辑别往 Server 上堆。
-	mpOps *modpackOps
 	// mpPacks 市场预览下下来、等着被安装取走的那份包（packToken）。
 	// 见 modpack_market.go：没有它，用户点「安装」时那几十 MB 得重下一遍。
 	mpPacks *packCache
+	// jobStore 所有「分钟级慢操作」（备份压包/还原解包/整合包导出/模组升级安装…）
+	// 共用的异步作业表。前端一份气泡组件轮询 /api/jobs 即可，不必每类各写一套。
+	jobStore *jobs.Store
 }
 
 // New 起一个服务。addr 是本次实际监听的地址（用来和配置里的值对照）。
@@ -38,8 +39,8 @@ func New(mgr *daemon.Manager, set *settings.Store, addr string) *Server {
 		set:      set,
 		sess:     newSessions(),
 		bindAddr: addr,
-		mpOps:    newModpackOps(),
 		mpPacks:  newPackCache(),
+		jobStore: jobs.NewStore(),
 	}
 }
 
@@ -82,6 +83,8 @@ func (s *Server) Routes() http.Handler {
 	s.configRoutes(mux)
 	s.systemRoutes(mux)
 	s.importRoutes(mux)
+	// 统一异步作业端点：备份/还原/导出/模组升级安装都走这里
+	s.jobRoutes(mux)
 	// 整张表都过鉴权：新增路由不会被漏掉，比一个个挑着挂安全
 	return s.withAuth(mux)
 }

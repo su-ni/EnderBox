@@ -902,7 +902,54 @@ export type ModpackOpResult = {
   warnings: string[]
 }
 
-/** 升级任务（GET /modpacks/ops/{opId}）。 */
+/**
+ * 统一作业快照（GET /api/jobs/{id}）。
+ *
+ * 所有「分钟级慢操作」——备份创建/还原、整合包导出、模组升级/安装——共用这一份结构，
+ * 后端也只用一张作业表（`internal/jobs`）。「每一个慢操作一套私有作业 + 一套轮询」的做法
+ * 已经废掉：那种写法改一处漏两处，进度条常常只有最新加的那个功能是准的。
+ *
+ * ⚠ startedAt 是毫秒时间戳（不是 RFC3339 字符串）：生活了 24 小时的作业会被清理，
+ * 「跑了多久」要能算，数字比字符串省一parse，也更难搞错时区。
+ */
+export type JobSnapshot = {
+  id: string
+  /** 归属实例 id（作业表里的 owner）。 */
+  owner: string
+  /** backup-create / backup-restore / modpack-export / upgrade / install …… */
+  kind: string
+  state: 'running' | 'done' | 'failed' | 'canceled'
+  /** 现在在干嘛；终态必定为空串（Finish 会清掉，避免报错了还写着「正在装模组」）。 */
+  stage: string
+  progress: {
+    filesDone: number
+    filesTotal: number
+    bytesDone: number
+    bytesTotal: number
+    current: string
+  }
+  /** 各 kind 自己填的结算；running 期间也有可能已经有值（取消会先落终态）。 */
+  result: Record<string, unknown>
+  err: string
+  startedAt: number
+}
+
+/** 把统一快照摆成旧整合包作业的形状，让那些还没改造的组件继续能读。 */
+function jobToModpackOp(j: JobSnapshot): ModpackOp & { id: string; startedAt: string } {
+  return {
+    id: j.id,
+    startedAt: new Date(j.startedAt).toISOString(),
+    state: j.state,
+    kind: (j.kind === 'install' ? 'install' : 'upgrade') as 'install' | 'upgrade',
+    instanceId: j.owner,
+    stage: j.stage,
+    progress: j.progress,
+    result: (j.result ?? {}) as unknown as ModpackOpResult,
+    err: j.err,
+  }
+}
+
+/** 整合包作业（统一作业表 /api/jobs 上，四处入口共用）。 */
 export type ModpackOp = {
   state: 'running' | 'done' | 'failed' | 'canceled'
   /**
@@ -1414,14 +1461,16 @@ export const api = {
   // ── 备份 ──
   backups: (id: string) => req<{ items: BackupItem[] }>(`/instances/${id}/backups`),
 
+  /** 异步：回 jobId，真结果要轮询 /api/jobs/{id}（result = { file, size }）。 */
   backupCreate: (id: string, label: string) =>
-    req<BackupItem>(`/instances/${id}/backups`, jsonInit('POST', { label })),
+    req<{ jobId: string }>(`/instances/${id}/backups`, jsonInit('POST', { label })),
 
   backupDelete: (id: string, file: string) =>
     req<{ ok: boolean }>(`/instances/${id}/backups/${enc(file)}`, { method: 'DELETE' }),
 
+  /** 异步：回 jobId，result = { safety }（还原前的那份后悔药文件名）。 */
   backupRestore: (id: string, file: string) =>
-    req<{ ok: boolean; safety: string }>(`/instances/${id}/backups/${enc(file)}/restore`, {
+    req<{ jobId: string }>(`/instances/${id}/backups/${enc(file)}/restore`, {
       method: 'POST',
     }),
 
@@ -1538,8 +1587,9 @@ export const api = {
 
   modpackExportPreview: (id: string, q?: ExportQuery) =>
     req<ModpackExportResult>(`/instances/${enc(id)}/modpack/export/preview${queryOf(q)}`),
+  /** 异步：回 jobId，result = { client, server }。 */
   modpackExport: (id: string, q?: ExportQuery) =>
-    req<ModpackExportResult>(`/instances/${enc(id)}/modpack/export${queryOf(q)}`, {
+    req<{ jobId: string }>(`/instances/${enc(id)}/modpack/export${queryOf(q)}`, {
       method: 'POST',
     }),
 
@@ -1585,14 +1635,29 @@ export const api = {
       throw e
     })(),
 
-  modpackOp: (opId: string) => req<ModpackOp>(`/modpacks/ops/${enc(opId)}`),
+  /**
+   * 统一作业端点。所有分钟级慢操作（备份/还原/导出/模组升级安装）共用这一组接口 ——
+   * 别再为某一类操作新开一套 ops 路由，那是「改一处漏两处」的起点。
+   */
+  jobs: {
+    get: (id: string) => req<JobSnapshot>(`/api/jobs/${enc(id)}`),
+    /** owner 非空时只列该实例（正是「这个实例正在做什么」那一栏要的）。 */
+    list: (owner?: string) =>
+      req<{ items: JobSnapshot[] }>(`/api/jobs${owner ? `?owner=${enc(owner)}` : ''}`),
+    cancel: (id: string) => req<{ ok: boolean }>(`/api/jobs/${enc(id)}/cancel`, { method: 'POST' }),
+    /** 关账：把看过的终态记录从表里删掉。仍在跑的会被后端拒（409）。 */
+    dismiss: (id: string) => req<{ ok: boolean }>(`/api/jobs/${enc(id)}/dismiss`, { method: 'POST' }),
+  },
+
+  modpackOp: async (opId: string): Promise<ModpackOp> =>
+    jobToModpackOp(await req<JobSnapshot>(`/api/jobs/${enc(opId)}`)),
 
   modpackOpCancel: (opId: string) =>
-    req<{ ok: boolean }>(`/modpacks/ops/${enc(opId)}/cancel`, { method: 'POST' }),
+    req<{ ok: boolean }>(`/api/jobs/${enc(opId)}/cancel`, { method: 'POST' }),
 
   /** 删掉一条已结束的整合包作业记录。运行中的会被后端拒（409）。 */
   modpackOpDismiss: (opId: string) =>
-    req<{ ok: boolean }>(`/modpacks/ops/${enc(opId)}/dismiss`, { method: 'POST' }),
+    req<{ ok: boolean }>(`/api/jobs/${enc(opId)}/dismiss`, { method: 'POST' }),
 
   // ── 整合包市场（P1，契约见 docs/MODPACK.md 第九节）──
   // 四步：搜 → 选版本 → 预览（只算不装，但要把包下下来）→ 安装（新建一个实例）。
@@ -1656,7 +1721,10 @@ export const api = {
    * 只靠发起时拿到的那个 opId 的话，刷新一下页面这笔作业就成了不可见的 ——
    * 它还在装，界面却是「什么都没发生」。全局那个下载入口就靠这份列表。
    */
-  modpackOps: () => req<{ items: ModpackOpListItem[] }>('/modpacks/ops'),
+  modpackOps: async (): Promise<{ items: ModpackOpListItem[] }> => {
+    const r = await req<{ items: JobSnapshot[] }>('/api/jobs')
+    return { items: (r.items ?? []).map(jobToModpackOp) }
+  },
 
   /**
    * 安装：新建实例 + 起作业，202 带回 instanceId 与 opId。

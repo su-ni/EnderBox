@@ -13,6 +13,7 @@ import (
 
 	"github.com/su-ni/EnderBox/internal/daemon"
 	"github.com/su-ni/EnderBox/internal/fetch"
+	"github.com/su-ni/EnderBox/internal/jobs"
 	"github.com/su-ni/EnderBox/internal/modpack"
 )
 
@@ -24,7 +25,7 @@ import (
 // 复用升级那三样东西，一行都不重写：
 //   - computeModpackPlan 算计划（同一份代码，所以预览/执行的口径不会漂）
 //   - modpack.Execute     执行
-//   - mpOps 作业表        看进度、取消、同实例单作业闸
+//   - 统一作业表 jobStore 看进度、取消、同实例单作业闸（/api/jobs）
 
 func (s *Server) modpackMarketRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/modpacks/search", s.modpackSearch)
@@ -702,8 +703,8 @@ func (s *Server) modpackInstall(w http.ResponseWriter, r *http.Request) {
 		writeErrReason(w, 409, "op_running", "这个实例上已经有一笔整合包作业在跑了。等它结束再试")
 		return
 	}
-	s.mpOps.setStage(op, "jar")
-	go s.runModpackInstall(op.ctx, op.cancel, op, inst, cp)
+	s.jobStore.SetStage(op, "jar")
+	go s.runModpackInstall(op, inst, cp)
 
 	writeJSON(w, 202, map[string]any{"instanceId": inst.ID, "opId": op.ID})
 }
@@ -715,9 +716,10 @@ func (s *Server) modpackInstall(w http.ResponseWriter, r *http.Request) {
 //  2. 模组走 modpack.Execute —— 与升级完全同一条路（同一份 plan/executor）。
 //  3. 任何一步发现装不了，**把刚建的实例删掉**：留一个空壳实例比报错更糟，
 //     用户会以为「装好了但没生效」，然后在配置页里找半天。
-func (s *Server) runModpackInstall(ctx context.Context, cancel context.CancelFunc, op *modpackOp, inst daemon.Instance, cp *cachedPack) {
+func (s *Server) runModpackInstall(op *jobs.Job, inst daemon.Instance, cp *cachedPack) {
 	defer cp.release()
-	defer cancel()
+
+	ctx := s.jobStore.Ctx(op)
 
 	var warnings []string
 
@@ -752,7 +754,7 @@ func (s *Server) runModpackInstall(ctx context.Context, cancel context.CancelFun
 	cplan.versionNumber = cp.versionNumber
 	cplan.slug = cp.slug
 
-	s.mpOps.setStage(op, "files")
+	s.jobStore.SetStage(op, "files")
 	res, err := modpack.Execute(ctx, modpack.ExecuteOptions{
 		InstanceDir:   inst.Dir,
 		PackPath:      cplan.packPath,
@@ -764,9 +766,7 @@ func (s *Server) runModpackInstall(ctx context.Context, cancel context.CancelFun
 		VersionNumber: cplan.versionNumber,
 		Fetcher:       standaloneFetcher{m: s.dl},
 		OnProgress: func(p modpack.Progress) {
-			s.mpOps.mu.Lock()
-			op.progress = p
-			s.mpOps.mu.Unlock()
+			s.jobStore.UpdateProgress(op, p.FilesDone, p.FilesTotal, p.BytesDone, p.BytesTotal, p.Current)
 		},
 	})
 	switch {
@@ -796,7 +796,7 @@ func (s *Server) runModpackInstall(ctx context.Context, cancel context.CancelFun
 //
 // 只在**还没产出任何东西**的失败上用（计划算不出来）。装到一半失败的走另一条路 ——
 // 那时磁盘上已经有用户下好的模组，删掉等于惩罚他。
-func (s *Server) abortInstall(op *modpackOp, inst daemon.Instance, msg string) {
+func (s *Server) abortInstall(op *jobs.Job, inst daemon.Instance, msg string) {
 	if err := s.mgr.Delete(inst.ID, true); err != nil {
 		s.finishOp(op, nil, opFailed, nil, msg+"（另外，回收这个空实例也失败了："+err.Error()+"）", nil)
 		return

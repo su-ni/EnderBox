@@ -185,6 +185,7 @@ func newMarketEnv(t *testing.T) *marketEnv {
 	pmux := http.NewServeMux()
 	env.s.instanceModpackRoutes(pmux)
 	env.s.modpackMarketRoutes(pmux)
+	env.s.jobRoutes(pmux)
 	env.panel = httptest.NewServer(pmux)
 
 	// 服务端文件那一步打桩。真实现留着不动，由其它包的路由共用，不在这里重复验。
@@ -487,7 +488,7 @@ func TestModpackInstallEndToEnd(t *testing.T) {
 
 	// 作业跑起来就得能看出这是「安装」而不是「升级」——
 	// 老作业不带 kind，缺省按 upgrade 报，所以这里必须显式是 install。
-	midCode, midRaw := mpGet(t, env.panel.URL+"/api/modpacks/ops/"+opID)
+	midCode, midRaw := mpGet(t, env.panel.URL+"/api/jobs/"+opID)
 	if midCode != 200 {
 		t.Fatalf("查作业返回 %d：%s", midCode, midRaw)
 	}
@@ -498,7 +499,7 @@ func TestModpackInstallEndToEnd(t *testing.T) {
 	_, snap := waitForOp(t, env.panel.URL, opID)
 	// 终态的**线上原始字节**不能出现 null —— Go 的 nil slice 会序列化成 null，
 	// 前端读 `result.failed.length` 会当场崩。这条只能查真响应，查重新编码的 map 是自欺。
-	if code, rawSnap := mpGet(t, env.panel.URL+"/api/modpacks/ops/"+opID); code == 200 {
+	if code, rawSnap := mpGet(t, env.panel.URL+"/api/jobs/"+opID); code == 200 {
 		assertNoNullInRaw(t, rawSnap)
 	} else {
 		t.Errorf("终态快照该取得到，实际 %d", code)
@@ -510,8 +511,8 @@ func TestModpackInstallEndToEnd(t *testing.T) {
 	if snap["stage"] != "" {
 		t.Errorf("终态的 stage 该是空串，实际 %v", snap["stage"])
 	}
-	if snap["instanceId"] != instID {
-		t.Errorf("作业快照要能指回实例：%v vs %v", snap["instanceId"], instID)
+	if snap["owner"] != instID {
+		t.Errorf("作业快照要能指回实例：%v vs %v", snap["owner"], instID)
 	}
 	result, _ := snap["result"].(map[string]any)
 	if result == nil {
@@ -763,7 +764,7 @@ func TestModpackOpListAlwaysArrayAndCarriesIdentity(t *testing.T) {
 
 	// 空表必须是 `[]` 而不是 null：前端直接读 .length，null 会让它当场崩。
 	// 这类错在 Go 这边只是 nil slice，序列化出来却是 null —— 只能查线上原始字节。
-	code, raw := mpGet(t, env.panel.URL+"/api/modpacks/ops")
+	code, raw := mpGet(t, env.panel.URL+"/api/jobs")
 	if code != 200 {
 		t.Fatalf("作业列表返回 %d：%s", code, raw)
 	}
@@ -789,7 +790,7 @@ func TestModpackOpListAlwaysArrayAndCarriesIdentity(t *testing.T) {
 	opID, _ := res["opId"].(string)
 	instID, _ := res["instanceId"].(string)
 
-	code, raw = mpGet(t, env.panel.URL+"/api/modpacks/ops")
+	code, raw = mpGet(t, env.panel.URL+"/api/jobs")
 	if code != 200 {
 		t.Fatalf("作业列表返回 %d：%s", code, raw)
 	}
@@ -817,8 +818,8 @@ func TestModpackOpListAlwaysArrayAndCarriesIdentity(t *testing.T) {
 	if found["kind"] != "install" {
 		t.Errorf("列表里也该带 kind=install，实际 %v", found["kind"])
 	}
-	if found["instanceId"] != instID {
-		t.Errorf("列表项要能指回实例：%v vs %v", found["instanceId"], instID)
+	if found["owner"] != instID {
+		t.Errorf("列表项要能指回实例（作业快照里叫 owner）：%v vs %v", found["owner"], instID)
 	}
 
 	// 列表同样是给前端直接吃的：一条 null 就能让那一栏崩掉。
@@ -827,7 +828,7 @@ func TestModpackOpListAlwaysArrayAndCarriesIdentity(t *testing.T) {
 	// 等这笔跑完，列表里还应该看得到它（终态作业保留 24 小时）——
 	// 「记录」这一栏的用处就在这儿，跑完就消失的话它只是另一份进度条。
 	_, _ = waitForOp(t, env.panel.URL, opID)
-	code, raw = mpGet(t, env.panel.URL+"/api/modpacks/ops")
+	code, raw = mpGet(t, env.panel.URL+"/api/jobs")
 	if code != 200 {
 		t.Fatalf("终态后列表返回 %d：%s", code, raw)
 	}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/su-ni/EnderBox/internal/fetch"
+	"github.com/su-ni/EnderBox/internal/jobs"
 )
 
 // 导出侧的三个硬规矩（和导入侧对称）：
@@ -62,6 +63,11 @@ type ExportOptions struct {
 
 	// Now 时间源，测试要固定输出。
 	Now func() time.Time
+
+	// OnProgress 边干边报进度（nil 不报）。导出分两阶段：扫描算哈希、写包；
+	// 扫描阶段用「已扫文件数 / 总数」推进，写包阶段用「已写 overrides / 总 overrides + 字节」推进。
+	// 类型与 jobs 框架统一，省得前端为每种操作各认一种回调签名。
+	OnProgress jobs.ProgressFunc
 }
 
 // PackResult 一个包的产出。
@@ -131,7 +137,7 @@ func Export(o ExportOptions) (*ExportResult, error) {
 	}
 	dirs = append(dirs, o.ExtraDirs...)
 
-	files, err := scanDirs(o.InstanceDir, dirs)
+	files, err := scanDirs(o.InstanceDir, dirs, o.OnProgress)
 	if err != nil {
 		return nil, err
 	}
@@ -148,14 +154,14 @@ func Export(o ExportOptions) (*ExportResult, error) {
 
 	res := &ExportResult{}
 	if o.WantClient {
-		p, err := buildPack(o, files, remote, true)
+		p, err := buildPack(o, files, remote, true, o.OnProgress)
 		if err != nil {
 			return nil, err
 		}
 		res.Client = p
 	}
 	if o.WantServer {
-		p, err := buildPack(o, files, remote, false)
+		p, err := buildPack(o, files, remote, false, o.OnProgress)
 		if err != nil {
 			return nil, err
 		}
@@ -168,7 +174,8 @@ func Export(o ExportOptions) (*ExportResult, error) {
 //
 // 目录不存在就跳过（整合包里 `kubejs` 这种目录经常没有），
 // 但**符号链接不跟随** —— 跟着出去可能把实例目录外的东西打进包里。
-func scanDirs(root string, dirs []string) ([]scanned, error) {
+// onProgress 非 nil 时，每算完一个文件的哈希就回报一次（总数此时未知，给 0 → 界面对「准备中/扫描中」）。
+func scanDirs(root string, dirs []string, onProgress jobs.ProgressFunc) ([]scanned, error) {
 	var out []scanned
 	seen := map[string]bool{}
 
@@ -225,6 +232,9 @@ func scanDirs(root string, dirs []string) ([]scanned, error) {
 				return nil
 			}
 			out = append(out, scanned{Rel: rel, Abs: p, SHA1: sum, Size: info.Size()})
+			if onProgress != nil {
+				onProgress(len(out), 0, 0, 0, rel)
+			}
 			return nil
 		})
 		if err != nil {
@@ -284,7 +294,8 @@ type ovFile struct {
 }
 
 // buildPack 生成一个包（client=true 出客户端包，否则服务端包）。
-func buildPack(o ExportOptions, files []scanned, remote map[string]fetch.RemoteVersion, client bool) (*PackResult, error) {
+// onProgress 非 nil 时，写包阶段按已写入的 overrides 文件数 + 字节回报进度。
+func buildPack(o ExportOptions, files []scanned, remote map[string]fetch.RemoteVersion, client bool, onProgress jobs.ProgressFunc) (*PackResult, error) {
 	idx := Index{
 		Game:          "minecraft",
 		FormatVersion: 1,
@@ -381,7 +392,7 @@ func buildPack(o ExportOptions, files []scanned, remote map[string]fetch.RemoteV
 	name := fmt.Sprintf("%s-%s-%s.mrpack", sanitizeFile(o.packName(client)), idx.VersionID, map[bool]string{true: "client", false: "server"}[client])
 	out := filepath.Join(dir, name)
 
-	if err := writePack(out, idx, overrides); err != nil {
+	if err := writePack(out, idx, overrides, onProgress); err != nil {
 		return nil, err
 	}
 	fi, err := os.Stat(out)
@@ -393,7 +404,8 @@ func buildPack(o ExportOptions, files []scanned, remote map[string]fetch.RemoteV
 }
 
 // writePack 把清单 + overrides 打成 zip（.mrpack 就是 zip）。
-func writePack(out string, idx Index, overrides []ovFile) error {
+// onProgress 非 nil 时，每写完一个 overrides 文件回报「已写 X/总N + 已写字节/总字节」。
+func writePack(out string, idx Index, overrides []ovFile, onProgress jobs.ProgressFunc) error {
 	f, err := os.Create(out)
 	if err != nil {
 		return fmt.Errorf("建包失败：%w", err)
@@ -422,6 +434,12 @@ func writePack(out string, idx Index, overrides []ovFile) error {
 	//   zip 头里写着 jar 有 4.19MB，正文是空的。外壳看着「导出成功」，
 	//   里面的文件全是零长度，收包那边装不起来还查不出原因。
 	//   这就是「不静默失败」原则要落地的地方：宁可导出报错，也不要给出一个坏包。
+	var totalBytes int64
+	for _, ov := range overrides {
+		totalBytes += ov.size
+	}
+	var written int
+	var writtenBytes int64
 	for _, ov := range overrides {
 		// ⚠ 再确认一次路径安全：zip 里的条目名必须是 `overrides/<安全相对路径>`
 		if !safeRelPath(ov.rel) {
@@ -443,6 +461,11 @@ func writePack(out string, idx Index, overrides []ovFile) error {
 		}
 		if n != ov.size {
 			return fmt.Errorf("把 %s 写进包时不完整：期望 %d 字节，实际写入 %d", ov.rel, ov.size, n)
+		}
+		written++
+		writtenBytes += n
+		if onProgress != nil {
+			onProgress(written, len(overrides), writtenBytes, totalBytes, ov.rel)
 		}
 	}
 	return nil

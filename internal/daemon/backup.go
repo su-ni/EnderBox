@@ -4,12 +4,15 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/su-ni/EnderBox/internal/jobs"
 )
 
 // BackupInfo 一份备份文件
@@ -90,57 +93,94 @@ func sanitizeLabel(s string) string {
 	return s
 }
 
-// zipDir 把 src 目录递归打包进 zw。rel 用来记录相对路径，保证解压后层级不变。
+// zipDir 把 src 目录递归打包进 zw，并边打边报进度（onProgress 为 nil 则不报）。
+// rel 用来记录相对路径，保证解压后层级不变。
 //
 // keepTop 只在顶层生效，决定某个顶层条目要不要收（文件和目录都算）——
 // 「只存存档」靠它把 plugins / config / server.jar / server.properties 全挡在外面。
 // 传 nil 表示全收（logs 永远不收，那是硬规则）。
-func zipDir(zw *zip.Writer, src, rel string, keepTop func(name string) bool) error {
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		return err
+//
+// 先 WalkDir 一遍统计文件数 + 总字节（给前端百分比分母），再逐文件打并回报 ——
+// 分母是「要打的文件」而非「目录」，目录不进 zip 不算进度。
+func zipDir(zw *zip.Writer, src, rel string, keepTop func(name string) bool, onProgress jobs.ProgressFunc) error {
+	type item struct {
+		p, rel string
+		size   int64
 	}
-	for _, e := range entries {
-		name := e.Name()
-		if rel == "" {
-			if skipDirs[name] {
-				continue
-			}
-			// 顶层文件同样要过这道闸：不过的话「只存存档」会把 50 MB 的 server.jar
-			// 一起打进去，等于范围白设。
+	var items []item
+	var total int
+	var totalBytes int64
+	walkErr := filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		name := d.Name()
+		isTop := filepath.Dir(p) == src
+		if isTop {
+			// 顶层条目（文件或目录）都得过 keepTop 这道闸：不过的话「只存存档」
+			// 会把 server.jar / plugins 一起打进去，范围等于白设。目录要 SkipDir 整棵跳过。
 			if keepTop != nil && !keepTop(name) {
-				continue
+				if d.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			if skipDirs[name] {
+				if d.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
 			}
 		}
-		if e.IsDir() {
-			if err := zipDir(zw, filepath.Join(src, name), filepath.Join(rel, name), keepTop); err != nil {
-				return err
-			}
-			continue
+		if d.IsDir() {
+			return nil
 		}
-		info, err := e.Info()
-		if err != nil {
-			continue
+		info, ie := d.Info()
+		if ie != nil {
+			return nil
 		}
-		p := filepath.Join(rel, name)
-		hdr, err := zip.FileInfoHeader(info)
-		if err != nil {
-			return err
+		r := strings.TrimPrefix(filepath.ToSlash(p[len(src):]), "/")
+		items = append(items, item{p: p, rel: r, size: info.Size()})
+		total++
+		totalBytes += info.Size()
+		return nil
+	})
+	if walkErr != nil {
+		return walkErr
+	}
+	if onProgress != nil {
+		onProgress(0, total, 0, totalBytes, "")
+	}
+	var done int
+	var doneBytes int64
+	for _, it := range items {
+		info, ie := os.Stat(it.p)
+		if ie != nil {
+			return ie
 		}
-		hdr.Name = filepath.ToSlash(p)
+		hdr, he := zip.FileInfoHeader(info)
+		if he != nil {
+			return he
+		}
+		hdr.Name = it.rel
 		hdr.Method = zip.Deflate
-		w, err := zw.CreateHeader(hdr)
-		if err != nil {
-			return err
+		w, ce := zw.CreateHeader(hdr)
+		if ce != nil {
+			return ce
 		}
-		f, err := os.Open(filepath.Join(src, name))
-		if err != nil {
-			return err
+		f, oe := os.Open(it.p)
+		if oe != nil {
+			return oe
 		}
-		_, err = io.Copy(w, f)
+		_, ce = io.Copy(w, f)
 		f.Close()
-		if err != nil {
-			return err
+		if ce != nil {
+			return ce
+		}
+		done++
+		doneBytes += it.size
+		if onProgress != nil {
+			onProgress(done, total, doneBytes, totalBytes, it.rel)
 		}
 	}
 	return nil
@@ -201,12 +241,16 @@ func (m *Manager) hasWorldDir(inst Instance, keepTop func(string) bool) bool {
 
 // CreateBackup 手动备份一份。范围用实例自己配的（页面上可切换）。
 // 存完之后按策略清一次旧备份 —— 用户的心智模型是「总量最多 N 份」。
-func (m *Manager) CreateBackup(id, label string) (BackupInfo, error) {
+func (m *Manager) CreateBackup(id, label string, onProgress ...jobs.ProgressFunc) (BackupInfo, error) {
 	inst, ok := m.st.Get(id)
 	if !ok {
 		return BackupInfo{}, fmt.Errorf("实例不存在: %s", id)
 	}
-	b, err := m.createBackup(inst, label, BackupKindManual, backupScopeOf(inst))
+	var cb jobs.ProgressFunc
+	if len(onProgress) > 0 {
+		cb = onProgress[0]
+	}
+	b, err := m.createBackup(inst, label, BackupKindManual, backupScopeOf(inst), cb)
 	if err != nil {
 		return BackupInfo{}, err
 	}
@@ -215,7 +259,7 @@ func (m *Manager) CreateBackup(id, label string) (BackupInfo, error) {
 }
 
 // createBackup 真正干活的那个。kind 决定文件名前缀，scope 决定打包范围。
-func (m *Manager) createBackup(inst Instance, label, kind, scope string) (BackupInfo, error) {
+func (m *Manager) createBackup(inst Instance, label, kind, scope string, onProgress jobs.ProgressFunc) (BackupInfo, error) {
 	if err := os.MkdirAll(m.backupsDir(inst.ID), 0o755); err != nil {
 		return BackupInfo{}, err
 	}
@@ -265,7 +309,7 @@ func (m *Manager) createBackup(inst Instance, label, kind, scope string) (Backup
 		return BackupInfo{}, err
 	}
 	zw := zip.NewWriter(f)
-	err = zipDir(zw, inst.Dir, "", keepTop)
+	err = zipDir(zw, inst.Dir, "", keepTop, onProgress)
 	if cerr := zw.Close(); err == nil {
 		err = cerr
 	}
@@ -318,7 +362,11 @@ func (m *Manager) DeleteBackup(id, file string) error {
 }
 
 // RestoreBackup 还原：停服 → 先给当前状态存一份 pre-restore → 清空实例目录 → 解压覆盖 → 之前在跑就重新开
-func (m *Manager) RestoreBackup(id, file string) (string, error) {
+func (m *Manager) RestoreBackup(id, file string, onProgress ...jobs.ProgressFunc) (string, error) {
+	var cb jobs.ProgressFunc
+	if len(onProgress) > 0 {
+		cb = onProgress[0]
+	}
 	inst, ok := m.st.Get(id)
 	if !ok {
 		return "", fmt.Errorf("实例不存在: %s", id)
@@ -341,7 +389,7 @@ func (m *Manager) RestoreBackup(id, file string) (string, error) {
 	// 安全网：把「还原前」的现场单独存一份，后悔了还能回来。
 	// ⚠ 这份**固定用整目录范围**，不跟用户的「只存存档」走 ——
 	// 它就是用来撤销这次还原的，只存存档的话插件/配置回不去，等于没有后悔药。
-	safety, err := m.createBackup(inst, BackupKindPreRestore, BackupKindPreRestore, BackupScopeAll)
+	safety, err := m.createBackup(inst, BackupKindPreRestore, BackupKindPreRestore, BackupScopeAll, nil)
 	if err != nil {
 		return "", fmt.Errorf("还原前备份失败，已中止: %w", err)
 	}
@@ -376,6 +424,19 @@ func (m *Manager) RestoreBackup(id, file string) (string, error) {
 		}
 	}
 
+	var n int
+	for _, f := range zr.File {
+		clean := filepath.Clean(filepath.FromSlash(f.Name))
+		if f.FileInfo().IsDir() || strings.HasPrefix(clean, "..") || filepath.IsAbs(clean) {
+			continue
+		}
+		n++
+	}
+	if cb != nil {
+		cb(0, n, 0, 0, "")
+	}
+	var done int
+
 	for _, f := range zr.File {
 		// 二次防线：zip 里的路径也可能带 ..，解压前必须校验
 		clean := filepath.Clean(filepath.FromSlash(f.Name))
@@ -406,6 +467,10 @@ func (m *Manager) RestoreBackup(id, file string) (string, error) {
 		out.Close()
 		if err != nil {
 			return "", err
+		}
+		done++
+		if cb != nil {
+			cb(done, n, 0, 0, clean)
 		}
 	}
 
@@ -664,7 +729,7 @@ func (m *Manager) runOneAutoBackup(inst Instance, now time.Time) {
 
 	logs := m.logsFor(inst.ID)
 	logs.Append("[EnderBox] 开始自动备份…")
-	b, err := m.createBackup(inst, "", BackupKindAuto, backupScopeOf(inst))
+	b, err := m.createBackup(inst, "", BackupKindAuto, backupScopeOf(inst), nil)
 	if err != nil {
 		logs.Append("[EnderBox] 自动备份失败：" + err.Error())
 		return

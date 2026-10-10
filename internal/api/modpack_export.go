@@ -6,6 +6,7 @@ import (
 
 	"github.com/su-ni/EnderBox/internal/daemon"
 	"github.com/su-ni/EnderBox/internal/fetch"
+	"github.com/su-ni/EnderBox/internal/jobs"
 	"github.com/su-ni/EnderBox/internal/modpack"
 )
 
@@ -16,14 +17,57 @@ import (
 // 而这里比升级更强调这点：**发出去的包改不了**，预览是用户唯一的反悔机会。
 
 func (s *Server) modpackExportPreview(w http.ResponseWriter, r *http.Request) {
-	s.doExport(w, r, true)
+	s.doExport(w, r, true, nil)
 }
 
 func (s *Server) modpackExportStart(w http.ResponseWriter, r *http.Request) {
-	s.doExport(w, r, false)
+	id := r.PathValue("id")
+	inst, ok := s.mgr.Get(id)
+	if !ok {
+		writeErr(w, 404, "实例不存在")
+		return
+	}
+	opts, err := s.exportOptions(inst, r, false)
+	if err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+
+	// 异步化：导出是分钟级（上百 MB 的 jar 逐个算哈希 + 打进包）。handler 立刻回 202 + jobId，
+	// 前端轮询 /api/jobs/{id} 拿进度。「同实例只准一笔在跑」的闸在 jobStore.New 里。
+	job := s.jobStore.New(id, "modpack-export")
+	if job == nil {
+		writeErrReason(w, 409, "busy", "该实例已有一笔作业在跑，等它结束再试")
+		return
+	}
+	cb := func(fd, ft int, bd, bt int64, cur string) {
+		s.jobStore.UpdateProgress(job, fd, ft, bd, bt, cur)
+	}
+	go func() {
+		s.jobStore.SetStage(job, "export")
+		opts.OnProgress = cb
+		res, err := modpack.Export(opts)
+		if err != nil {
+			s.jobStore.Finish(job, jobs.StateFailed, nil, err.Error())
+			return
+		}
+		s.jobStore.Finish(job, jobs.StateDone, map[string]any{
+			"client": packPath(res.Client),
+			"server": packPath(res.Server),
+		}, "")
+	}()
+	writeJSON(w, 202, map[string]any{"jobId": job.ID})
 }
 
-func (s *Server) doExport(w http.ResponseWriter, r *http.Request, dryRun bool) {
+// packPath 从一个包的产出里取出落盘路径；nil 包（没选那种包）返回空串。
+func packPath(p *modpack.PackResult) string {
+	if p == nil {
+		return ""
+	}
+	return p.Path
+}
+
+func (s *Server) doExport(w http.ResponseWriter, r *http.Request, dryRun bool, onProgress jobs.ProgressFunc) {
 	inst, ok := s.mgr.Get(r.PathValue("id"))
 	if !ok {
 		writeErr(w, 404, "实例不存在")
@@ -34,6 +78,7 @@ func (s *Server) doExport(w http.ResponseWriter, r *http.Request, dryRun bool) {
 		writeErr(w, 400, err.Error())
 		return
 	}
+	opts.OnProgress = onProgress
 
 	res, err := modpack.Export(opts)
 	if err != nil {

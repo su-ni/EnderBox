@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { api, type ModpackExportOne, type ModpackExportResult } from '../api'
+import { api, type ModpackExportOne, type ModpackExportResult, type JobSnapshot } from '../api'
+import { JobProgress } from './JobProgress'
 import type { Instance } from '../types'
 import { Chk, ConHead, Icon, Panel } from './design'
 
@@ -135,16 +136,29 @@ export function ModpackExportPanel({
     }
   }
 
+  const [exportJob, setExportJob] = useState<string | null>(null)
+
+  const onExportFinish = (j: JobSnapshot) => {
+    setExportJob(null)
+    setBusy('')
+    if (j.state === 'done') {
+      setResult(j.result as unknown as Parameters<typeof setResult>[0])
+      onToast('整合包已导出')
+    } else if (j.state === 'canceled') {
+      setErr('导出已取消')
+    } else {
+      setErr(j.err || '导出失败')
+    }
+  }
+
   const doExport = async () => {
     setBusy('export')
     setErr('')
     try {
       const r = await api.modpackExport(instance.id, query())
-      setResult(r)
-      onToast('整合包已导出')
+      setExportJob(r.jobId)
     } catch (e) {
       setErr((e as Error).message)
-    } finally {
       setBusy('')
     }
   }
@@ -158,6 +172,9 @@ export function ModpackExportPanel({
         sub="把这台服打包成 .mrpack，发给别人装"
       />
       <div style={{ padding: '12px 16px 16px' }}>
+        {exportJob ? (
+          <JobProgress jobId={exportJob} label="正在导出" onFinish={onExportFinish} />
+        ) : null}
         <div className="field">
           <div>
             <div className="lb">包名</div>

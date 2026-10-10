@@ -71,7 +71,7 @@ const offlinePage = `<!doctype html>
     <li>构建前端（<code>tsc -b --force</code> + <code>vite build</code>）</li>
     <li>把 <code>web/dist</code> 复制到 <code>internal/webui/dist</code><br>
         <span class="muted">go:embed 不能跨 <code>..</code>，所以必须先搬进同一个包目录</span></li>
-    <li>编译出带界面的 <code>bin/serverbox.exe</code></li>
+    <li>编译出带界面的 <code>bin/enderbox.exe</code></li>
   </ol>
 
   <p>

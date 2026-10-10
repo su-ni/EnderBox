@@ -18,6 +18,7 @@ import (
 
 	"github.com/su-ni/EnderBox/internal/daemon"
 	"github.com/su-ni/EnderBox/internal/fetch"
+	"github.com/su-ni/EnderBox/internal/jobs"
 )
 
 // 这些路由服务于「插件 / 备份 / 设置」三页。
@@ -780,35 +781,55 @@ func (s *Server) backupList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) backupCreate(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
 	var body struct {
 		Label string `json:"label"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	b, err := s.mgr.CreateBackup(r.PathValue("id"), body.Label)
-	if err != nil {
-		// 实例没了 → 404；「没找到世界存档」是用户换个范围就能解决的 → 400；
-		// 其余（磁盘满、没权限）才是我们这边的 500。
-		switch {
-		case errors.Is(err, daemon.ErrInstanceNotFound):
-			writeErr(w, 404, err.Error())
-		case errors.Is(err, daemon.ErrNoWorldArchive):
-			writeErr(w, 400, err.Error())
-		default:
-			writeErr(w, 500, err.Error())
-		}
+
+	// 异步化：压包是分钟级操作，放 goroutine 里跑，handler 立刻回 202 + jobId，
+	// 前端靠轮询 /api/jobs/{id} 拿进度。「同实例只准一笔在跑」的闸在 jobStore.New 里，
+	// 撞上了就回 409 让用户等，别开两个压包器写同一批文件。
+	job := s.jobStore.New(id, "backup-create")
+	if job == nil {
+		writeErrReason(w, 409, "busy", "该实例已有一笔作业在跑（备份/还原/升级…），等它结束再试")
 		return
 	}
-	writeJSON(w, 201, b)
+	cb := func(fd, ft int, bd, bt int64, cur string) {
+		s.jobStore.UpdateProgress(job, fd, ft, bd, bt, cur)
+	}
+	go func() {
+		b, err := s.mgr.CreateBackup(id, body.Label, cb)
+		if err != nil {
+			s.jobStore.Finish(job, jobs.StateFailed, nil, err.Error())
+			return
+		}
+		s.jobStore.Finish(job, jobs.StateDone, map[string]any{"file": b.File, "size": b.Size}, "")
+	}()
+	writeJSON(w, 202, map[string]any{"jobId": job.ID})
 }
 
 func (s *Server) backupRestore(w http.ResponseWriter, r *http.Request) {
-	safety, err := s.mgr.RestoreBackup(r.PathValue("id"), r.PathValue("file"))
-	if err != nil {
-		writeErr(w, 500, err.Error())
+	id := r.PathValue("id")
+	file := r.PathValue("file")
+	job := s.jobStore.New(id, "backup-restore")
+	if job == nil {
+		writeErrReason(w, 409, "busy", "该实例已有一笔作业在跑，等它结束再试")
 		return
 	}
-	// 返回还原前那份安全备份的文件名，界面要告诉用户「后悔药在这」
-	writeJSON(w, 200, map[string]any{"ok": true, "safety": safety})
+	cb := func(fd, ft int, bd, bt int64, cur string) {
+		s.jobStore.UpdateProgress(job, fd, ft, bd, bt, cur)
+	}
+	go func() {
+		safety, err := s.mgr.RestoreBackup(id, file, cb)
+		if err != nil {
+			s.jobStore.Finish(job, jobs.StateFailed, nil, err.Error())
+			return
+		}
+		// 返回还原前那份安全备份的文件名，界面要告诉用户「后悔药在这」
+		s.jobStore.Finish(job, jobs.StateDone, map[string]any{"safety": safety}, "")
+	}()
+	writeJSON(w, 202, map[string]any{"jobId": job.ID})
 }
 
 func (s *Server) backupDelete(w http.ResponseWriter, r *http.Request) {

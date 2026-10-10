@@ -16,11 +16,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/su-ni/EnderBox/internal/daemon"
 	"github.com/su-ni/EnderBox/internal/fetch"
+	"github.com/su-ni/EnderBox/internal/jobs"
 	"github.com/su-ni/EnderBox/internal/modpack"
 )
 
@@ -39,12 +39,8 @@ func (s *Server) instanceModpackRoutes(mux *http.ServeMux) {
 	// preview 会被反复调用（用户改一次参数就重算一次），而导出只该发生一次且必须显式触发。
 	mux.HandleFunc("GET /api/instances/{id}/modpack/export/preview", s.modpackExportPreview)
 	mux.HandleFunc("POST /api/instances/{id}/modpack/export", s.modpackExportStart)
-	// 作业表两条挂在 /api/modpacks/ 前缀下，与上面的实例路由不同前缀，不会撞。
-	// 作业 id 与实例无关（跨实例轮询进度），所以不往 /instances/{id} 里塞。
-	mux.HandleFunc("GET /api/modpacks/ops", s.modpackOpList)
-	mux.HandleFunc("GET /api/modpacks/ops/{opId}", s.modpackOpGet)
-	mux.HandleFunc("POST /api/modpacks/ops/{opId}/cancel", s.modpackOpCancel)
-	mux.HandleFunc("POST /api/modpacks/ops/{opId}/dismiss", s.modpackOpDismiss)
+	// 升级/安装这类长任务的进度、取消、历史记录统一走 /api/jobs（见 server.go 的 jobRoutes），
+	// 不再各搞一套 /api/modpacks/ops* —— 备份、导出、模组升级/安装共用同一张作业表与同一个前端气泡。
 }
 
 // modpackRunning 查实例是否在跑。默认指向 Server.instanceRunning；
@@ -343,7 +339,7 @@ func (s *Server) downloadMrpack(
 	label string,
 	onDelta func(int64),
 ) (string, string, error) {
-	tmp, err := os.MkdirTemp("", "serverbox-mrpack-")
+	tmp, err := os.MkdirTemp("", "enderbox-mrpack-")
 	if err != nil {
 		return "", "", &planError{kind: planErrUpstream, msg: "建临时目录失败：" + err.Error()}
 	}
@@ -597,16 +593,13 @@ func (s *Server) modpackUpgradeStart(w http.ResponseWriter, r *http.Request) {
 // ── 作业表 ────────────────────────────────────────────────
 
 // 作业的四种状态。终态（done/failed/canceled）之后不再变。
+// 值与 jobs 包里的 State* 常量一致，测试与前端用这两个名字即可。
 const (
-	opRunning  = "running"
-	opDone     = "done"
-	opFailed   = "failed"
-	opCanceled = "canceled"
+	opRunning  = jobs.StateRunning
+	opDone     = jobs.StateDone
+	opFailed   = jobs.StateFailed
+	opCanceled = jobs.StateCanceled
 )
-
-// opLifetime 终态作业保留多久。留着是为了让用户切走再回来还能看到
-// 「刚才那次升成了什么样」；过了这个点，就只是占内存。
-const opLifetime = 24 * time.Hour
 
 // modpackOpResult 升级终态的结算。⚠ 部分失败不算成功：failed 非空时 state 仍是
 // done，但 failed 必须如实带出，界面要把它列出来 —— 不能报「全部成功」。
@@ -624,156 +617,38 @@ type modpackOpResult struct {
 	Warnings []string `json:"warnings"`
 }
 
-// modpackOps 整合包升级的作业表（内存）。进程重启即清空 —— 升级做到一半断电，
-// 磁盘上留下的是「做到一半」的现实，packstate 没动过，重新预览会如实算出新计划。
-type modpackOps struct {
-	mu  sync.Mutex
-	ops map[string]*modpackOp
-}
-
-// modpackOp 一笔升级作业。所有字段的读写都在 modpackOps.mu 之内 ——
-// 进度回调来自执行 goroutine，快照来自 HTTP handler，两边没有别的同步点。
-type modpackOp struct {
-	ID         string
-	instanceID string
-	state      string
-	// stage 现在这一步在干嘛：""（升级作业不细分）| prepare(下包+解析) | jar(服务端文件) | files(装模组)。
-	// 只有一个百分比的话，用户看着「1%」不知道是在下 28MB 的包还是在装 1300 个文件 ——
-	// 这两件事的等待预期差了一个量级，界面必须说得出来。
-	stage    string
-	progress modpack.Progress
-	result   modpackOpResult
-	err      string
-	// kind 作业种类：install（市场一键装成实例）| upgrade。空串按 upgrade 报（老作业没有这字段）。
-	// 只影响界面文案与「去看这个实例」入口，不影响进度字段 —— 别拿它分流数据。
-	kind string
-	// ctx 作业自己的取消上下文。建作业时就备好，跑哪个函数由调用方决定。
-	ctx       context.Context
-	cancel    context.CancelFunc
-	startedAt time.Time
-}
-
-func newModpackOps() *modpackOps {
-	return &modpackOps{ops: map[string]*modpackOp{}}
-}
-
-// registerOp 把一笔新作业登记进表，返回 false 表示该实例已有一笔 running 作业。
-//
-// 「同实例只准一笔在跑」的检查**必须**和插入在同一把锁里完成：check 与 act 分开
-// （先查一把锁、再开另一把插）的话，两个并发 POST 可以在对方插入前双双过闸，
-// 起两个执行器写同一批文件 —— 正是这道闸要防的事故。终态作业不挡新作业；
-// 顺手清掉过期的终态作业（不做后台定时器 —— 家用面板的升级频率撑不起一个
-// 专门的清理循环，挂在「新建作业」这个必然发生的节点上就够了）。
-func (o *modpackOps) registerOp(op *modpackOp) bool {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	for _, ex := range o.ops {
-		if ex.instanceID == op.instanceID && ex.state == opRunning {
-			return false
-		}
-	}
-	now := time.Now()
-	for id, ex := range o.ops {
-		if ex.state != opRunning && now.Sub(ex.startedAt) > opLifetime {
-			delete(o.ops, id)
-		}
-	}
-	// UnixNano 一纳秒内撞上是理论可能 —— 撞了就换一个，别把别人悄悄覆盖掉。
-	for {
-		if _, exists := o.ops[op.ID]; !exists {
-			break
-		}
-		op.ID = fmt.Sprintf("mp_%d", time.Now().UnixNano())
-	}
-	o.ops[op.ID] = op
-	return true
-}
-
-// setStage 更新「现在在干嘛」。与进度同锁 —— 否则前端可能读到「阶段已到 files
-// 但进度还是上一个阶段的数字」这种自相矛盾的快照。
-func (o *modpackOps) setStage(op *modpackOp, stage string) {
-	o.mu.Lock()
-	op.stage = stage
-	o.mu.Unlock()
-}
-
-// opSnapshot 对外的作业快照。state/progress/result/err 四个字段恒在 ——
-// 前端的类型把 result 当非可选用，running 时给零值 + 空集合，不给 undefined。
-func opSnapshot(op *modpackOp) map[string]any {
-	res := op.result
-	if res.SkippedPaths == nil {
-		res.SkippedPaths = []string{}
-	}
-	if res.Failed == nil {
-		res.Failed = []string{}
-	}
-	if res.Warnings == nil {
-		res.Warnings = []string{}
-	}
-	// 老作业不带 kind（这个字段是 P1 才加的），**缺省必须是 upgrade** ——
-	// 让前端拿到 undefined 再自己猜的话，一笔正在跑的升级会被画成「正在安装新实例」，
-	// 还会多出一个指向不存在实例的入口。
-	kind := op.kind
-	if kind == "" {
-		kind = "upgrade"
-	}
-	return map[string]any{
-		"state":      op.state,
-		"kind":       kind,
-		"instanceId": op.instanceID,
-		"stage":      op.stage,
-		"progress": map[string]any{
-			"filesDone":  op.progress.FilesDone,
-			"filesTotal": op.progress.FilesTotal,
-			"bytesDone":  op.progress.BytesDone,
-			"bytesTotal": op.progress.BytesTotal,
-			"current":    op.progress.Current,
-		},
-		"result": res,
-		"err":    op.err,
-	}
-}
-
-// startModpackOp 落一笔新作业并起 goroutine 执行。
+// startModpackOp 起一笔升级作业并把所持资源交给 goroutine。
 // cp 的所有权（含临时包目录）一并移交：作业要活到 Execute 结束之后才能删它。
-// 返回 nil 表示该实例已有一笔 running 作业（同实例闸在 registerOp 里与入表同锁），
+// 返回 nil 表示该实例已有一笔 running 作业（同 owner 闸在 jobs.Store.New 里与入表同锁），
 // 此时所有权不移交，调用方负责 release 并回 409。
-func (s *Server) startModpackOp(inst daemon.Instance, cp *computedPlan) *modpackOp {
-	op := s.newModpackOp(inst.ID, "upgrade")
-	if op == nil {
+//
+// 作业挂统一的 s.jobStore：整合包升级/安装与备份、导出共用同一张表和同一套 /api/jobs
+// 端点。早年每个慢操作各开一张作业表（modpack 一套、备份一套、下载一套），
+// 前端就得跟着写三份轮询 + 取消 + 进度，改一处漏两处。
+func (s *Server) startModpackOp(inst daemon.Instance, cp *computedPlan) *jobs.Job {
+	job := s.jobStore.New(inst.ID, "upgrade")
+	if job == nil {
 		return nil
 	}
-	go s.runModpackOp(op.ctx, op.cancel, op, inst, cp)
-	return op
+	// 预置空集合结算：取消可能早于 Finish 落地，那一瞬的快照也得带着全字段。
+	s.jobStore.PrimeResult(job, modpackOpResult{SkippedPaths: []string{}, Failed: []string{}, Warnings: []string{}})
+	go s.runModpackOp(job, inst, cp)
+	return job
 }
 
-// newModpackOp 建一笔作业并登记入表。返回 nil = 该实例已有一笔 running 作业。
+// newModpackOp 建一笔整合包作业并入表。返回 nil = 该实例已有一笔 running 作业。
+// kind 只影响界面文案与「去看这个实例」入口，不影响进度字段 —— 别拿它分流数据。
 //
-// 把「建」与「跑」分开，是因为安装（P1）与升级跑的**不是同一个函数**；
-// 但「同实例只准一笔」这条闸必须共用一份实现 —— 各写一遍的话，
-// 总有一天两边会不一致，而症状是两个执行器同时写同一批文件。
-func (s *Server) newModpackOp(instID, kind string) *modpackOp {
-	now := time.Now()
-	ctx, cancel := context.WithCancel(context.Background())
-	op := &modpackOp{
-		ID:         fmt.Sprintf("mp_%d", now.UnixNano()),
-		instanceID: instID,
-		state:      opRunning,
-		kind:       kind,
-		ctx:        ctx,
-		result:     modpackOpResult{SkippedPaths: []string{}, Failed: []string{}, Warnings: []string{}},
-		startedAt:  now,
-	}
-	// cancel 在入表**之前**就挂上：取消请求可能比 goroutine 跑起来还快，
-	// 晚挂的话那一下取消就落空了（用户点了取消，作业却继续跑完）。
-	op.cancel = cancel
-
-	if !s.mpOps.registerOp(op) {
-		// 没入表的作业用不上它的 ctx，收掉，别漏一个取消句柄。
-		cancel()
+// 「建」与「跑」分开，是因为安装与升级跑的**不是同一个函数**，
+// 但「同实例只准一笔」这条闸必须共用一份实现：各写一遍的话总有一天两边不一致，
+// 症状是两个执行器同时写同一批文件。
+func (s *Server) newModpackOp(instID, kind string) *jobs.Job {
+	job := s.jobStore.New(instID, kind)
+	if job == nil {
 		return nil
 	}
-	return op
+	s.jobStore.PrimeResult(job, modpackOpResult{SkippedPaths: []string{}, Failed: []string{}, Warnings: []string{}})
+	return job
 }
 
 // standaloneFetcher 把 modpack.Fetcher 适配到下载管理器的 FetchStandalone：
@@ -799,11 +674,11 @@ func (f standaloneFetcher) Fetch(ctx context.Context, url, dst, wantSHA, shaKind
 //     配不上任何一份完整状态；宁可让下次预览重新算（多算的部分只会进跳过清单，
 //     不会覆盖用户的改动）。
 //  3. 部分失败不算成功：state 照样是 done，但 failed 原样带出。
-func (s *Server) runModpackOp(ctx context.Context, cancel context.CancelFunc, op *modpackOp, inst daemon.Instance, cp *computedPlan) {
+func (s *Server) runModpackOp(op *jobs.Job, inst daemon.Instance, cp *computedPlan) {
 	defer cp.release()
-	defer cancel()
 
-	s.mpOps.setStage(op, "files")
+	ctx := s.jobStore.Ctx(op)
+	s.jobStore.SetStage(op, "files")
 
 	res, err := modpack.Execute(ctx, modpack.ExecuteOptions{
 		InstanceDir:   inst.Dir,
@@ -816,9 +691,7 @@ func (s *Server) runModpackOp(ctx context.Context, cancel context.CancelFunc, op
 		VersionNumber: cp.versionNumber,
 		Fetcher:       standaloneFetcher{m: s.dl},
 		OnProgress: func(p modpack.Progress) {
-			s.mpOps.mu.Lock()
-			op.progress = p
-			s.mpOps.mu.Unlock()
+			s.jobStore.UpdateProgress(op, p.FilesDone, p.FilesTotal, p.BytesDone, p.BytesTotal, p.Current)
 		},
 	})
 
@@ -849,15 +722,10 @@ func (s *Server) runModpackOp(ctx context.Context, cancel context.CancelFunc, op
 
 // finishOp 给作业落一笔终态。res 可能为 nil（还没产出任何东西就被取消）。
 // warnings 是「我们没接、你自己来」类的话（升级没有这类，一律传 nil）。
-func (s *Server) finishOp(op *modpackOp, plan *modpack.Plan, state string, res *modpack.Result, errMsg string, warnings []string) {
+func (s *Server) finishOp(op *jobs.Job, plan *modpack.Plan, state string, res *modpack.Result, errMsg string, warnings []string) {
 	r := opResultOf(res, plan)
 	r.Warnings = append(r.Warnings, warnings...)
-	s.mpOps.mu.Lock()
-	op.state = state
-	op.result = r
-	op.err = errMsg
-	op.stage = ""
-	s.mpOps.mu.Unlock()
+	s.jobStore.Finish(op, state, r, errMsg)
 }
 
 // opResultOf 把执行结果折成对外的结算。
@@ -877,90 +745,6 @@ func opResultOf(res *modpack.Result, plan *modpack.Plan) modpackOpResult {
 		}
 	}
 	return r
-}
-
-// modpackOpList 列出全部作业（在跑的和最近的终态）。
-//
-// 为什么需要它：整合包的安装/升级是**后端在跑**的长任务，和「用户当前停在哪个页面」无关。
-// 以前前端只能拿自己发起时那个 opId 去问进度 —— 那意味着刷新一下页面、或者换台设备打开面板，
-// 这笔作业就变成了不可见的：它还在老老实实装，用户看到的却是「什么都没发生」。
-//
-// 返回按开始时间倒序（新的在前）：界面拿它当「正在跑 + 最近记录」一栏直接用，
-// 不需要为了排序再引一次时间字段。
-func (s *Server) modpackOpList(w http.ResponseWriter, _ *http.Request) {
-	s.mpOps.mu.Lock()
-	out := make([]map[string]any, 0, len(s.mpOps.ops))
-	for id, op := range s.mpOps.ops {
-		snap := opSnapshot(op)
-		snap["id"] = id
-		// startedAt 给界面上「跑了多久」用。RFC3339 与实例、任务表保持同一套时间口径。
-		snap["startedAt"] = op.startedAt.Format(time.RFC3339)
-		out = append(out, snap)
-	}
-	s.mpOps.mu.Unlock()
-	sort.Slice(out, func(i, j int) bool {
-		return fmt.Sprint(out[i]["startedAt"]) > fmt.Sprint(out[j]["startedAt"])
-	})
-	// ⚠ 恒返回 []，不是 null：前端直接读 .length，nil 切片序列化成 null 会让它炸在第一天。
-	writeJSON(w, 200, map[string]any{"items": out})
-}
-
-// modpackOpGet 作业快照。未知 id → 404。
-func (s *Server) modpackOpGet(w http.ResponseWriter, r *http.Request) {
-	s.mpOps.mu.Lock()
-	op, ok := s.mpOps.ops[r.PathValue("opId")]
-	var snap map[string]any
-	if ok {
-		snap = opSnapshot(op)
-	}
-	s.mpOps.mu.Unlock()
-	if !ok {
-		writeErr(w, 404, "没有这个作业 —— id 不对，或者它已经是很久以前的了（终态作业保留 24 小时）")
-		return
-	}
-	writeJSON(w, 200, snap)
-}
-
-// modpackOpCancel 取消升级。只有 running 才有得取消；已结束的返回当前快照（200）——
-// 「取消一个已经完成的升级」不是错误，界面不必为它分流。
-func (s *Server) modpackOpCancel(w http.ResponseWriter, r *http.Request) {
-	s.mpOps.mu.Lock()
-	op, ok := s.mpOps.ops[r.PathValue("opId")]
-	if ok && op.state == opRunning && op.cancel != nil {
-		op.cancel()
-	}
-	var snap map[string]any
-	if ok {
-		snap = opSnapshot(op)
-	}
-	s.mpOps.mu.Unlock()
-	if !ok {
-		writeErr(w, 404, "没有这个作业 —— id 不对，或者它已经是很久以前的了（终态作业保留 24 小时）")
-		return
-	}
-	writeJSON(w, 200, snap)
-}
-
-// modpackOpDismiss 从作业表里删掉一条**终态**记录（用户手动清账本）。
-// running 的返回 409：先取消。终态保留 24 小时是兜底，用户想现在清就走这里。
-func (s *Server) modpackOpDismiss(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("opId")
-	s.mpOps.mu.Lock()
-	op, ok := s.mpOps.ops[id]
-	if ok && op.state == opRunning {
-		s.mpOps.mu.Unlock()
-		writeErr(w, 409, "作业还在跑 —— 先取消，等它结束再删记录")
-		return
-	}
-	if ok {
-		delete(s.mpOps.ops, id)
-	}
-	s.mpOps.mu.Unlock()
-	if !ok {
-		writeErr(w, 404, "没有这个作业（可能已被清理）")
-		return
-	}
-	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
 // ── 磁盘探针（比对「磁盘上现在是什么」用）──────────────────

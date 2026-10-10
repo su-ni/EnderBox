@@ -30,6 +30,7 @@ import (
 
 	"github.com/su-ni/EnderBox/internal/daemon"
 	"github.com/su-ni/EnderBox/internal/fetch"
+	"github.com/su-ni/EnderBox/internal/jobs"
 	"github.com/su-ni/EnderBox/internal/modpack"
 	"github.com/su-ni/EnderBox/internal/settings"
 )
@@ -270,6 +271,9 @@ func newModpackEnv(t *testing.T, cdnDelay time.Duration) *modpackEnv {
 	env.s = New(mgr, set, "127.0.0.1:0")
 	pmux := http.NewServeMux()
 	env.s.instanceModpackRoutes(pmux)
+	// 作业端点单独一组：把这几条漏掉的话，轮询 /api/jobs 只会拿到 mux 原生的 404，
+	// 报「作业不存在」那样的人话却拿不到 —— 测试会误判成产品代码的问题。
+	env.s.jobRoutes(pmux)
 	env.panel = httptest.NewServer(pmux)
 	t.Cleanup(env.panel.Close)
 	t.Cleanup(market.Close)
@@ -410,7 +414,7 @@ func waitForOp(t *testing.T, panelURL, opID string) (string, map[string]any) {
 	deadline := time.Now().Add(30 * time.Second)
 	var last []byte
 	for time.Now().Before(deadline) {
-		code, raw := mpGet(t, panelURL+"/api/modpacks/ops/"+opID)
+		code, raw := mpGet(t, panelURL+"/api/jobs/"+opID)
 		if code != 200 {
 			t.Fatalf("轮询作业返回 %d：%s", code, raw)
 		}
@@ -642,8 +646,8 @@ func TestModpackStartStaleThenConfirmStale(t *testing.T) {
 		t.Fatalf("confirmStale 后该放行：%d：%s", code, raw)
 	}
 	opID, _ := mpDecode(t, raw)["opId"].(string)
-	if !strings.HasPrefix(opID, "mp_") {
-		t.Fatalf("opId 形态不对：%q", opID)
+	if !strings.HasPrefix(opID, "job_") {
+		t.Fatalf("opId 该是统一作业表的 id（job_ 前缀），实际 %q", opID)
 	}
 
 	opRaw, op := waitForOp(t, env.panel.URL, opID)
@@ -740,7 +744,7 @@ func TestModpackStartBlockedWhileOpRunning(t *testing.T) {
 		t.Fatalf("第一笔该 202：%d：%s", code, raw)
 	}
 	opID := mpDecode(t, raw)["opId"].(string)
-	t.Cleanup(func() { _, _ = mpPost(t, env.panel.URL+"/api/modpacks/ops/"+opID+"/cancel", nil) })
+	t.Cleanup(func() { _, _ = mpPost(t, env.panel.URL+"/api/jobs/"+opID+"/cancel", nil) })
 
 	// 同指纹立刻再点一次开始：拦它的必须是「已有作业在跑」，不是指纹
 	code, raw = mpPost(t, base, map[string]any{"version": mpVerID, "planHash": hash})
@@ -779,13 +783,13 @@ func TestModpackOpsLifecycle(t *testing.T) {
 	env := newModpackEnv(t, 100*time.Millisecond)
 
 	// 未知作业：查 / 取消都 404
-	code, _ := mpGet(t, env.panel.URL+"/api/modpacks/ops/mp_nope")
+	code, _ := mpGet(t, env.panel.URL+"/api/jobs/mp_nope")
 	if code != 404 {
 		t.Errorf("未知作业该 404，实际 %d", code)
 	}
-	code, _ = mpPost(t, env.panel.URL+"/api/modpacks/ops/mp_nope/cancel", nil)
-	if code != 404 {
-		t.Errorf("取消未知作业该 404，实际 %d", code)
+	code, _ = mpPost(t, env.panel.URL+"/api/jobs/mp_nope/cancel", nil)
+	if code != 409 {
+		t.Errorf("取消未知作业该 409（统一端点里「不存在」与「已结束」同码 —— 取消键本就该消失，界面不用分流），实际 %d", code)
 	}
 
 	// 起一笔（curl 型流程：预览拿指纹 → POST）
@@ -799,12 +803,12 @@ func TestModpackOpsLifecycle(t *testing.T) {
 	opID, _ := mpDecode(t, raw)["opId"].(string)
 
 	// 立刻取消。cancel 在入表前就挂好了，这一下必须生效
-	code, raw = mpPost(t, env.panel.URL+"/api/modpacks/ops/"+opID+"/cancel", nil)
+	code, raw = mpPost(t, env.panel.URL+"/api/jobs/"+opID+"/cancel", nil)
 	if code != 200 {
-		t.Fatalf("取消该 200（快照，不是错误）：%d：%s", code, raw)
+		t.Fatalf("取消该 200：%d：%s", code, raw)
 	}
-	if m := mpDecode(t, raw); m["state"] != opRunning && m["state"] != opCanceled {
-		t.Errorf("取消快照的 state 不对：%v", m["state"])
+	if m := mpDecode(t, raw); m["ok"] != true {
+		t.Errorf("取消成功该回 {\"ok\":true}，实际 %s", raw)
 	}
 
 	opRaw, op := waitForOp(t, env.panel.URL, opID)
@@ -821,13 +825,11 @@ func TestModpackOpsLifecycle(t *testing.T) {
 		}
 	}
 
-	// 对已结束的作业再取消：返回当前快照 200，不是错误
-	code, raw = mpPost(t, env.panel.URL+"/api/modpacks/ops/"+opID+"/cancel", nil)
-	if code != 200 {
-		t.Errorf("取消已结束的作业该 200 快照：%d：%s", code, raw)
-	}
-	if m := mpDecode(t, raw); m["state"] != opCanceled {
-		t.Errorf("再次取消返回的 state 该还是 canceled：%v", m["state"])
+	// 对已结束的作业再取消：统一端点给 409 —— 取消键在作业跑完后本就该消失，
+	// 让「还能点到」变成报错比静默忽略更诚实。
+	code, raw = mpPost(t, env.panel.URL+"/api/jobs/"+opID+"/cancel", nil)
+	if code != 409 {
+		t.Errorf("取消已结束的作业该 409：%d：%s", code, raw)
 	}
 }
 
@@ -886,30 +888,30 @@ func TestModpackInstallFreshFromLocalPack(t *testing.T) {
 	}
 }
 
-// 「同实例只准一笔 running 作业」的闸必须与入表在同一把锁里（registerOp）。
+// 「同实例只准一笔 running 作业」的闸必须与入表在同一把锁里。
 // 并发的过闸竞态没法确定性地复现 —— 这正是要把 check 和 insert 塞进同一把锁的原因；
-// 锁结构由这条契约测试看守：running 挡同实例、放别实例、放终态后的重开。
+// 锁结构由这条契约测试看守：running 挡同 owner、放别 owner、放终态后的重开。
+//
+// ⚠ 闸的实现已经从 modpack 专属的 registerOp 上移到通用作业表 internal/jobs，
+// 所以这条测试直接对着 jobs.Store 验 —— 整合包升级/安装、备份、导出共用同一把闸，
+// 任何一类作业从这个表上绕开，再写一版私有的闸，这条测试就守不住它了。
 func TestModpackOpsOneRunningPerInstance(t *testing.T) {
-	ops := newModpackOps()
-	now := time.Now()
+	store := jobs.NewStore()
 
-	first := &modpackOp{ID: "mp_1", instanceID: "A", state: opRunning, startedAt: now}
-	if !ops.registerOp(first) {
+	first := store.New("A", "upgrade")
+	if first == nil {
 		t.Fatal("空表上第一笔作业应当能登记")
 	}
-	second := &modpackOp{ID: "mp_2", instanceID: "A", state: opRunning, startedAt: now}
-	if ops.registerOp(second) {
+	if store.New("A", "upgrade") != nil {
 		t.Fatal("同实例已有一笔 running 作业，第二笔必须被闸住")
 	}
-	other := &modpackOp{ID: "mp_3", instanceID: "B", state: opRunning, startedAt: now}
-	if !ops.registerOp(other) {
+	if store.New("B", "upgrade") == nil {
 		t.Fatal("别的实例不该被同实例的闸挡住")
 	}
 
 	// 终态作业不挡新作业：A 那笔结束后，A 上要能再起一笔。
-	first.state = opCanceled
-	again := &modpackOp{ID: "mp_4", instanceID: "A", state: opRunning, startedAt: now}
-	if !ops.registerOp(again) {
+	store.Finish(first, jobs.StateCanceled, nil, "")
+	if store.New("A", "upgrade") == nil {
 		t.Fatal("上一笔已是终态，同实例的新作业应当放行")
 	}
 }

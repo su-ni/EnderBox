@@ -36,7 +36,7 @@ import (
 var (
 	daemonAddr = flag.String("daemon", "http://127.0.0.1:23456",
 		"守护进程地址（可以是另一台机器，例如 http://192.168.1.5:23456）")
-	autoStart = flag.Bool("auto-start", true, "守护进程没在跑时，自动拉起同目录的 serverbox.exe")
+	autoStart = flag.Bool("auto-start", true, "守护进程没在跑时，自动拉起同目录的 enderbox.exe")
 	waitSecs  = flag.Int("wait", 20, "自动拉起后最多等多少秒")
 	dataDir   = flag.String("data", "",
 		"自动拉起守护进程时用它做数据目录；留空则用守护进程自己的默认值（exe 旁边的 data/）")
@@ -90,7 +90,7 @@ func (s *shell) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	canLaunch, why := launchDecision()
 	// 只在第一次尝试拉起。失败之后别每来一次请求就再拉一次进程 ——
-	// 等待页是每秒重刷的，那样会每秒在后台堆一个 serverbox.exe。
+	// 等待页是每秒重刷的，那样会每秒在后台堆一个 enderbox.exe。
 	if canLaunch && !launching && startErr == "" {
 		s.mu.Lock()
 		s.launching = true
@@ -167,7 +167,7 @@ func isLocal(base string) bool {
 	return false
 }
 
-// launchDaemon 拉起同目录的 serverbox.exe。
+// launchDaemon 拉起同目录的 enderbox.exe。
 //
 // ⚠ 一定要传 -open=false：守护进程默认会再开一个浏览器标签，
 // 那样用户双击一次会得到「一个原生窗口 + 一个浏览器标签」，看着像出了 bug。
@@ -177,9 +177,9 @@ func launchDaemon() error {
 		return fmt.Errorf("定位自身路径失败：%w", err)
 	}
 	dir := filepath.Dir(exe)
-	name := "serverbox.exe"
+	name := "enderbox.exe"
 	if runtime.GOOS != "windows" {
-		name = "serverbox"
+		name = "enderbox"
 	}
 	bin := filepath.Join(dir, name)
 	if _, err := os.Stat(bin); err != nil {
@@ -219,7 +219,7 @@ func waitingPage(target string, launching bool, startErr, refuse string) string 
 		title = "连不上守护进程"
 		hint = refuse
 		if hint == "" {
-			hint = "它没在跑，同目录也没有 serverbox.exe 可以自动拉起 —— 手动启动它，或者用 -daemon 指到别的地址。"
+			hint = "它没在跑，同目录也没有 enderbox.exe 可以自动拉起 —— 手动启动它，或者用 -daemon 指到别的地址。"
 		}
 	}
 	var b strings.Builder
@@ -295,7 +295,7 @@ func main() {
 		// ⚠ OnSecondInstanceLaunch 挂在 **SingleInstanceLock 里面**，不是 App 上的字段。
 		SingleInstanceLock: &options.SingleInstanceLock{
 			// UniqueId 全机唯一即可，它同时也是互斥体的名字
-			UniqueId: "serverbox-desktop-7f3a1c",
+			UniqueId: "enderbox-desktop-7f3a1c",
 			OnSecondInstanceLaunch: func(options.SecondInstanceData) {
 				ctx := app.getCtx()
 				if ctx == nil {
