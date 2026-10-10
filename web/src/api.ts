@@ -1721,10 +1721,12 @@ export const api = {
    * 只靠发起时拿到的那个 opId 的话，刷新一下页面这笔作业就成了不可见的 ——
    * 它还在装，界面却是「什么都没发生」。全局那个下载入口就靠这份列表。
    */
-  modpackOps: async (): Promise<{ items: ModpackOpListItem[] }> => {
-    const r = await req<{ items: JobSnapshot[] }>('/api/jobs')
-    return { items: (r.items ?? []).map(jobToModpackOp) }
-  },
+  /**
+   * 后台作业列表（右下角气泡 / 下载台账的唯一来源）。
+   * ⚠ 返回**原始快照**，不要再经 jobToModpackOp 映射 —— 那个映射器会把非 install 的 kind
+   * 一律当成 upgrade，备份/还原/导出会因此被显示成「升级」。消费方按 kind 自己出文案。
+   */
+  modpackOps: () => req<{ items: JobSnapshot[] }>('/api/jobs'),
 
   /**
    * 安装：新建实例 + 起作业，202 带回 instanceId 与 opId。

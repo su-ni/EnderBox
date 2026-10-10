@@ -35,30 +35,24 @@
 
 ## 二、已确认未开工：统一作业框架 + 进度气泡
 
-> ⚠ **进度（2026-10-11 更新，含精确定位）**
+> ✅ **进度（2026-10-11 收尾完成）**
 >
-> **后端：已全做完**（`internal/jobs` 统一表 + `/api/jobs` 四端点 list/get/cancel/dismiss +
-> 备份创建/还原、导出、模组升级安装全部异步化）。提交 `df6be6b`。
+> **后端 + 前端气泡均已落地**：
+> - 后端：`internal/jobs` 统一表 + `/api/jobs` 四端点；备份创建/还原、导出、模组升级安装全部异步化。
+> - 前端：气泡壳复用现成的 `Bubbles`（`DownloadCenter.tsx:25`，`App.tsx:796` 已接）。
+>   数据层补齐了**所有 kind**：`FeedItem.kind` 扩到 `download|install|upgrade|backup|restore|export`，
+>   `useDownloadFeed.ts` 的 `feedKindOf()` 按后端 kind 分流（`backup-create`→backup，
+>   `backup-restore`→restore，`modpack-export`→export，其余→upgrade），
+>   `opNote()` 按 kind 出完成文案（备份带文件名+大小、导出带两个包路径、升级带失败项数）；
+>   `DownloadCenter.tsx` 的 `KIND_META` 与进行中标签（`KIND_STEP`）同步补齐。
+> - `api.modpackOps()` 改回返回**原始快照**（原先经 `jobToModpackOp` 会把备份扭成 upgrade 的 bug 已修）。
 >
-> **前端：气泡容器其实早就有，缺的是「数据层不认识新作业」**——以下是接手时要改的确切位置：
+> **验证**：`npx tsc -b --force` 过；`node tools/sweep.mjs http://127.0.0.1:23333` 42/42 零溢出；
+> 真机起了一个真实备份作业（149 文件 / 195MB）——`/api/jobs` 全程 `kind: backup-create`、
+> 双口径进度正确、终态 `result:{file,size}` 且 `stage` 被清空。
 >
-> 1. `web/src/components/DownloadCenter.tsx:25` 的 `Bubbles` 就是右下角气泡；`App.tsx:796`
->    已按 `items={dlOpen ? [] : feed.items}` 接好（面板打开时清空，符合 §9.7.4）。
->    **气泡壳不用新建，别重写。**
-> 2. 缺的是 `web/src/useDownloadFeed.ts` 的 `FeedItem.kind` 只有
->    `'download' | 'install' | 'upgrade'` —— 没有 backup / restore / export。
-> 3. ⚠ **现存的错**：`web/src/api.ts` 里我加的 `jobToModpackOp()` 把非 install 的 kind **一律扭成
->    `'upgrade'`**，所以**备份/还原/导出作业在气泡里会被显示成「升级」**。这是本轮引入的 bug，
->    接手第一件事就该修：让 `FeedItem.kind` 覆盖全部 kind，`opItem()` 按 kind 出文案与 result。
-> 4. 各 kind 的 result 形状（用于 `Bubbles` 里的完成态文案）：
->    `backup-create`→`{file,size}`；`backup-restore`→`{safety}`；`modpack-export`→`{client,server}`；
->    `upgrade`/`install`→`{added,replaced,removed,skipped,skippedPaths[],failed[],warnings[]}`
->    （failed 非空必须逐条列出，不许画全绿）。
-> 5. 我在 `web/src/components/JobProgress.tsx` 做的**面板内联**细条可以保留给面板内用，
->    但它不是 §4.2 要的右下角气泡形态。
->
-> 验收：`cd web && npx tsc -b --force` 过；`node tools/sweep.mjs http://127.0.0.1:23333` 42/42；
-> 真机起一个备份作业（`POST /api/instances/{id}/backups` → 拿 jobId）看气泡里是不是如实显示「备份」而不是「升级」。
+> 仍未做（非阻塞）：`Bubbles` 里每条目前是环形百分比 + 完成文案，**升级失败项没有逐条展开**成
+> 列表（文案里带了失败数，明细仍需去下载台账/模组页看）。要做的话在 Bubbles 的终态条目上加展开。
 
 > 背景与九类慢操作清单见 `LONG-TASKS-INVENTORY.md`。一句话：**现在有四套各写各的进度机制，要「所有功能都加进度」必须先抽一个统一框架，否则会变成七套八套。**
 

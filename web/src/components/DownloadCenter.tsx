@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Icon } from './design'
 import { Sheet, fmtSize, fmtTime, fmtAgoMin } from './ui'
-import { type FeedItem, type Toast } from '../useDownloadFeed'
+import { KIND_STEP, type FeedItem, type Toast } from '../useDownloadFeed'
 
 // 「正在下 / 正在装」的两个界面形态，共用 useDownloadFeed 那份数据。
 //
@@ -72,7 +72,7 @@ export function Bubbles({
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-1.5">
               <span className="shrink-0 text-[11px] font-bold tracking-[0.06em] text-cyan">
-                {i.kind === 'download' ? '下载中' : i.kind === 'install' ? '安装中' : '升级中'}
+                {KIND_STEP[i.kind]}
               </span>
               {/* 百分比要**一直**在：用户原话就是「你好歹做个百分比」。未知总量时给「—」，
                   不给 0% —— 那会被读成卡住。 */}
@@ -302,6 +302,9 @@ const KIND_META = {
   download: { icon: 'dl', label: '下载', color: 'var(--cyan)' },
   install: { icon: 'cube', label: '安装', color: 'var(--copper)' },
   upgrade: { icon: 'refresh', label: '升级', color: 'var(--warn)' },
+  backup: { icon: 'dl', label: '备份', color: 'var(--ok)' },
+  restore: { icon: 'refresh', label: '还原', color: 'var(--warn)' },
+  export: { icon: 'cube', label: '导出', color: 'var(--copper)' },
 } as const
 
 /** 终态说明的语气：完成=绿、失败=红、取消=中性。 */

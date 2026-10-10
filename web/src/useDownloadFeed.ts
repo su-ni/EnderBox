@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, type DownloadTask, type ModpackOpListItem } from './api'
+import { api, type DownloadTask, type JobSnapshot } from './api'
 import type { Instance } from './types'
 
 // 「后台在跑什么」的唯一数据源。
@@ -15,7 +15,7 @@ import type { Instance } from './types'
 export type FeedItem = {
   /** 前缀区分数据源：`dl:` 下载任务 / `op:` 整合包作业。取消时按前缀分流。 */
   key: string
-  kind: 'download' | 'install' | 'upgrade'
+  kind: 'download' | 'install' | 'upgrade' | 'backup' | 'restore' | 'export'
   /** 给人看的名字：优先实例名，其次任务自带的 label（下载 JDK 就是这种）。 */
   label: string
   /** 归属实例。空 = 没有实例可跳（JDK 下载）。 */
@@ -45,13 +45,48 @@ export type FeedItem = {
 /** 一条纯文字通知（原来是单条 toast 字符串）。 */
 export type Toast = { id: number; text: string }
 
+/** 后端作业 kind → 气泡种类。备份/还原/导出是统一作业表后新增的，别再一律当「升级」。 */
+export function feedKindOf(kind: string): FeedItem['kind'] {
+  switch (kind) {
+    case 'install':
+      return 'install'
+    case 'backup-create':
+      return 'backup'
+    case 'backup-restore':
+      return 'restore'
+    case 'modpack-export':
+      return 'export'
+    default:
+      return 'upgrade'
+  }
+}
+
+/** 各种类「正在干嘛」的一句话（气泡第一行）。 */
+export const KIND_STEP: Record<FeedItem['kind'], string> = {
+  download: '下载中',
+  install: '安装中',
+  upgrade: '升级中',
+  backup: '备份中',
+  restore: '还原中',
+  export: '导出中',
+}
+
+/** 本地小工具：不引 ui 的 fmtSize，省得动依赖（就这一处用）。 */
+function fmtSize(n: number): string {
+  if (!n) return '0 B'
+  const u = ['B', 'KB', 'MB', 'GB']
+  const i = Math.min(u.length - 1, Math.floor(Math.log(n) / Math.log(1024)))
+  const v = n / Math.pow(1024, i)
+  return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${u[i]}`
+}
+
 const STAGE_TEXT: Record<string, string> = {
   prepare: '解析整合包',
   jar: '准备服务端文件',
   files: '装模组',
 }
 
-function opPercent(op: ModpackOpListItem): number | null {
+function opPercent(op: JobSnapshot): number | null {
   const p = op.progress
   // 先按文件数：装模组阶段「已装 128 / 1300 个文件」比字节数更能说明还要多久。
   if (p?.filesTotal > 0) return Math.min(100, (p.filesDone / p.filesTotal) * 100)
@@ -59,17 +94,32 @@ function opPercent(op: ModpackOpListItem): number | null {
   return null
 }
 
-function opNote(op: ModpackOpListItem): string {
-  switch (op.state) {
-    case 'done':
-      return op.kind === 'install' ? '安装完成' : '升级完成'
-    case 'canceled':
-      return '已取消'
-    case 'failed':
-      return op.err || '失败'
-    default:
-      return ''
+function opNote(op: JobSnapshot): string {
+  // 完成态要说得具体：备份给出文件名+大小，导出给出两个包的路径，升级把失败项数带出来
+  //（部分失败不算成功，别画成全绿）。
+  const r = (op.result ?? {}) as Record<string, unknown>
+  if (op.state === 'done') {
+    if (op.kind === 'backup-create') {
+      const file = String(r.file ?? '')
+      const size = Number(r.size ?? 0)
+      return file ? `备份完成：${file}${size ? `（${fmtSize(size)}）` : ''}` : '备份完成'
+    }
+    if (op.kind === 'backup-restore') {
+      const safety = String(r.safety ?? '')
+      return safety ? `已还原（还原前的现场存成了 ${safety}）` : '已还原'
+    }
+    if (op.kind === 'modpack-export') {
+      const client = String(r.client ?? '')
+      const server = String(r.server ?? '')
+      return client || server ? `已导出：客户端 ${client} / 服务端 ${server}` : '已导出'
+    }
+    const failed = Array.isArray(r.failed) ? (r.failed as unknown[]).length : 0
+    if (op.kind === 'install') return failed ? `安装完成，但有 ${failed} 项失败` : '安装完成'
+    return failed ? `升级完成，但有 ${failed} 项失败` : '升级完成'
   }
+  if (op.state === 'canceled') return '已取消'
+  if (op.state === 'failed') return op.err || '失败'
+  return ''
 }
 
 function taskItem(t: DownloadTask, nameOf: (id: string) => string): FeedItem {
@@ -97,24 +147,27 @@ function taskItem(t: DownloadTask, nameOf: (id: string) => string): FeedItem {
   }
 }
 
-function opItem(op: ModpackOpListItem, nameOf: (id: string) => string): FeedItem {
-  const stage = STAGE_TEXT[op.stage] ?? ''
+function opItem(op: JobSnapshot, nameOf: (id: string) => string): FeedItem {
+  const kind = feedKindOf(op.kind)
+  // 阶段文案只有模组作业有（prepare/jar/files）；备份/还原/导出直接说「备份中」这类。
+  const stage = kind === 'upgrade' || kind === 'install' ? (STAGE_TEXT[op.stage] ?? '') : ''
   const p = op.progress
   const detail =
-    op.stage === 'files' && p?.filesTotal > 0 ? `${stage} ${p.filesDone}/${p.filesTotal}` : stage
+    op.stage === 'files' && (p?.filesTotal ?? 0) > 0 ? `${stage} ${p.filesDone}/${p.filesTotal}` : stage
   return {
     key: 'op:' + op.id,
-    kind: op.kind === 'install' ? 'install' : 'upgrade',
+    kind,
     // install 的新实例在后端受理那一刻就建好了，但列表刷新有最多 3 秒延迟 ——
     // 那一小段里给个「新世界」比显示一个裸 id 强。
-    label: nameOf(op.instanceId) || (op.kind === 'install' ? '新世界' : op.instanceId),
-    instanceId: op.instanceId,
-    step: detail || (op.state === 'running' ? '准备中' : ''),
+    label: nameOf(op.owner) || (kind === 'install' ? '新世界' : op.owner),
+    instanceId: op.owner,
+    step: detail || (op.state === 'running' ? KIND_STEP[kind] : ''),
     pct: opPercent(op),
     rate: 0,
     running: op.state === 'running',
     note: opNote(op),
-    startedAt: op.startedAt,
+    // 统一作业表的 startedAt 是毫秒时间戳；FeedItem 要 ISO 串（台账按它算「多久之前」）。
+    startedAt: new Date(op.startedAt).toISOString(),
     endedAt: '',
     bytesDone: p?.bytesDone ?? 0,
     bytesTotal: p?.bytesTotal ?? 0,
@@ -158,7 +211,7 @@ export function useDownloadFeed(instances: Instance[]) {
       const nameOf = (id: string) => insts.find((i) => i.id === id)?.name ?? ''
 
       let tasks: DownloadTask[] = []
-      let ops: ModpackOpListItem[] = []
+      let ops: JobSnapshot[] = []
       let got = false
       // 两个请求并发：串行的话，慢的那个会把另一个的进度一起拖到下一拍。
       const [tr, or] = await Promise.allSettled([api.fetchTasks(), api.modpackOps()])
