@@ -1374,3 +1374,17 @@ modpackOps→internal/jobs 迁移中途停摆，留了一棵编译不过的树�
 
 **下一梯队（待选）**：#30 规则编辑器真机读写验收 → M6 托盘/图标/开机自启 → P2 CurseForge →
 存档管理 → 监控历史 → Java 版本区间匹配。桌面壳 `enderbox-desktop.exe` 本轮未重建（需时跑 build-desktop.sh）。
+
+## 2026-10-11 凌晨：#30 游戏规则编辑器真机读写验收（完成）
+
+真机：Forge 1.20.1 实例（10086）起真服 → 读全量 → 改 keepInventory → 复读 → 停服测错误码。
+
+- ✅ 读全量：45 条规则，带中文 label/note（keepInventory →「死亡保留物品」）
+- ✅ POST keepInventory=true → 生效；复读一致；未知规则 → 404
+- ✅ 停服态 GET → 409 not-ready
+- 🐛→✅ **抓到并修掉一个真 bug**：停服态 POST 曾回 **400**「服务端没有确认这次修改」，
+  而正确语义是 409。根因：`daemon/gamerules.go` 那条错误是**裸 fmt.Errorf、没包哨兵**，
+  处理器的两个 errors.Is 都不中 → 掉进 default 400。加哨兵 `ErrGameruleNoConfirm` + POST 映射
+  409 not-ready，已真机复验回 409。教训：错误一旦要分流状态码，**产生处就得包哨兵**；
+  靠文案匹配（处理器写死了句子）是脆的。
+- 复原：keepInventory 改回 false。

@@ -68,6 +68,9 @@ func (s *Server) gameruleSet(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, daemon.ErrGameruleNoServer):
 			writeErrReason(w, 409, "no-server", err.Error())
+		case errors.Is(err, daemon.ErrGameruleNoConfirm):
+			// 服务器还在起（或没应答）—— 让界面说「稍后重试」，别报成 400「你填错了」。
+			writeErrReason(w, 409, "not-ready", err.Error())
 		case errors.Is(err, daemon.ErrGameruleNotFound):
 			writeErrReason(w, 404, "unknown-rule", err.Error())
 		default:

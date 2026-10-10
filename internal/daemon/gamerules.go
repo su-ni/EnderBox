@@ -78,6 +78,10 @@ var ErrGameruleNotFound = errors.New("不认识的游戏规则名")
 // 单独一个错误值（而不是一句 fmt.Errorf）：界面要按它切「稍后重试」的态，
 // 靠匹配文案分流太脆。
 var ErrGameruleNoReply = errors.New("没有读到任何规则 —— 服务器可能还在启动（就绪前命令不执行），稍后重试")
+// ErrGameruleNoConfirm 命令发出去了，但服务端没回「已被设为」那行 —— 最常见的原因是还没就绪
+//（就绪前的命令不执行），也可能这条改动被服务端拒了。归到「现在不该这么做」而不是「你填错了」：
+// 名字/值不合法另有专门的路径报 400，别把「服务端没应答」也塞进 400，用户会去改一个根本没问题的值。
+var ErrGameruleNoConfirm = errors.New("服务端没有确认这次修改 —— 看看控制台（是不是还没启动完）")
 
 // GameruleRow 读出来的一行。
 type GameruleRow struct {
@@ -524,7 +528,7 @@ func (m *Manager) SetGamerule(id, name, value string) (string, error) {
 		}
 	}
 	if !ok {
-		return "", fmt.Errorf("服务端没有确认这次修改 —— 看看控制台（是不是还没启动完）")
+		return "", ErrGameruleNoConfirm
 	}
 	return v, nil
 }
