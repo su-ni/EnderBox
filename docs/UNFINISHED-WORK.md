@@ -33,6 +33,14 @@
 
 ## 二、已确认未开工：统一作业框架 + 进度气泡
 
+> ⚠ **进度（2026-10-11 更新）**：后端已全做完（`internal/jobs` 统一表 + `/api/jobs` 四端点 +
+> 备份创建/还原、导出、模组升级安装全部异步化，已提交）。**但前端只做了一半**：
+> 落地的是**面板内联**的 `JobProgress.tsx`（细进度条），**不是本方案里的右下角 `JobBar` 气泡
+> 与各 kind 的 `JobCard` result 渲染器**。下面「前端：…新增通用 JobCard」这一段仍未开工，
+> 且 kind 命名实际用了 `backup-create` / `backup-restore` / `modpack-export`（与本文档的
+> `backup` / `restore` / `export` 有偏差）。下一轮做气泡时以 `DownloadBar.tsx` /
+> `useDownloadFeed.ts` / `ModpackOpView.tsx` 为基底合并。
+
 > 背景与九类慢操作清单见 `LONG-TASKS-INVENTORY.md`。一句话：**现在有四套各写各的进度机制，要「所有功能都加进度」必须先抽一个统一框架，否则会变成七套八套。**
 
 ### 现状代码（已读，作为抽框架的基底——以它为准，不另发明）
