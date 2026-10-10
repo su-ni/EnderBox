@@ -1352,3 +1352,25 @@ vanilla bundler 内层 / Paper / Forge 布局实测都能读，Fabric 没有→�
   设置页「守护与启动」全局行为要等 Windows 服务层；M6 托盘/.ico/自启；P1 崩溃日志智能分析、配置编辑器高亮与
   保存前校验、存档管理/监控历史/Java 版本区间；P3 MCP / Webhook（审计只覆盖了 live 与插件侧装）。
 - 清理项：死文件 `web/src/components/PlayersPanel.tsx`（旧面板，已无人引用）、`PluginsPanel.tsx.bak-render`。
+
+## 2026-10-11 凌晨：统一作业框架（scope B）+ 改名收尾
+
+**背景**：工作区里有个并行 agent 也在做同一件事（多次 Edit 报成功却没落盘的真凶），它在
+modpackOps→internal/jobs 迁移中途停摆，留了一棵编译不过的树。用户拍板由我接手修完。
+
+- **后端统一**：所有分钟级慢操作（备份创建/还原、整合包导出、模组升级/安装）收进 `internal/jobs`
+  一张表 + `/api/jobs` 一套端点（list/get/cancel/dismiss），私有作业表 `modpackOps` 删除。
+  两条契约落进 Store：`PrimeResult()`（Cancel 会早于 Finish 标终态，预置零值结算防快照掉字段）、
+  `Finish()` 顺带清 stage。
+- **前端统一**：`api.ts` 全走 `/api/jobs`，老组件靠 `jobToModpackOp()` 映射器零改动续用；
+  新 `JobProgress.tsx` 统一轮询气泡（单次回调记账 / 无分母显示「准备中」），接入备份与导出面板。
+- **改名收尾**：侧栏品牌字 SERVERBOX→ENDERBOX；**桌面壳 launchDaemon 还在找 serverbox.exe
+  （改名后「自动拉起守护进程」必然坏）已修**；离线页 / mrpack 临时前缀同步；`.serverbox/`
+  磁盘格式刻意不动（改了老实例整合包状态会失忆）。
+- **顺手修**：`zipDir` 回归——重写成 WalkDir 时 keepTop 只拦顶层文件、顶层目录（plugins）漏过，
+  「只存存档」把插件打进了包。
+- 验证：`go build`/`go vet`/`go test ./internal/...` 全绿；接口冒烟过；全站 sweep **42/42** 零溢出；
+  新 bundle 只含 ENDERBOX。提交 `df6be6b`（已推送）。清理死文件 PlayersPanel.tsx / PluginsPanel.tsx.bak-render。
+
+**下一梯队（待选）**：#30 规则编辑器真机读写验收 → M6 托盘/图标/开机自启 → P2 CurseForge →
+存档管理 → 监控历史 → Java 版本区间匹配。桌面壳 `enderbox-desktop.exe` 本轮未重建（需时跑 build-desktop.sh）。
