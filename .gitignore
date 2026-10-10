@@ -62,3 +62,6 @@ docs/DESIGN.md
 checks*.txt
 git_status.txt
 test_*.txt
+
+# WorkBuddy 本地数据（项目记忆 / 技能 / 配置）—— 纯本地，绝不入库
+.workbuddy/
