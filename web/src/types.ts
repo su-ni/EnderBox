@@ -60,6 +60,18 @@ export type Metrics = {
 }
 
 /**
+ * 一次落盘的监控采样（后端每 10 秒记一个点，保留 12 小时）。
+ * 和 Metrics 的区别：Metrics 是**此刻**的瞬时值，这个是历史里的一个点。
+ */
+export type MetricPoint = {
+  /** Unix 秒 */
+  t: number
+  cpu: number
+  mem: number
+  players: number
+}
+
+/**
  * 类型显示名。⚠ 这张表和**后端 `fetch.Sources()` 是两份**，加类型时两边都要动：
  * 后端那份决定「能不能自动下载」，这份决定「向导里有没有这个入口」。
  * 只加后端不加这里 = 后端能下、用户在建服向导里根本选不到（Mohist 就这样漏过一次）。

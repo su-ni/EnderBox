@@ -4,6 +4,7 @@ import { Chipf, ConFoot, ConHead, Icon, Panel, SecHead, Tog } from './design'
 import { JobProgress } from './JobProgress'
 import { Empty, SkeletonList, fmtSize, fmtTime, useConfirm } from './ui'
 import { StepInput } from './StepInput'
+import { SavesPanel } from './SavesPanel'
 import type { BackupPolicy, BackupPolicyView, Instance } from '../types'
 
 const PREVIEW_RESTORE = new URLSearchParams(location.search).has('restore')
@@ -227,8 +228,9 @@ export function BackupPanel({ instance, onToast }: Props) {
         title="备份与还原"
         sub={
           <>
-            正在管「{instance.name}」的存档。服务器开着的时候备份，会先让服务端把地图刷盘再打包，
-            不会拿到半个区块。
+            正在管「{instance.name}」。服务器开着的时候备份，会先让服务端把地图刷盘再打包，
+            不会拿到半个区块。想把<b style={{ color: 'var(--ink-1)' }}>某一个</b>世界单独搬走
+            （导出 / 导入 / 切换），看最下面的「世界存档」。
             {pol && (
               <>
                 {' '}
@@ -538,6 +540,16 @@ export function BackupPanel({ instance, onToast }: Props) {
           </div>
         )}
       </Panel>
+
+      {/* 04 世界存档：单存档的搬运（导出 / 导入 / 切换当前世界）。
+          与上面三块放一起，是因为它们管的是同一件事的另一半 ——
+          备份是「回到过去某个时间点」，这里是「把某一个世界搬去别处」。 */}
+      <SavesPanel
+        instance={instance}
+        running={instance.status === 'running'}
+        onToast={onToast}
+        num="04"
+      />
 
       {/* 还原确认：点列表里的「还原」才出现，是整页风险最高的交互 */}
       {pick && (

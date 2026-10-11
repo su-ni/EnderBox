@@ -56,6 +56,8 @@ type Manager struct {
 	tasks *store.Store[taskSet]
 	// tasksRunning 正在执行的任务，按任务 ID 记。上一轮没结束就不许再进来。
 	tasksRunning map[string]bool
+	// metricsHist 监控历史（内存副本 + 周期落盘）。采样循环在 main 里起。
+	metricsHist *metricsStore
 }
 
 func NewManager(baseDir string) (*Manager, error) {
@@ -94,6 +96,7 @@ func NewManager(baseDir string) (*Manager, error) {
 		restarts:       map[string]*restartState{},
 		backupsRunning: map[string]bool{},
 		tasksRunning:   map[string]bool{},
+		metricsHist:    loadMetricsStore(baseDir),
 	}, nil
 }
 

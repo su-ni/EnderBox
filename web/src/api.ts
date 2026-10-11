@@ -6,6 +6,7 @@ import type {
   LiveAudit,
   LiveResult,
   LiveSnapshot,
+  MetricPoint,
   Metrics,
 } from './types'
 
@@ -269,6 +270,16 @@ export type McmodRelations = {
   fetchedAt?: string
   /** 后端给的提示（比如「百科没登记关系」），有就显示。 */
   note?: string
+}
+
+/** 一个世界（存档）目录。判据是目录里有 level.dat，不是目录叫 world。 */
+export type SaveInfo = {
+  /** 目录名（世界的物理标识）—— 导出 / 切换都按它，不是 level-name */
+  name: string
+  /** 是不是当前 server.properties 里 level-name 指的那个 */
+  active: boolean
+  size: number
+  files: number
 }
 
 export type BackupItem = {
@@ -1106,6 +1117,51 @@ async function postForm<T>(path: string, fd: FormData): Promise<T> {
   return r.json() as Promise<T>
 }
 
+/**
+ * 带进度的表单上传。
+ *
+ * 用 XHR 而不是 fetch：**fetch 拿不到上传进度**（请求体的流式上传在浏览器里支持得还不全），
+ * 于是「传一个几百 MB 的世界到底走到哪了、是不是卡住了」只能靠猜 —— 猜错的下场是用户
+ * 以为卡死、中途关掉，留一个半截文件。
+ *
+ * path 是**完整路径**（含 /api 前缀），因为 XHR 不走 req 那层封装。
+ */
+export function uploadFormWithProgress<T>(
+  path: string,
+  fd: FormData,
+  onPct?: (pct: number) => void,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', path)
+    if (onPct) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onPct(Math.round((e.loaded / e.total) * 100))
+      }
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as T)
+        } catch {
+          resolve({} as T)
+        }
+        return
+      }
+      let msg = ''
+      try {
+        msg = (JSON.parse(xhr.responseText) as { error?: string }).error ?? ''
+      } catch {
+        /* 不是 JSON（代理 / 网关的错误页）就用状态码兜底 */
+      }
+      reject(new Error(msg || `上传失败（HTTP ${xhr.status}）`))
+    }
+    xhr.onerror = () => reject(new Error('上传失败：网络中断'))
+    xhr.onabort = () => reject(new Error('上传已中断'))
+    xhr.send(fd)
+  })
+}
+
 const enc = encodeURIComponent
 
 /** 制作整合包的入参。空值会被 queryOf 丢掉（不发给后端）。 */
@@ -1304,6 +1360,17 @@ export const api = {
 
   metrics: (id: string) => req<Metrics>(`/instances/${id}/metrics`),
 
+  /**
+   * 监控历史（概览页曲线的初值）。
+   *
+   * 曲线原来完全由前端自己攒 —— 刷新、切实例、隔天再打开都从零开始。
+   * 有了它，打开页面就能看到「之前那段时间什么样」。points 恒为 []（可以直读 .length）。
+   */
+  metricsHistory: (id: string, minutes = 60) =>
+    req<{ points: MetricPoint[]; intervalSec: number; minutes: number }>(
+      `/instances/${id}/metrics/history?minutes=${minutes}`,
+    ),
+
   logHistory: (id: string) => req<string[]>(`/instances/${id}/logs/history`),
 
   // ── 插件 / 模组 ──
@@ -1479,6 +1546,38 @@ export const api = {
 
   saveBackupPolicy: (id: string, p: BackupPolicy) =>
     req<BackupPolicyView>(`/instances/${id}/backup-policy`, jsonInit('PUT', p)),
+
+  // ── 存档（世界）搬运 ──
+  /**
+   * 列出实例目录里所有世界目录。判据是目录里有 level.dat ——
+   * 所以 logs/、config/ 这类目录不会混进来。active 是当前 level-name 指的那个。
+   */
+  saves: (id: string) => req<{ items: SaveInfo[]; active: string }>(`/instances/${id}/saves`),
+
+  /** 异步：回 jobId，真结果要轮询 /api/jobs/{id}（result = { world, name, size }）。 */
+  saveExport: (id: string, name: string) =>
+    req<{ jobId: string }>(`/instances/${id}/saves/${enc(name)}/export`, { method: 'POST' }),
+
+  /** 导出 zip 的下载直链（走 Cookie 会话，浏览器自己带上，前端不拼任何鉴权）。 */
+  saveDownloadUrl: (id: string, file: string) =>
+    `/api/instances/${id}/saves/download/${enc(file)}`,
+
+  /**
+   * 导入一个存档 zip。上传本身走 XHR 报进度；解压在后台跑，回 jobId
+   * （result = { world, files, size }）。
+   */
+  saveImport: (id: string, name: string, f: File, onPct?: (pct: number) => void) => {
+    const fd = new FormData()
+    fd.append('file', f)
+    fd.append('name', name)
+    return uploadFormWithProgress<{ jobId: string }>(`/api/instances/${id}/saves/import`, fd, onPct)
+  },
+
+  /** 切换当前生效的世界。必须停服 —— 运行中后端回 409（reason=running）。 */
+  saveActivate: (id: string, name: string) =>
+    req<{ ok: boolean; active: string }>(`/instances/${id}/saves/${enc(name)}/activate`, {
+      method: 'POST',
+    }),
 
   // ── 计划任务 ──
   tasks: (id: string) => req<{ items: TaskView[] }>(`/instances/${id}/tasks`),

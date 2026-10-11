@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/su-ni/EnderBox/internal/jobs"
 )
 
 // JDK 归档的解压与安装。单独一个文件是因为这是纯文件操作，
@@ -52,22 +54,56 @@ func extractZip(archivePath, destDir string) error {
 // extractZipTo 解压 zip。stripPrefix 非空时只解压该前缀下的条目，并把前缀去掉
 // —— 文件管理器用它剥掉「整合包里多套的那一层文件夹」。
 func extractZipTo(archivePath, destDir, stripPrefix string) error {
+	return extractZipToProgress(archivePath, destDir, stripPrefix, nil)
+}
+
+// zipEntryName 按 stripPrefix 规则算出条目在目标目录里的相对名。ok=false 表示这条要跳过。
+func zipEntryName(raw, stripPrefix string) (string, bool) {
+	if stripPrefix == "" {
+		return raw, true
+	}
+	if !strings.HasPrefix(raw, stripPrefix) {
+		return "", false
+	}
+	n := strings.TrimPrefix(raw, stripPrefix)
+	if n == "" {
+		return "", false
+	}
+	return n, true
+}
+
+// extractZipToProgress 是 extractZipTo 的带进度版本（onProgress 为 nil 则静默）。
+//
+// 为什么需要它：存档导入是分钟级操作（大世界几十万个区块文件），没有进度
+// 用户不知道到底在解还是卡死了。分母取 zip 条目 UncompressedSize 之和 —— 那是
+// 解压后真正要落盘的字节数，比压缩包大小更贴近「还剩多少」的体感。
+func extractZipToProgress(archivePath, destDir, stripPrefix string, onProgress jobs.ProgressFunc) error {
 	zr, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return fmt.Errorf("打开压缩包失败（文件可能没下完整）：%w", err)
 	}
 	defer zr.Close()
 
+	// 先扫一遍算分母：被 stripPrefix 滤掉的条目、目录项都不该进分母。
+	var total int
+	var totalBytes int64
 	for _, f := range zr.File {
-		name := f.Name
-		if stripPrefix != "" {
-			if !strings.HasPrefix(name, stripPrefix) {
-				continue
-			}
-			name = strings.TrimPrefix(name, stripPrefix)
-			if name == "" {
-				continue
-			}
+		if _, ok := zipEntryName(f.Name, stripPrefix); !ok || f.FileInfo().IsDir() {
+			continue
+		}
+		total++
+		totalBytes += int64(f.UncompressedSize64)
+	}
+	if onProgress != nil {
+		onProgress(0, total, 0, totalBytes, "")
+	}
+
+	var done int
+	var doneBytes int64
+	for _, f := range zr.File {
+		name, ok := zipEntryName(f.Name, stripPrefix)
+		if !ok {
+			continue
 		}
 		target, err := safeJoin(destDir, name)
 		if err != nil {
@@ -92,6 +128,11 @@ func extractZipTo(archivePath, destDir, stripPrefix string) error {
 		rc.Close()
 		if werr != nil {
 			return werr
+		}
+		done++
+		doneBytes += int64(f.UncompressedSize64)
+		if onProgress != nil {
+			onProgress(done, total, doneBytes, totalBytes, name)
 		}
 	}
 	return nil

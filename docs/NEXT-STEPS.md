@@ -1409,3 +1409,64 @@ modpackOps→internal/jobs 迁移中途停摆，留了一棵编译不过的树�
   + `GET /saves/download/{file}`（ServeFile，Content-Disposition 带 RFC5987 中文兜底）。
   校验在起作业前做（存档不存在→400、实例没了→404）；世界名两道防穿越。
   真机验证：world 25 文件/13.6MB → 导出 zip 10.1MB，下载落盘是合法 zip 含 level.dat；不存在文件 404、`..%2F` 400。
+- ✅ 切片 3+4 + 前端（10-11 03:3x 完成）：导入与切换。
+
+  **切片 3 · 导入**：`POST /api/instances/{id}/saves/import`（multipart：`file`=zip、`name`=世界名）。
+  流程是「预检名字/重名 → **先抢作业闸再落盘**（闸被占时当场 409，不白写几十 MB）→ 落临时 zip →
+  `save-import` 作业 → 202+jobId」。解压**先到 `<名字>.enderbox-import.tmp` 再 rename 转正** ——
+  失败一律清干净，绝不留半个「看着像导入成功、实际缺 level.dat」的目录。
+
+  ⚠ 剥层必须用新增的 `soleTopDir()`，**不能**用整合包那套 `singleRootPrefix()`：后者把 `world/`
+  当 layoutDirs 而不剥（那是为「整合包并进实例目录」设计的），用户会拿到 `world/world/level.dat`。
+  判据只看**有内容的条目** —— 打包工具顺手塞的空目录项不参与，否则「唯一顶层目录」会误判成两个。
+  回归测试 `TestSoleTopDir` 里「夹着无关空目录项」那条抓的就是这个。
+
+  进度：`extractZipToProgress()`（`archive.go`，`extractZipTo` 的带进度版，互不破坏），
+  分母用 zip 条目的 `UncompressedSize` 之和 —— 那是解压后真正要落盘的字节数，比压缩包大小准。
+
+  **切片 4 · 切换**：`POST /api/instances/{id}/saves/{name}/activate`。停服校验走哨兵
+  `daemon.ErrSaveNeedsStop` → 409 `reason=running`（照 #30 的教训：要分流状态码的错误，产生处就得包哨兵）；
+  目标世界必须**真的存在**（含 level.dat），否则下次开服会静默生成一个空的新世界。实际改的是 `level-name`。
+
+  **前端**：`SavesPanel.tsx` 挂在文件页的文件面板之后（`FileManager.tsx` 一行引用）；`api.ts` 补 saves 组
+  + 通用 `uploadFormWithProgress()`（XHR —— fetch 拿不到上传进度，大世界传没传完只能靠猜）。
+
+  **真机验收**：列表 world/active/25 文件/13.6MB；导入 202 → job done（2/2、2059/2059 双口径、
+  `result{files,size,world}`、**stage 已清空**）；重名 400、非法名 400、未知实例 404、切换不存在 400；
+  切换 200 且 `level-name` 真落盘（读回 server.properties 核对）；**运行中切换 409 + reason=running**
+  （起了真 Forge 服测的）。探测产物 smoke-imported 已删、level-name 已恢复 `world`。
+  前端 1440/520 存档块 + 导入表单展开态截图核对；sweep 41/42（backup@520 偶发量不到，单页复测通过）。
+
+- ⚠ **并行 agent 冲突（本轮实锤，第二次）**：codex 期间在 `daemon/saves.go` **追加**了另一套导入
+  （`ImportSaveFromZip` + `ImportResult`）与路由 `/saves/upload`，且漏了 `io` import 导致整棵树编译不过。
+  已合并成一条路：保留原子的 `ImportSave`（tmp+rename），吸收它「剥层只看文件条目」的精度与
+  「先抢作业闸再落盘」的顺序，删掉重复的那一套。
+  **教训：并行 agent 会在同一文件里追加等价实现（不是覆盖），收工前必须 grep 同义函数名确认只有一条路。**
+  判定方法同前：`stat -c '%y %n'` 看 mtime 落在自己操作之外 + `git status` 冒出新文件。
+- ⚠ 遗留（**非我方产物**）：实例 `i1791122149514` 目录下有并行 agent 留下的 `importprobe/`（6KB/3 文件）
+  探测存档，未擅自删除（可能是对方还在用的验证数据）。
+
+### 监控历史落盘 —— 完成（后端 03:5x 凌晨 / 前端接线 15:0x 收尾）
+
+**后端**：每 10s 给在跑的实例记一点、每 60s 原子落盘（tmp+rename）到 `data/metrics.json`
+（**刻意不放实例目录** —— 实例目录会被整体备份带走，12h 历史白撑备份包），保留 12h；
+`GET /metrics/history?minutes=` 恒返回 [] 不 null。停着的实例**不采样**（0 会把曲线按平、
+把「什么时候真在跑」淹掉）。单测 3 条（保留窗口 / GetNeverNil / FlushRoundTrip）。
+
+**前端接线**（`App.tsx` 指标 effect）：activeId 变化时先拉 `metricsHistory(id, 60)` 铺底
+（**merge 非 replace** —— 抢跑进来的 1-2 个实时点不能丢），实时采样再往上叠；cap 360 点
+（= 1h@10s；`Spark` 反正会重采样成 40 点，几何不受密度影响）。**停着不灌 0**：前端镜像
+守护进程的哲学 —— 否则把页面留在停服实例上十几分钟，真历史会被 0 一节节冲掉。
+峰值（peakCpu/peakMem）原本就从 hist 数组现算 → 铺底后自动变成「跨刷新的峰值」，零额外代码。
+`api.ts` 补 `MetricPoint` import（凌晨漏了，tsc 就挂在这）。
+
+**验证**：`probe_metrichist.mjs` 5/5（561ms 铺底到位 / 无重复铺设 / **刷新不归零** / 无缩水 / PID 对口）；
+`probe_metrichist_frozen.mjs` 5/5（真实停服 → 12s 严格冻结 30→30 → 重开 12s 恢复 34、PID 换新对口）；
+`tsc` + `go build/test` 全绿；sweep 42/42 零溢出；构建后 bundle `BKTqImcu`。
+截图 `F:/tmp/metrichist-{load,reload,stopped,resumed}.png`。
+
+**观察（非本次 bug，留待决策）**：MEMORY 走进程 RSS 口径，Windows 在内存吃紧时会修剪工作集 ——
+实测抓到一条 1.5GB→15MB→回升 的锯齿（时机正对无头 Chrome 启动）。瞬时值一直如此（老特性），
+但现在会进历史曲线；要不要换更稳的口径（如提交内存）由用户定。
+
+**收尾状态**：实例 `i1791122149514`（10086）保持 running —— 用户打开面板即可看到曲线继续长。

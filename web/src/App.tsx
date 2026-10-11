@@ -75,7 +75,10 @@ function initialPage(): Page {
 }
 
 const POLL_MS = 3000
-const HISTORY = 60
+/** 曲线铺底向守护进程要多少分钟历史（它保留 12h；1h 够看，一次拉完也够快）。 */
+const HIST_MINUTES = 60
+/** 曲线最多留多少个采样点：1 小时历史（10s 一点）正好 360 点，取齐。 */
+const HISTORY = 360
 
 export default function App() {
   const [instances, setInstances] = useState<Instance[]>([])
@@ -162,7 +165,8 @@ export default function App() {
     if (wasDown && !down) setToast('已重新连上守护进程')
   }, [online, probed])
 
-  // 指标轮询：只采当前选中的实例；峰值在客户端攒，后端不存历史
+  // 指标轮询：只采当前选中的实例。曲线先拿后端历史铺底，再叠实时采样 ——
+  // 刷新、切实例、隔天再打开，都从「刚才发生过什么」续上，而不是从零攒。
   useEffect(() => {
     setMetrics(null)
     setHistCpu([])
@@ -171,11 +175,32 @@ export default function App() {
     if (!activeId) return
 
     let alive = true
+
+    // 铺底：一次拉到最近 1 小时的点（10s 一个）。拿不到（旧后端/网络抖）就
+    // 退化成原来的「从零攒」—— 这不是错误路径，不弹提示。
+    // ⚠ 用 merge 不是 replace：铺底请求回来前的 1-2 个实时点已经进数组了，不能丢；
+    //   历史在前、实时在后，顺序天然就是对的。
+    api
+      .metricsHistory(activeId, HIST_MINUTES)
+      .then((h) => {
+        if (!alive) return
+        const pts = h.points ?? []
+        if (!pts.length) return
+        setHistCpu((cur) => [...pts.map((p) => p.cpu), ...cur].slice(-HISTORY))
+        setHistMem((cur) => [...pts.map((p) => p.mem), ...cur].slice(-HISTORY))
+        setHistPlayers((cur) => [...pts.map((p) => p.players), ...cur].slice(-HISTORY))
+      })
+      .catch(() => {})
+
     const tick = async () => {
       try {
         const m = await api.metrics(activeId)
         if (!alive) return
         setMetrics(m)
+        // 停着的时候不往曲线里灌 0 —— 守护进程采样时就刻意跳过停着的实例
+        //（「0 会把曲线按平、把『什么时候真在跑』淹掉」），前端照做：
+        // 否则把页面留在停服的实例上十几分钟，之前那段真历史会被 0 一节节冲掉。
+        if (!m.running) return
         setHistCpu((h) => [...h, m.cpu].slice(-HISTORY))
         setHistMem((h) => [...h, m.memUsed].slice(-HISTORY))
         setHistPlayers((h) => [...h, m.players].slice(-HISTORY))

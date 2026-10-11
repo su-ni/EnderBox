@@ -61,6 +61,10 @@ func main() {
 	// 它内部会先等 20 秒再开始看 —— 别和 AutoStartAll 抢磁盘。
 	mgr.StartScheduler()
 
+	// 监控历史采样：每 10 秒给在跑的实例记一个点，每分钟落一次盘。
+	// 它自己会先等 5 秒 —— 同样是为了别和 AutoStartAll 抢。
+	mgr.StartMetricsHistory()
+
 	log.Printf("EnderBox %s 守护进程已启动，数据目录 %s", version, *dir)
 
 	// 前端产物嵌在二进制里。没打包的话这里的 dist 只有一份占位说明页 ——

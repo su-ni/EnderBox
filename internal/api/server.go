@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/su-ni/EnderBox/internal/daemon"
@@ -59,6 +60,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/instances/{id}/kill", s.kill)
 	mux.HandleFunc("POST /api/instances/{id}/command", s.command)
 	mux.HandleFunc("GET /api/instances/{id}/metrics", s.metrics)
+	mux.HandleFunc("GET /api/instances/{id}/metrics/history", s.metricsHistory)
 	mux.HandleFunc("GET /api/instances/{id}/logs/history", s.logHistory)
 	mux.HandleFunc("GET /api/instances/{id}/logs", s.logs)
 
@@ -207,6 +209,31 @@ func (s *Server) command(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, s.mgr.Metrics(r.PathValue("id")))
+}
+
+// metricsHistory 某实例最近一段时间的采样点，供概览页在打开/刷新时先把曲线画出来。
+//
+// 为什么要有它：曲线原来完全由前端自己攒 —— 刷新一下就从零开始，切个实例再切回来也是。
+// 历史落盘之后，这里负责把「打开这一页之前发生过什么」补上。
+// ⚠ points 恒为 []（后端保证了），前端可以直接 .length。
+func (s *Server) metricsHistory(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if _, ok := s.mgr.Get(id); !ok {
+		writeErr(w, 404, "实例不存在")
+		return
+	}
+	minutes := 60
+	if v := r.URL.Query().Get("minutes"); v != "" {
+		// 解析不了就按默认来 —— 这是个只读的展示参数，不值得为它回 400。
+		if n, err := strconv.Atoi(v); err == nil {
+			minutes = n
+		}
+	}
+	writeJSON(w, 200, map[string]any{
+		"points":      s.mgr.MetricsHistory(id, minutes),
+		"intervalSec": daemon.MetricIntervalSec(),
+		"minutes":     minutes,
+	})
 }
 
 // logHistory 一次性返回日志快照，给不建立长连接的场景用（截图、静态预览）
